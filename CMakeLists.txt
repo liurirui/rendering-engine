@@ -1,0 +1,31 @@
+cmake_minimum_required (VERSION 3.6)
+
+set (CMAKE_CXX_STANDARD 11)
+set (CMAKE_CXX_STANDARD_REQUIRED ON)
+
+#第四位为0为正式包
+project(RenderEngine VERSION 1.0.0.0)
+
+
+
+set (ENGINE_LIB_PATH "${PROJECT_SOURCE_DIR}/src")
+set (THIRDPARTY_PATH "${PROJECT_SOURCE_DIR}/src/3rdparty")
+
+set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}")
+set (CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} "${PROJECT_SOURCE_DIR}")
+
+set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${ENGINE_LIB_PATH}")
+set (CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} "${ENGINE_LIB_PATH}")
+
+set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${THIRDPARTY_PATH}")
+set (CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} "${THIRDPARTY_PATH}")
+
+
+include ("${PROJECT_SOURCE_DIR}/FilterFolder.cmake")
+
+add_subdirectory("${THIRDPARTY_PATH}/glad")
+add_subdirectory("${THIRDPARTY_PATH}/stb_image")
+
+add_subdirectory("${PROJECT_SOURCE_DIR}/src/Engine")
+
+add_subdirectory("${PROJECT_SOURCE_DIR}/src/Example")
