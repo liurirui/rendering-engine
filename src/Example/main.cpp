@@ -123,7 +123,7 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
     openGLRenderContext->windowsWidth = SRC_WIDTH;
     openGLRenderContext->windowsHeight = SRC_HEIGHT;
 
-    BasePassRenderer* basePassRenderer = new BasePassRenderer;
+    //BasePassRenderer* basePassRenderer = new BasePassRenderer;
 
     MeshRenderer* meshRenderer = new MeshRenderer("E:/learnRenderC++/resources/objects/nanosuit/nanosuit.obj");
 
@@ -164,7 +164,7 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
         glfwPollEvents();
     }
 
-    delete basePassRenderer;
+    //delete basePassRenderer;
     delete meshRenderer;
     delete openGLRenderContext;
 
