@@ -18,7 +18,11 @@ extern const char* Frag_highlight;
 
 extern const char* Frag_blur;
 
-extern const char* Frag_last;
+extern const char* Frag_Radialblur;
+
+extern const char* Frag_Motionblur;
+
+extern const char* Frag_bloom;
 
 extern const char* Vert_quad;
 

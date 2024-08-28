@@ -321,7 +321,56 @@ void main()
 }
 )";
 
-const char* Frag_last = R"(
+const char* Frag_Radialblur = R"(
+#version 330 core
+layout (location = 0) out vec4 FragColor;
+
+in vec2 TexCoords;
+
+uniform sampler2D sceneTexture;
+uniform vec2 center; 
+uniform float strength;
+
+void main() {
+    vec2 dir = TexCoords - center; 
+    vec4 color = texture(sceneTexture, TexCoords);
+
+    float totalWeight = 1.0;
+    for (float i = 1.0; i <= 10.0; i++) {
+        vec2 offset = dir * (i / 10.0) * strength;
+        color += texture(sceneTexture, TexCoords - offset) * 0.1;
+        totalWeight += 0.1;
+    }
+
+    FragColor = color / totalWeight; 
+}
+)";
+
+const char* Frag_Motionblur = R"(
+#version 330 core
+layout (location = 0) out vec4 FragColor;
+
+in vec2 TexCoords;
+
+uniform sampler2D sceneTexture;
+uniform vec2 motionDirection; // 运动方向，(x, y) 偏移
+
+void main() {
+    vec4 color = texture(sceneTexture, TexCoords); // 当前像素的颜色
+
+    // 模拟运动模糊，通过叠加多个样本
+    float totalWeight = 1.0;
+    for (float i = 1.0; i <= 10.0; i++) {
+        vec2 offset = motionDirection * (i / 10.0);
+        color += texture(sceneTexture, TexCoords - offset) * 0.1;
+        totalWeight += 0.1;
+    }
+
+    FragColor = color / totalWeight; // 平均化结果
+}
+)";
+
+const char* Frag_bloom = R"(
 #version 330 core
 layout (location = 0) out vec4 FragColor;
 

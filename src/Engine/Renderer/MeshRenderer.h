@@ -16,57 +16,40 @@ class MeshRenderer {
 public:
     MeshRenderer(const std::string& modelPath);
     ~MeshRenderer();
-    float time;
     virtual void render(Camera* camera, RenderGraph& rg);
-    unsigned int getTargetColorTexture(int  attachment);
+    unsigned int getTargetColorTextureID(int  attachment);
+    Texture2D* getTargetColorTexture(int  attachment);
 
 private:
     //shader
     TRefCountPtr<Shader> lightingShader;
-    TRefCountPtr<Shader> hight_lightingShader;
     TRefCountPtr<Shader> lightingShader_cube;
-    TRefCountPtr<Shader> cartoonShader;
-    TRefCountPtr<Shader> blurShader;
-    TRefCountPtr<Shader> lastShader;
 
-    unordered_map<std::string, Texture2D*> ColorTextureMap;
-    vector<glm::vec3> lightPositions;
-    vector<glm::vec3> lightColors;
+    //FBO
     FrameBufferInfo OriginFramebuffer;
-    FrameBufferInfo HightLightFramebuffer;
-    FrameBufferInfo CartoonFramebuffer;
-    FrameBufferInfo PingpongFramebuffer[2];
-    FrameBufferInfo LastFramebuffer;
 
-    GraphicsPipeline graphicsPipeline1, graphicsPipeline2;
-    DepthStencilState depthStencilState;
+    //texture
+    unordered_map<std::string, Texture2D*> ColorTextureMap;
     Texture2D* fboColorTexture = nullptr;
-    Texture2D* fboBrightTexture = nullptr;
     Texture2D* fboDepthTexture = nullptr;
-    Texture2D* fboCartoonColorTexture = nullptr;
-    Texture2D* fboCartoonDepthTexture = nullptr;
-    Texture2D* fbopingpongColorTexture[2];
-    Texture2D* fbopingpongDepthTexture[2];
-    Texture2D* fbolastColorTexture = nullptr;
-
-    const unsigned int SCR_WIDTH = 800;
-    const unsigned int SCR_HEIGHT = 600;
     Texture2D* baseTexture = nullptr;
     Texture2D* normalTexture = nullptr;
+
+    //Render pipeline status
+    GraphicsPipeline graphicsPipeline;
+    DepthStencilState depthStencilState;
+    
+    const unsigned int SCR_WIDTH = 800;
+    const unsigned int SCR_HEIGHT = 600;
+    
     Model* modelSample = nullptr;
     Model* modelSample1 = nullptr;
     Model* modelSample2 = nullptr;
-    float quadVertices[24] = {
-        // positions   // texCoords
-        -1.0f,  1.0f,  0.0f, 1.0f,
-        -1.0f, -1.0f,  0.0f, 0.0f,
-         1.0f, -1.0f,  1.0f, 0.0f,
 
-        -1.0f,  1.0f,  0.0f, 1.0f,
-         1.0f, -1.0f,  1.0f, 0.0f,
-         1.0f,  1.0f,  1.0f, 1.0f
-    };
-    unsigned int VBO = 0, quadVAO = 0,cubeVAO=0,cubeVBO=0;
+    //cube
+    vector<glm::vec3> lightPositions;
+    vector<glm::vec3> lightColors;
+    unsigned int cubeVAO=0,cubeVBO=0;
     float cubevertices[288] = {
         // back face
         -1.0f, -1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 0.0f, 0.0f, // bottom-left
