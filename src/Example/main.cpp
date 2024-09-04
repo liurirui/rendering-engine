@@ -124,8 +124,8 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
     openGLRenderContext->windowsWidth = SRC_WIDTH;
     openGLRenderContext->windowsHeight = SRC_HEIGHT;
 
-    //BasePassRenderer* basePassRenderer = new BasePassRenderer;
-
+    BasePassRenderer* basePassRenderer = new BasePassRenderer;
+    Texture2D* texture = new Texture2D("E:/learnRenderC++/resources/textures/background.jpg");
     MeshRenderer* meshRenderer = new MeshRenderer("E:/learnRenderC++/resources/objects/nanosuit/nanosuit.obj");
     PostProcessRenderer* postprocessRenderer = new PostProcessRenderer;
     // render loop
@@ -146,18 +146,19 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
         
         //basePassRenderer->render(&camera, renderGraph);
         meshRenderer->render(&camera, renderGraph);
-        postprocessRenderer->render(renderGraph, meshRenderer->getTargetColorTexture(0));
+        postprocessRenderer->render(renderGraph, meshRenderer->getTargetFrameBuffer());
         renderGraph.execute(openGLRenderContext);
 
         glDisable(GL_DEPTH_TEST); // disable depth test so screen-space quad isn't discarded due to depth test.
+        glDepthMask(GL_FALSE);
         glDisable(GL_CULL_FACE);
         screenShader->use();
         glBindVertexArray(quadVAO);
 
         glActiveTexture(GL_TEXTURE0);
         //glBindTexture(GL_TEXTURE_2D, basePassRenderer->getTargetColorTexture(0));	// use the color attachment texture as the texture of the quad plane
-        glBindTexture(GL_TEXTURE_2D, meshRenderer->getTargetColorTextureID(0));
-        //glBindTexture(GL_TEXTURE_2D, postprocessRenderer->getTargetColorTextureID(0));
+        //glBindTexture(GL_TEXTURE_2D, meshRenderer->getTargetColorTextureID(0));
+        glBindTexture(GL_TEXTURE_2D, postprocessRenderer->getTargetColorTextureID(0));
         glDrawArrays(GL_TRIANGLES, 0, 6);
 
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
@@ -166,8 +167,8 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
         glfwPollEvents();
     }
 
-    //delete basePassRenderer;
-    
+    delete basePassRenderer;
+    delete texture;
     delete meshRenderer;
     delete postprocessRenderer;
     delete openGLRenderContext;

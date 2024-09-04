@@ -11,13 +11,16 @@
 NAMESPACE_START
 MeshRenderer::MeshRenderer(const std::string& modelPath) {
     depthStencilState.depthTest = true;
+    depthStencilState.depthWrite = true;
     modelSample = new Model(modelPath);
     string modelPath1 = "E:/download_model/cat_mask.fbx";
     modelSample1 = new Model(modelPath1);
     string modelPath2 = "E:/download_model/glass_11_2.fbx";
     modelSample2 = new Model(modelPath2);
+
     lightingShader = TRefCountPtr<Shader>(new Shader(Vertmodel_lighting, Fragmodel_lighting));
     lightingShader_cube= TRefCountPtr<Shader>(new Shader(Vertmodel_lighting, Fragmodel_cube));
+
     ColorTextureMap["hands"] = RenderContext::getInstance()->loadTexture2D("E:/learnRenderC++/resources/objects/nanosuit/hand_dif.png");
     ColorTextureMap["Visor"] = RenderContext::getInstance()->loadTexture2D("E:/learnRenderC++/resources/objects/nanosuit/glass_dif.png");
     ColorTextureMap["Body"] = RenderContext::getInstance()->loadTexture2D("E:/learnRenderC++/resources/objects/nanosuit/body_dif.png");
@@ -74,6 +77,8 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
         lightingShader_cube.getPtr()->use();
         lightingShader_cube.getPtr()->setMat4("projection", projection);
         lightingShader_cube.getPtr()->setMat4("view", view);
+
+        //render light cube
         for (int i = 0; i < lightPositions.size(); i++) {
             light_model = glm::mat4(1.0f);
             light_model = glm::translate(light_model, glm::vec3(lightPositions[i]));
@@ -83,6 +88,7 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
             renderContext->bindVertexBuffer(cubeVAO);
             renderContext->drawArrays(0, 36);
         }
+        int errorCode = glGetError();
         lightingShader.getPtr()->use();
         lightingShader.getPtr()->setMat4("projection", projection);
         lightingShader.getPtr()->setMat4("view", view);
@@ -108,6 +114,7 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
         lightingShader.getPtr()->setVec3("point[3].Color", lightColors[3]);
         bool IsGlass = false;
         lightingShader.getPtr()->setInt("baseTexture", 0);
+        //render first model
         for (const Mesh* mesh : modelSample->meshes) {
             if (ColorTextureMap.find(mesh->nowName) != ColorTextureMap.end()) {
                 if (mesh->nowName == "Visor") {
@@ -121,20 +128,15 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
             else {
                 baseTexture = nullptr;
             }
-            // 清除之前绑定的纹理和缓冲区
             renderContext->bindVertexBuffer(0);
             renderContext->bindIndexBuffer(0);
-
             lightingShader.getPtr()->setBool("isGlass", IsGlass);
-            // 设置纹理和缓冲区
             if (baseTexture) {
                 renderContext->bindTexture(baseTexture->id, 0);
+                renderContext->bindVertexBuffer(mesh->vertexAttributeBufferID);
+                renderContext->bindIndexBuffer(mesh->indexBufferID);
+                renderContext->drawElements(mesh->numTriangle * 3, 0);
             }
-            renderContext->bindVertexBuffer(mesh->vertexAttributeBufferID);
-            renderContext->bindIndexBuffer(mesh->indexBufferID);
-
-            // 渲染当前网格
-            renderContext->drawElements(mesh->numTriangle * 3, 0);
         }
 
         lightingShader.getPtr()->setBool("isGlass", true);
@@ -189,12 +191,8 @@ unsigned int MeshRenderer::getTargetColorTextureID(int  attachment) {
     return OriginFramebuffer.colorAttachments[attachment].texture->id;
 }
 
-Texture2D* MeshRenderer::getTargetColorTexture(int  attachment) {
-
-    if (attachment >= OriginFramebuffer.colorAttachments.size()) {
-        return nullptr;
-    }
-    return OriginFramebuffer.colorAttachments[attachment].texture;
+FrameBufferInfo* MeshRenderer::getTargetFrameBuffer() {
+    return &OriginFramebuffer;
 }
 
 MeshRenderer::~MeshRenderer() {

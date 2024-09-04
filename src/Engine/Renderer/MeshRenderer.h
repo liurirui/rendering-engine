@@ -18,7 +18,7 @@ public:
     ~MeshRenderer();
     virtual void render(Camera* camera, RenderGraph& rg);
     unsigned int getTargetColorTextureID(int  attachment);
-    Texture2D* getTargetColorTexture(int  attachment);
+    FrameBufferInfo* getTargetFrameBuffer();
 
 private:
     //shader

@@ -67,9 +67,11 @@ void OpenGLRenderContext::beginRendering(FrameBufferInfo& fbo) {
 
     if (fbo.depthStencilAttachment.texture) {
         if (fbo.depthStencilAttachment.action == AttachmentAction::Clear) {
+            glDepthMask(GL_TRUE);
             glClearDepth(fbo.depthStencilAttachment.depthClearValue); // 设置深度值，1.0 表示最远
             glClearStencil(fbo.depthStencilAttachment.stencilClearValue);
             glClear(GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT); // 清除深度缓冲区
+            glDepthMask(GL_FALSE);
         }
     }
 
@@ -233,7 +235,7 @@ void OpenGLRenderContext::drawElements(unsigned int count, const void* indices) 
 void OpenGLRenderContext::setDepthStencilState(const DepthStencilState& depthStencilState) {
 
     depthStencilState.depthTest ?glEnable(GL_DEPTH_TEST) : glDisable(GL_DEPTH_TEST);
-    depthStencilState.depthWrite ? glDepthMask(true) : glDepthMask(false);
+    depthStencilState.depthWrite ? glDepthMask(GL_TRUE) : glDepthMask(GL_FALSE);
 
 }
 
