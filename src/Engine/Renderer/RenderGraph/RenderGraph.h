@@ -3,7 +3,7 @@
 #ifndef RenderGraph_h
 
 #include <vector>
-#include"RenderGraphPass.h";
+#include"RenderGraphPass.h"
 
 namespace realtimerenderingengine {
     class RenderContext;

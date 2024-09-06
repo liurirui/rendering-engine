@@ -11,6 +11,8 @@ NAMESPACE_START
 
 class Camera;
 class Shader;
+class DirectionLight;
+class PointLight;
 
 class MeshRenderer {
 public:
@@ -46,9 +48,11 @@ private:
     Model* modelSample1 = nullptr;
     Model* modelSample2 = nullptr;
 
+    //light
+    DirectionLight* directiontLight;
+    vector<PointLight*> pointLights;
+
     //cube
-    vector<glm::vec3> lightPositions;
-    vector<glm::vec3> lightColors;
     unsigned int cubeVAO=0,cubeVBO=0;
     float cubevertices[288] = {
         // back face

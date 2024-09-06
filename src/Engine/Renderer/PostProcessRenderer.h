@@ -23,7 +23,7 @@ private:
     TRefCountPtr<Shader> RippleShader;
 
     //fbo
-    FrameBufferInfo HightLightFramebuffer;
+    FrameBufferInfo HighLightFramebuffer;
     FrameBufferInfo PingpongFramebuffer[2];
     FrameBufferInfo BloomFramebuffer;
     FrameBufferInfo RadialFramebuffer;

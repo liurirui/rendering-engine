@@ -125,8 +125,8 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
     openGLRenderContext->windowsHeight = SRC_HEIGHT;
 
     BasePassRenderer* basePassRenderer = new BasePassRenderer;
-    Texture2D* texture = new Texture2D("E:/learnRenderC++/resources/textures/background.jpg");
-    MeshRenderer* meshRenderer = new MeshRenderer("E:/learnRenderC++/resources/objects/nanosuit/nanosuit.obj");
+    Texture2D* texture = new Texture2D("E:/rendering-engine/resources/textures/background.jpg");
+    MeshRenderer* meshRenderer = new MeshRenderer("E:/rendering-engine/resources/objects/nanosuit/nanosuit.obj");
     PostProcessRenderer* postprocessRenderer = new PostProcessRenderer;
     // render loop
     // -----------
@@ -137,7 +137,7 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
         float currentFrame = static_cast<float>(glfwGetTime());
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
-        //meshRenderer->time = currentFrame;
+ 
         // input
         // -----
         processInput(window);

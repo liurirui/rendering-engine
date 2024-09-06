@@ -26,7 +26,7 @@ PostProcessRenderer::PostProcessRenderer() {
     brightAttachment.attachment = 0;
     brightAttachment.texture = fboBrightTexture;
     brightAttachment.clearColor = glm::vec4(0, 1, 0, 1);
-    HightLightFramebuffer.colorAttachments.emplace_back(std::move(brightAttachment));
+    HighLightFramebuffer.colorAttachments.emplace_back(std::move(brightAttachment));
     PostProcessRenderer_graphicsPipeline.shader = HightLightShader.getPtr();
     PipelineColorBlendAttachment pipelineColorBlendAttachment;
     pipelineColorBlendAttachment.blendState.enabled = false;
@@ -114,7 +114,7 @@ void PostProcessRenderer::render(RenderGraph& rg, FrameBufferInfo* sceneFBO) {
     rg.addPass(bloomPassName, sceneFBO, [this, sceneFBO](RenderContext* renderContext) {
         //get high light
         PostProcessRenderer_graphicsPipeline.shader = HightLightShader.getPtr();
-        renderContext->beginRendering(HightLightFramebuffer);
+        renderContext->beginRendering(HighLightFramebuffer);
         renderContext->setDepthStencilState(PostProcessRenderer_depthStencilState);
         renderContext->bindPipeline(PostProcessRenderer_graphicsPipeline);
         HightLightShader.getPtr()->use();
@@ -132,7 +132,7 @@ void PostProcessRenderer::render(RenderGraph& rg, FrameBufferInfo* sceneFBO) {
         BlurShader.getPtr()->use();
         BlurShader.getPtr()->setInt("horizontal", horizontal);
         BlurShader.getPtr()->setInt("image", 0);
-        renderContext->bindTexture(HightLightFramebuffer.colorAttachments[0].texture->id, 0);
+        renderContext->bindTexture(HighLightFramebuffer.colorAttachments[0].texture->id, 0);
         renderContext->bindVertexBuffer(quadVAO);
         renderContext->drawArrays(0, 6);
     
@@ -245,10 +245,10 @@ void PostProcessRenderer::render(RenderGraph& rg, FrameBufferInfo* sceneFBO) {
 }
 unsigned int PostProcessRenderer::getTargetColorTextureID(int  attachment) {
 
-    if (attachment >= MotionFramebufferA.colorAttachments.size()) {
+    if (attachment >= BloomFramebuffer.colorAttachments.size()) {
         return 0;
     }
-    return MotionFramebufferA.colorAttachments[attachment].texture->id;
+    return BloomFramebuffer.colorAttachments[attachment].texture->id;
 }
 
 PostProcessRenderer::~PostProcessRenderer() {

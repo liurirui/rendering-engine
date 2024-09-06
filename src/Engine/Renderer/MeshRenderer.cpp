@@ -2,6 +2,7 @@
 #include "Base/ShaderCode.h"
 #include "Base/Shader.h"
 #include "Base/Camera.h"
+#include "Base/Light.h"
 #include "RenderGraph/RenderGraph.h"
 
 #include <glm/glm.hpp>
@@ -21,14 +22,14 @@ MeshRenderer::MeshRenderer(const std::string& modelPath) {
     lightingShader = TRefCountPtr<Shader>(new Shader(Vertmodel_lighting, Fragmodel_lighting));
     lightingShader_cube= TRefCountPtr<Shader>(new Shader(Vertmodel_lighting, Fragmodel_cube));
 
-    ColorTextureMap["hands"] = RenderContext::getInstance()->loadTexture2D("E:/learnRenderC++/resources/objects/nanosuit/hand_dif.png");
-    ColorTextureMap["Visor"] = RenderContext::getInstance()->loadTexture2D("E:/learnRenderC++/resources/objects/nanosuit/glass_dif.png");
-    ColorTextureMap["Body"] = RenderContext::getInstance()->loadTexture2D("E:/learnRenderC++/resources/objects/nanosuit/body_dif.png");
-    ColorTextureMap["Helmet"] = RenderContext::getInstance()->loadTexture2D("E:/learnRenderC++/resources/objects/nanosuit/helmet_diff.png");
-    ColorTextureMap["Legs"] = RenderContext::getInstance()->loadTexture2D("E:/learnRenderC++/resources/objects/nanosuit/leg_dif.png");
-    ColorTextureMap["Arms"] = RenderContext::getInstance()->loadTexture2D("E:/learnRenderC++/resources/objects/nanosuit/arm_dif.png");
-    ColorTextureMap["glass"] = RenderContext::getInstance()->loadTexture2D("E:/learnRenderC++/resources/textures/skybox/back.jpg");
-    ColorTextureMap["app"] = RenderContext::getInstance()->loadTexture2D("E:/learnRenderC++/resources/textures/background.jpg");
+    ColorTextureMap["hands"] = RenderContext::getInstance()->loadTexture2D("E:/rendering-engine/resources/objects/nanosuit/hand_dif.png");
+    ColorTextureMap["Visor"] = RenderContext::getInstance()->loadTexture2D("E:/rendering-engine/resources/objects/nanosuit/glass_dif.png");
+    ColorTextureMap["Body"] = RenderContext::getInstance()->loadTexture2D("E:/rendering-engine/resources/objects/nanosuit/body_dif.png");
+    ColorTextureMap["Helmet"] = RenderContext::getInstance()->loadTexture2D("E:/rendering-engine/resources/objects/nanosuit/helmet_diff.png");
+    ColorTextureMap["Legs"] = RenderContext::getInstance()->loadTexture2D("E:/rendering-engine/resources/objects/nanosuit/leg_dif.png");
+    ColorTextureMap["Arms"] = RenderContext::getInstance()->loadTexture2D("E:/rendering-engine/resources/objects/nanosuit/arm_dif.png");
+    ColorTextureMap["glass"] = RenderContext::getInstance()->loadTexture2D("E:/rendering-engine/resources/textures/skybox/back.jpg");
+    ColorTextureMap["app"] = RenderContext::getInstance()->loadTexture2D("E:/rendering-engine/resources/textures/background.jpg");
 
     //set  Originframebuffer's Texture Attachments
     fboColorTexture = RenderContext::getInstance()->createTexture2D(TextureUsage::RenderTarget, TextureFormat::RGBA32F, RenderContext::getInstance()->windowsWidth,
@@ -55,14 +56,12 @@ MeshRenderer::MeshRenderer(const std::string& modelPath) {
         RenderContext::getInstance()->setUpVertexBufferLayoutInfo(cubeVBO, cubeVAO, 3, 8 * sizeof(float), 1, 3);
         RenderContext::getInstance()->setUpVertexBufferLayoutInfo(cubeVBO, cubeVAO, 2, 8 * sizeof(float), 2, 6);
     }
-    lightPositions.push_back(glm::vec3(0.0f, 15.0f, 1.5f));
-    lightPositions.push_back(glm::vec3(-2.0f, 0.5f, -3.0f));
-    lightPositions.push_back(glm::vec3(3.0f, 8.5f, 1.0f));
-    lightPositions.push_back(glm::vec3(-8.0f, 2.4f, -1.0f));
-    lightColors.push_back(glm::vec3(15.0f, 15.0f, 15.0f));
-    lightColors.push_back(glm::vec3(30.0f, 0.0f, 0.0f));
-    lightColors.push_back(glm::vec3(0.0f, 0.0f, 45.0f));
-    lightColors.push_back(glm::vec3(0.0f, 15.0f, 0.0f));
+
+    directiontLight = new DirectionLight(glm::vec3(-0.5f, -0.8f, -0.3f), glm::vec3(1.0f, 1.0f, 1.0f), 1.0f);
+    pointLights.push_back(new PointLight(glm::vec3(0.0f, 15.0f, 1.5f), glm::vec3(15.0f, 15.0f, 15.0f), 0.5f));
+    pointLights.push_back(new PointLight(glm::vec3(-2.0f, 0.5f, -3.0f), glm::vec3(30.0f, 0.0f, 0.0f), 0.4f));
+    pointLights.push_back(new PointLight(glm::vec3(3.0f, 8.5f, 1.0f), glm::vec3(0.0f, 0.0f, 45.0f), 0.3f));
+    pointLights.push_back(new PointLight(glm::vec3(-8.0f, 2.4f, -1.0f), glm::vec3(0.0f, 15.0f, 0.0f), 0.3f));
 }
 
 void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
@@ -74,22 +73,25 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
         glm::mat4 light_model=glm::mat4(1.0f);
         glm::mat4 projection = glm::perspective(glm::radians(camera->Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
         glm::mat4 view = camera->GetViewMatrix();
+        int errorCode = glGetError();
         lightingShader_cube.getPtr()->use();
+        errorCode = glGetError();
         lightingShader_cube.getPtr()->setMat4("projection", projection);
         lightingShader_cube.getPtr()->setMat4("view", view);
 
         //render light cube
-        for (int i = 0; i < lightPositions.size(); i++) {
+        for (int i = 0; i < pointLights.size(); i++) {
             light_model = glm::mat4(1.0f);
-            light_model = glm::translate(light_model, glm::vec3(lightPositions[i]));
+            light_model = glm::translate(light_model, glm::vec3(pointLights[i]->getPosition()));
             light_model = glm::scale(light_model, glm::vec3(0.25f, 0.25f, 0.25f));
             lightingShader_cube.getPtr()->setMat4("model", light_model); 
-            lightingShader_cube.getPtr()->setVec3("lightColor", lightColors[i]);
+            lightingShader_cube.getPtr()->setVec3("lightColor", pointLights[i]->getColor());
             renderContext->bindVertexBuffer(cubeVAO);
             renderContext->drawArrays(0, 36);
         }
-        int errorCode = glGetError();
+        
         lightingShader.getPtr()->use();
+        errorCode = glGetError();
         lightingShader.getPtr()->setMat4("projection", projection);
         lightingShader.getPtr()->setMat4("view", view);
         glm::mat4 model = glm::mat4(1.0f);
@@ -97,21 +99,23 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
         lightingShader.getPtr()->setMat4("model", model);
         // light properties
         lightingShader.getPtr()->setVec3("viewPos", camera->Position);
-        lightingShader.getPtr()->setVec3("light.direction", -0.5f, -0.8f, -0.3f);
-        lightingShader.getPtr()->setVec3("light.ambient", 0.3f, 0.3f, 0.3f);
-        lightingShader.getPtr()->setVec3("light.diffuse", 0.6f, 0.6f, 0.6f);
-        lightingShader.getPtr()->setVec3("light.specular", 1.0f, 1.0f, 1.0f);
+        lightingShader.getPtr()->setVec3("light.direction", directiontLight->getDirection());
+        lightingShader.getPtr()->setVec3("light.color", directiontLight->getColor());
+        lightingShader.getPtr()->setFloat("light.intensity", directiontLight->getIntensity());
+        lightingShader.getPtr()->setVec3("ambient", 0.3f, 0.3f, 0.3f);
+        lightingShader.getPtr()->setVec3("diffuse", 0.6f, 0.6f, 0.6f);
+        lightingShader.getPtr()->setVec3("specular", 1.0f, 1.0f, 1.0f);
         lightingShader.getPtr()->setVec3("objectColor", 1.0f, 1.0f, 1.0f);
         lightingShader.getPtr()->setFloat("shininess", 32.0f);
         lightingShader.getPtr()->setBool("isMirror", false);
-        lightingShader.getPtr()->setVec3("point[0].Position", lightPositions[0]);
-        lightingShader.getPtr()->setVec3("point[1].Position", lightPositions[1]);
-        lightingShader.getPtr()->setVec3("point[2].Position", lightPositions[2]);
-        lightingShader.getPtr()->setVec3("point[3].Position", lightPositions[3]);
-        lightingShader.getPtr()->setVec3("point[0].Color", lightColors[0]);
-        lightingShader.getPtr()->setVec3("point[1].Color", lightColors[1]);
-        lightingShader.getPtr()->setVec3("point[2].Color", lightColors[2]);
-        lightingShader.getPtr()->setVec3("point[3].Color", lightColors[3]);
+        for (int i = 0; i<pointLights.size(); ++i) {
+            lightingShader.getPtr()->setVec3(("point[" + std::to_string(i) + "].position").c_str(), pointLights[i]->getPosition());
+            lightingShader.getPtr()->setVec3(("point[" + std::to_string(i) + "].color").c_str(), pointLights[i]->getColor());
+            lightingShader.getPtr()->setFloat(("point[" + std::to_string(i) + "].intensity").c_str(), pointLights[i]->getIntensity());
+            lightingShader.getPtr()->setFloat(("point[" + std::to_string(i) + "].constant").c_str(), pointLights[i]->getConstantAttenuation());
+            lightingShader.getPtr()->setFloat(("point[" + std::to_string(i) + "].linear").c_str(), pointLights[i]->getLinearAttenuation());
+            lightingShader.getPtr()->setFloat(("point[" + std::to_string(i) + "].quadratic").c_str(), pointLights[i]->getQuadraticAttenuation());
+        }
         bool IsGlass = false;
         lightingShader.getPtr()->setInt("baseTexture", 0);
         //render first model

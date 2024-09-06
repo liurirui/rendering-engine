@@ -143,65 +143,52 @@ in vec3 FragPos;
 in vec2 UV;
   
 uniform sampler2D baseTexture;
-struct Directiona_Light {
-    vec3 direction;
-    vec3 ambient;
-    vec3 diffuse;
-    vec3 specular;
-};
-uniform Directiona_Light light;
-struct Point_Light {
-    vec3 Position;
-    vec3 Color;
-};
 
+struct Direction_Light {
+    vec3 direction;
+    vec3 color;
+    float intensity;
+};
+uniform Direction_Light light;
+
+struct Point_Light {
+    vec3 position;
+    vec3 color;
+    float intensity;
+    float constant;      
+    float linear;         
+    float quadratic;
+};
 uniform Point_Light point[4];
 uniform float shininess;
 uniform vec3 viewPos;
+uniform vec3 ambient;
+uniform vec3 diffuse;
+uniform vec3 specular;
 uniform bool isGlass;
 uniform bool isMirror;
 uniform vec3 objectColor;
+
+vec3 CalcDirLight(Direction_Light light, vec3 normal, vec3 viewDir);
+vec3 CalcPointLight(Point_Light light, vec3 normal, vec3 fragPos, vec3 viewDir);
 void main()
 {      
      if(!isMirror){
         vec4 texColor = texture(baseTexture, UV);
-        //ambient
-        vec3 ambient = light.ambient * texColor.rgb ;
-
-        // Direct light diffuse 
         vec3 norm = normalize(Normal);
-        vec3 lightDir = normalize(-light.direction);  
-        float diff_straight = max(dot(norm, lightDir), 0.0);
-        vec3 diffuse_straight = light.diffuse * diff_straight * texColor.rgb; 
+        vec3 viewDir = normalize(viewPos - FragPos); 
+        //ambient
+        vec3 Ambient =ambient * texColor.rgb ;
+
+        //Direction light  
+        vec3 Direction = CalcDirLight(light, norm, viewDir)*texColor.rgb;
         
-        //Point Light diffuse 
-        vec3 lighting = vec3(0.0);
-        for(int i = 0; i < 4; i++)
-        {
-            // diffuse
-            vec3 lightDir_point = normalize(point[i].Position - FragPos);
-            float diff_point = max(dot(lightDir_point, norm), 0.0);
-            vec3 diffuse_point = point[i].Color * diff_point * texColor.rgb;      
-            // attenuation 
-            float distance = length(FragPos - point[i].Position);
-            diffuse_point *= 1.0 / (distance * distance) ;
-            lighting += diffuse_point;
-         }
-        vec3 diffuse= lighting + diffuse_straight;
-        // specular
-        vec3 specular =vec3(0.0);
-        //Only Glass have specular
-        if(isGlass){
-            vec3 viewDir = normalize(viewPos - FragPos);
-            vec3 reflectDir = reflect(-lightDir, norm);  
-            float spec = pow(max(dot(viewDir, reflectDir), 0.0),shininess);
-            specular = light.specular * spec * texColor.rgb;  
-        }
-        else{
-            specular =vec3(0.0);
-        }
+        //Point Light 
+        vec3 Point = vec3(0.0);
+        for(int i = 0; i < 4; i++) Point+=CalcPointLight(point[i], norm, FragPos, viewDir)*texColor.rgb;
+
         //lastColor
-        vec3 result = specular + diffuse + ambient;
+        vec3 result = Point + Direction + Ambient;
         FragColor=vec4 (result,1.0);
         
     }
@@ -212,6 +199,49 @@ void main()
 
         FragColor = vec4(reflectColor, 0.1);
     }
+}
+
+// calculates the color when using a directional light.
+vec3 CalcDirLight(Direction_Light light, vec3 normal, vec3 viewDir)
+{
+    vec3 lightDir = normalize(-light.direction);
+    // diffuse shading
+    float diff = max(dot(normal, lightDir), 0.0);
+    // specular shading
+    float spec =0;
+    if(isGlass){
+        vec3 halfwayDir = normalize(lightDir + viewDir); 
+        spec = pow(max(dot(normal, halfwayDir), 0.0), shininess);
+    }
+    // combine results
+    vec3 diffuseDir = diffuse * diff;
+    vec3 specularDir = specular * spec;
+    vec3 resultLight=( diffuseDir + specularDir)* light.color * light.intensity;
+    return resultLight;
+}
+
+// calculates the color when using a point light.
+vec3 CalcPointLight(Point_Light light, vec3 normal, vec3 fragPos, vec3 viewDir)
+{
+    vec3 lightDir = normalize(light.position - fragPos);
+    // diffuse shading
+    float diff = max(dot(normal, lightDir), 0.0);
+    // specular shading
+    float spec =0;
+    if(isGlass){
+        vec3 halfwayDir = normalize(lightDir + viewDir); 
+        spec = pow(max(dot(normal, halfwayDir), 0.0), shininess);
+    }
+    // attenuation
+    float distance = length(light.position - fragPos);
+    float attenuation = 1.0 / (light.constant + light.linear * distance + light.quadratic * (distance * distance));
+    // combine results
+    vec3 diffusePoint = diffuse * diff ;
+    vec3 specularPoint = specular * spec;
+    diffusePoint *= attenuation;
+    specularPoint *= attenuation;
+    vec3 resultLight=( diffusePoint + specularPoint)* light.color * light.intensity;
+    return resultLight;
 }
 )";
 
@@ -267,22 +297,13 @@ void main()
 {             
      vec2 tex_offset = 1.0 / textureSize(image, 0); // gets size of single texel
      vec3 result = texture(image, TexCoords).rgb * weight[0];
-     if(horizontal)
-     { 
-         for(int i = 1; i < 9; ++i)
-         {
-            result += texture(image,  clamp(TexCoords + vec2(tex_offset.x * i , 0.0), 0.0, 1.0 )).rgb * weight[i];
-            result += texture(image,  clamp(TexCoords - vec2(tex_offset.x * i,  0.0), 0.0, 1.0 )).rgb * weight[i];
-         }
-     }
-     else
-     {
-         for(int i = 1; i < 9; ++i)
-         {
-             result += texture(image, clamp(TexCoords + vec2(0.0, tex_offset.y * i), 0.0, 1.0 )).rgb * weight[i];
-             result += texture(image, clamp(TexCoords - vec2(0.0, tex_offset.y * i), 0.0, 1.0 )).rgb * weight[i];
-         }
-     }
+      for(int i = 1; i < 9; ++i)
+    {
+        vec2 offset = horizontal ? vec2(tex_offset.x * i, 0.0) : vec2(0.0, tex_offset.y * i);
+        
+        result += texture(image, clamp(TexCoords + offset, vec2(0.0)+offset, vec2(1.0)-offset)).rgb * weight[i];
+        result += texture(image, clamp(TexCoords - offset, vec2(0.0)+offset, vec2(1.0)-offset)).rgb * weight[i];
+    }
      FragColor = vec4(result, 1.0);
 }
 )";
