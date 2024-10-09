@@ -13,23 +13,41 @@ NAMESPACE_START
 MeshRenderer::MeshRenderer(const std::string& modelPath) {
     depthStencilState.depthTest = true;
     depthStencilState.depthWrite = true;
-    modelSample = new Model(modelPath);
-    string modelPath1 = "E:/download_model/cat_mask.fbx";
-    modelSample1 = new Model(modelPath1);
-    string modelPath2 = "E:/download_model/glass_11_2.fbx";
+    modelSample1 = new Model(modelPath);
+    string modelPath2 = "E:/download_model/cat_mask.fbx";
     modelSample2 = new Model(modelPath2);
-
+    string modelPath3 = "E:/download_model/glass_11_2.fbx";
+    modelSample3 = new Model(modelPath3);
+    Mesh *mesh = new Mesh();
+    scene->addMesh(mesh);
+    //Storing the model's mesh
+    for (Mesh* mesh : modelSample1->meshes) {
+        mesh->modelNumber = 1;
+        scene->addMesh(mesh);
+    }
+    for (Mesh* mesh : modelSample2->meshes) {
+        mesh->modelNumber = 2;
+        mesh->isTramslucent = true;
+        scene->addMesh(mesh);
+    }
+    for (Mesh* mesh : modelSample3->meshes) {
+        mesh->modelNumber = 3;
+        if (mesh->nowName != "frame") mesh->isTramslucent = true;
+        scene->addMesh(mesh);
+    }
+    depthMapShader = TRefCountPtr<Shader>(new Shader(Vert_depth_map, Frag_depth_map));
     lightingShader = TRefCountPtr<Shader>(new Shader(Vertmodel_lighting, Fragmodel_lighting));
     lightingShader_cube= TRefCountPtr<Shader>(new Shader(Vertmodel_lighting, Fragmodel_cube));
 
-    ColorTextureMap["hands"] = RenderContext::getInstance()->loadTexture2D("E:/rendering-engine/resources/objects/nanosuit/hand_dif.png");
-    ColorTextureMap["Visor"] = RenderContext::getInstance()->loadTexture2D("E:/rendering-engine/resources/objects/nanosuit/glass_dif.png");
-    ColorTextureMap["Body"] = RenderContext::getInstance()->loadTexture2D("E:/rendering-engine/resources/objects/nanosuit/body_dif.png");
-    ColorTextureMap["Helmet"] = RenderContext::getInstance()->loadTexture2D("E:/rendering-engine/resources/objects/nanosuit/helmet_diff.png");
-    ColorTextureMap["Legs"] = RenderContext::getInstance()->loadTexture2D("E:/rendering-engine/resources/objects/nanosuit/leg_dif.png");
-    ColorTextureMap["Arms"] = RenderContext::getInstance()->loadTexture2D("E:/rendering-engine/resources/objects/nanosuit/arm_dif.png");
-    ColorTextureMap["glass"] = RenderContext::getInstance()->loadTexture2D("E:/rendering-engine/resources/textures/skybox/back.jpg");
-    ColorTextureMap["app"] = RenderContext::getInstance()->loadTexture2D("E:/rendering-engine/resources/textures/background.jpg");
+    ColorTextureMap["hands"] = RenderContext::getInstance()->loadTexture2D("E:/resources/objects/nanosuit/hand_dif.png");
+    ColorTextureMap["Visor"] = RenderContext::getInstance()->loadTexture2D("E:/resources/objects/nanosuit/glass_dif.png");
+    ColorTextureMap["Body"] = RenderContext::getInstance()->loadTexture2D("E:/resources/objects/nanosuit/body_dif.png");
+    ColorTextureMap["Helmet"] = RenderContext::getInstance()->loadTexture2D("E:/resources/objects/nanosuit/helmet_diff.png");
+    ColorTextureMap["Legs"] = RenderContext::getInstance()->loadTexture2D("E:/resources/objects/nanosuit/leg_dif.png");
+    ColorTextureMap["Arms"] = RenderContext::getInstance()->loadTexture2D("E:/resources/objects/nanosuit/arm_dif.png");
+    ColorTextureMap["glass"] = RenderContext::getInstance()->loadTexture2D("E:/resources/textures/skybox/back.jpg");
+    ColorTextureMap["app"] = RenderContext::getInstance()->loadTexture2D("E:/resources/textures/background.jpg");
+    ColorTextureMap["plane"]= RenderContext::getInstance()->loadTexture2D("E:/resources/textures/wood.png");
 
     //set  Originframebuffer's Texture Attachments
     fboColorTexture = RenderContext::getInstance()->createTexture2D(TextureUsage::RenderTarget, TextureFormat::RGBA32F, RenderContext::getInstance()->windowsWidth,
@@ -47,8 +65,16 @@ MeshRenderer::MeshRenderer(const std::string& modelPath) {
     pipelineColorBlendAttachment.blendState.enabled = true;
     graphicsPipeline.rasterizationState.blendState.attachmentsBlendState.push_back(pipelineColorBlendAttachment);
 
+    depthMap = RenderContext::getInstance()->createTexture2D(TextureUsage::DepthStencil, TextureFormat::Depth, RenderContext::getInstance()->windowsWidth,
+        RenderContext::getInstance()->windowsHeight);
+    DepthMapFramebuffer.depthStencilAttachment.texture = depthMap;
+    DepthMapFramebuffer.depthStencilAttachment.useStencil = false;
+    graphicsPipeline_DepthMap.shader = depthMapShader.getPtr();
+    //graphicsPipeline_DepthMap.rasterizationState.cullMode = CullMode::Front;
+    
+
     if (!cubeVBO) {
-        cubeVBO = RenderContext::getInstance()->createVertexBuffer(cubevertices, sizeof(cubevertices));
+        cubeVBO = RenderContext::getInstance()->createVertexBuffer(cubeVertices, sizeof(cubeVertices));
     }
     if (!cubeVAO) {
         cubeVAO = RenderContext::getInstance()->createVertexBufferLayoutInfo(cubeVBO);
@@ -56,24 +82,80 @@ MeshRenderer::MeshRenderer(const std::string& modelPath) {
         RenderContext::getInstance()->setUpVertexBufferLayoutInfo(cubeVBO, cubeVAO, 3, 8 * sizeof(float), 1, 3);
         RenderContext::getInstance()->setUpVertexBufferLayoutInfo(cubeVBO, cubeVAO, 2, 8 * sizeof(float), 2, 6);
     }
-
-    directiontLight = new DirectionLight(glm::vec3(-0.5f, -0.8f, -0.3f), glm::vec3(1.0f, 1.0f, 1.0f), 1.0f);
-    pointLights.push_back(new PointLight(glm::vec3(0.0f, 15.0f, 1.5f), glm::vec3(15.0f, 15.0f, 15.0f), 0.5f));
-    pointLights.push_back(new PointLight(glm::vec3(-2.0f, 0.5f, -3.0f), glm::vec3(30.0f, 0.0f, 0.0f), 0.4f));
-    pointLights.push_back(new PointLight(glm::vec3(3.0f, 8.5f, 1.0f), glm::vec3(0.0f, 0.0f, 45.0f), 0.3f));
-    pointLights.push_back(new PointLight(glm::vec3(-8.0f, 2.4f, -1.0f), glm::vec3(0.0f, 15.0f, 0.0f), 0.3f));
+    if (!planeVBO) {
+        planeVBO = RenderContext::getInstance()->createVertexBuffer(planeVertices, sizeof(planeVertices));
+    }
+    if (!planeVAO) {
+        planeVAO = RenderContext::getInstance()->createVertexBufferLayoutInfo(planeVBO);
+        RenderContext::getInstance()->setUpVertexBufferLayoutInfo(planeVBO, planeVAO, 3, 8 * sizeof(float), 0, 0);
+        RenderContext::getInstance()->setUpVertexBufferLayoutInfo(planeVBO, planeVAO, 3, 8 * sizeof(float), 1, 3);
+        RenderContext::getInstance()->setUpVertexBufferLayoutInfo(planeVBO, planeVAO, 2, 8 * sizeof(float), 2, 6);
+    }
+    directiontLight = new DirectionLight(glm::vec3(-0.5f, -0.8f, -0.5f), glm::vec3(1.5f, 1.5f, 1.5f), 1.0f);
+    pointLights.push_back(new PointLight(glm::vec3(0.0f, 12.0f, 1.5f), glm::vec3(10.0f, 0.0f, 0.0f), 0.4f));
+    pointLights.push_back(new PointLight(glm::vec3(-2.0f, 0.5f, -3.0f), glm::vec3(0.0f, 10.0f, 0.0f), 0.4f));
+    pointLights.push_back(new PointLight(glm::vec3(3.0f, 8.5f, 1.0f), glm::vec3(0.0f, 0.0f, 12.0f), 0.4f));
+    pointLights.push_back(new PointLight(glm::vec3(-8.0f, 2.4f, -1.0f), glm::vec3(10.0f, 10.0f, 10.0f), 0.2f));
 }
 
 void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
     const char* passName = "modelPass";
     rg.addPass(passName, camera, [this, camera](RenderContext* renderContext) {
+        //Rendering shadow maps
+        renderContext->beginRendering(directiontLight->getShadow()->DepthMapFramebuffer);
+        renderContext->setDepthStencilState(depthStencilState);
+        renderContext->bindPipeline(graphicsPipeline_DepthMap);
+        depthMapShader.getPtr()->use();
+        int errorCode = glGetError();
+        glm::mat4 model = glm::mat4(1.0f);
+        depthMapShader.getPtr()->setMat4("lightSpaceMatrix",directiontLight->calculateLightSpaceMatrix());
+        depthMapShader.getPtr()->setMat4("model", model);
+
+        //plane(shadow)
+        renderContext->bindVertexBuffer(planeVAO);
+        renderContext->drawArrays(0, 6);
+
+        // first modelMatrix(shadow)
+        glm::mat4 modelA = glm::mat4(1.0f);
+        modelA = glm::scale(modelA, glm::vec3(0.5f, 0.5f, 0.5f));
+       
+        //second modelMatrix(shadow)
+        glm::mat4 modelB = glm::mat4(1.0f);
+        modelB = glm::translate(modelB, glm::vec3(3.0f, 1.0f, 0.0f));
+        modelB = glm::scale(modelB, glm::vec3(25.0f));
+
+        //third modelMatrix(shadow)
+        glm::mat4 modelC = glm::mat4(1.0f);
+        modelC = glm::translate(modelC, glm::vec3(3.0f, 1.0f, -0.6f));
+        modelC = glm::scale(modelC, glm::vec3(0.01f));
+        modelC = glm::rotate(modelC, glm::radians(90.0f), glm::vec3(-1.0f, 0.0f, 0.0f));
+
+        for (Mesh* mesh : scene->Opaque) {
+            if(mesh->modelNumber==1) depthMapShader.getPtr()->setMat4("model", modelA);
+            else if(mesh->modelNumber==2) depthMapShader.getPtr()->setMat4("model", modelB);
+            else if (mesh->modelNumber == 3) depthMapShader.getPtr()->setMat4("model", modelC);
+            renderContext->bindVertexBuffer(mesh->vertexAttributeBufferID);
+            renderContext->bindIndexBuffer(mesh->indexBufferID);
+            renderContext->drawElements(mesh->numTriangle * 3, 0);
+        }
+
+        for (Mesh* mesh : scene->Translucent) {
+            if (mesh->modelNumber == 1) depthMapShader.getPtr()->setMat4("model", modelA);
+            else if (mesh->modelNumber == 2) depthMapShader.getPtr()->setMat4("model", modelB);
+            else if (mesh->modelNumber == 3) depthMapShader.getPtr()->setMat4("model", modelC);
+            renderContext->bindVertexBuffer(mesh->vertexAttributeBufferID);
+            renderContext->bindIndexBuffer(mesh->indexBufferID);
+            renderContext->drawElements(mesh->numTriangle * 3, 0);
+        }
+
+        // Start render scene
         renderContext->beginRendering(OriginFramebuffer);
         renderContext->setDepthStencilState(depthStencilState);
         renderContext->bindPipeline(graphicsPipeline);
         glm::mat4 light_model=glm::mat4(1.0f);
         glm::mat4 projection = glm::perspective(glm::radians(camera->Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
         glm::mat4 view = camera->GetViewMatrix();
-        int errorCode = glGetError();
+        errorCode = glGetError();
         lightingShader_cube.getPtr()->use();
         errorCode = glGetError();
         lightingShader_cube.getPtr()->setMat4("projection", projection);
@@ -94,11 +176,10 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
         errorCode = glGetError();
         lightingShader.getPtr()->setMat4("projection", projection);
         lightingShader.getPtr()->setMat4("view", view);
-        glm::mat4 model = glm::mat4(1.0f);
-        model = glm::scale(model, glm::vec3(0.5f, 0.5f, 0.5f));
-        lightingShader.getPtr()->setMat4("model", model);
         // light properties
         lightingShader.getPtr()->setVec3("viewPos", camera->Position);
+        lightingShader.getPtr()->setVec3("lightPos", directiontLight->getDirection()*(-10.0f));
+        lightingShader.getPtr()->setMat4("lightSpaceMatrix", directiontLight->calculateLightSpaceMatrix());
         lightingShader.getPtr()->setVec3("light.direction", directiontLight->getDirection());
         lightingShader.getPtr()->setVec3("light.color", directiontLight->getColor());
         lightingShader.getPtr()->setFloat("light.intensity", directiontLight->getIntensity());
@@ -108,6 +189,10 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
         lightingShader.getPtr()->setVec3("objectColor", 1.0f, 1.0f, 1.0f);
         lightingShader.getPtr()->setFloat("shininess", 32.0f);
         lightingShader.getPtr()->setBool("isMirror", false);
+        bool IsGlass = false;
+        lightingShader.getPtr()->setInt("baseTexture", 0);
+        lightingShader.getPtr()->setInt("shadowMap", 1);
+        renderContext->bindTexture(directiontLight->getShadow()->depthMap->id, 1);
         for (int i = 0; i<pointLights.size(); ++i) {
             lightingShader.getPtr()->setVec3(("point[" + std::to_string(i) + "].position").c_str(), pointLights[i]->getPosition());
             lightingShader.getPtr()->setVec3(("point[" + std::to_string(i) + "].color").c_str(), pointLights[i]->getColor());
@@ -116,71 +201,117 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
             lightingShader.getPtr()->setFloat(("point[" + std::to_string(i) + "].linear").c_str(), pointLights[i]->getLinearAttenuation());
             lightingShader.getPtr()->setFloat(("point[" + std::to_string(i) + "].quadratic").c_str(), pointLights[i]->getQuadraticAttenuation());
         }
-        bool IsGlass = false;
-        lightingShader.getPtr()->setInt("baseTexture", 0);
-        //render first model
-        for (const Mesh* mesh : modelSample->meshes) {
-            if (ColorTextureMap.find(mesh->nowName) != ColorTextureMap.end()) {
-                if (mesh->nowName == "Visor") {
-                    IsGlass = true;
-                }
-                else {
-                    IsGlass = false;
-                }
+        
+        //render plane
+        lightingShader.getPtr()->setMat4("model", modelA);
+        baseTexture = ColorTextureMap["plane"];
+        renderContext->bindVertexBuffer(planeVAO);
+        renderContext->bindTexture(baseTexture->id, 0);
+        renderContext->drawArrays(0, 6);
+
+        //Rendering Opaque Meshes
+        lightingShader.getPtr()->setBool("isMirror", false);
+        for (Mesh* mesh : scene->Opaque) {
+            if (mesh->modelNumber == 1&& ColorTextureMap.find(mesh->nowName) != ColorTextureMap.end()) {
+                lightingShader.getPtr()->setMat4("model", modelA);
+                if (mesh->nowName == "Visor")  IsGlass = true;
+                else  IsGlass = false;
                 baseTexture = ColorTextureMap[mesh->nowName];
+                lightingShader.getPtr()->setBool("isGlass", IsGlass);
             }
-            else {
-                baseTexture = nullptr;
+            else if (mesh->modelNumber == 2) {
+                lightingShader.getPtr()->setMat4("model", modelB);
             }
-            renderContext->bindVertexBuffer(0);
-            renderContext->bindIndexBuffer(0);
-            lightingShader.getPtr()->setBool("isGlass", IsGlass);
+            else if (mesh->modelNumber == 3) {
+                lightingShader.getPtr()->setMat4("model", modelC);
+                baseTexture = ColorTextureMap["app"];
+            }
             if (baseTexture) {
                 renderContext->bindTexture(baseTexture->id, 0);
                 renderContext->bindVertexBuffer(mesh->vertexAttributeBufferID);
                 renderContext->bindIndexBuffer(mesh->indexBufferID);
                 renderContext->drawElements(mesh->numTriangle * 3, 0);
             }
-        }
-
-        lightingShader.getPtr()->setBool("isGlass", true);
-        model = glm::translate(model, glm::vec3(4.0f, 4.0f, -2.0f));
-        model = glm::mat4(25.0f);
-        lightingShader.getPtr()->setMat4("model", model);
-        lightingShader.getPtr()->setBool("isMirror", true);
-        baseTexture = ColorTextureMap["glass"];
-        lightingShader.getPtr()->setVec3("objectColor", 1.0f, 0.0f, 0.0f);
-        //first mask
-        for (const Mesh* mesh : modelSample1->meshes) {
-            renderContext->bindTexture(baseTexture->id, 0);
-            renderContext->bindVertexBuffer(mesh->vertexAttributeBufferID);
-            renderContext->bindIndexBuffer(mesh->indexBufferID);
-
-            // 渲染当前网格
-            renderContext->drawElements(mesh->numTriangle * 3, 0);
-        }
-
-        model = glm::mat4(0.01f);
-        model = glm::rotate(model, glm::radians(90.0f), glm::vec3(-1.0f, 0.0f, 0.0f));
-        model = glm::translate(model, glm::vec3(-500.0f, 200.0f, 20.0f));
-        lightingShader.getPtr()->setMat4("model", model);
-        lightingShader.getPtr()->setVec3("objectColor", 1.0f, 1.0f, 1.0f);
-        for (const Mesh* mesh : modelSample2->meshes) {       
             baseTexture = nullptr;
-            if (mesh->nowName == "frame") {
-                lightingShader.getPtr()->setBool("isMirror", false);
-                baseTexture = ColorTextureMap["app"];
+        }
+
+        //Rendering Translucent Meshes
+        lightingShader.getPtr()->setBool("isGlass",true);
+        lightingShader.getPtr()->setBool("isMirror", true);
+        for (Mesh* mesh : scene->Translucent) {
+            if (mesh->modelNumber == 1 && ColorTextureMap.find(mesh->nowName) != ColorTextureMap.end()) {
+                lightingShader.getPtr()->setMat4("model", modelA);
             }
-            else {
-                lightingShader.getPtr()->setBool("isMirror", true);
+            else if (mesh->modelNumber == 2) {
+                lightingShader.getPtr()->setMat4("model", modelB);
+                lightingShader.getPtr()->setVec3("objectColor", 1.0f, 0.0f, 0.0f);
                 baseTexture = ColorTextureMap["glass"];
             }
-            renderContext->bindTexture(baseTexture->id, 0);
-            renderContext->bindVertexBuffer(mesh->vertexAttributeBufferID);
-            renderContext->bindIndexBuffer(mesh->indexBufferID);
-            // 渲染当前网格
-            renderContext->drawElements(mesh->numTriangle * 3, 0);
+            else if (mesh->modelNumber == 3) {
+                lightingShader.getPtr()->setMat4("model", modelC);
+                lightingShader.getPtr()->setVec3("objectColor", 1.0f, 1.0f, 1.0f);
+                baseTexture = ColorTextureMap["glass"];
+            }
+            if (baseTexture) {
+                renderContext->bindTexture(baseTexture->id, 0);
+                renderContext->bindVertexBuffer(mesh->vertexAttributeBufferID);
+                renderContext->bindIndexBuffer(mesh->indexBufferID);
+                renderContext->drawElements(mesh->numTriangle * 3, 0);
+            }
+            baseTexture = nullptr;
         }
+
+        ////render first model
+        //for (const Mesh* mesh : modelSample1->meshes) {
+        //    if (ColorTextureMap.find(mesh->nowName) != ColorTextureMap.end()) {
+        //        if (mesh->nowName == "Visor")  IsGlass = true;
+        //        else  IsGlass = false;
+        //        baseTexture = ColorTextureMap[mesh->nowName];
+        //    }
+        //    else  baseTexture = nullptr;
+        //    renderContext->bindVertexBuffer(0);
+        //    renderContext->bindIndexBuffer(0);
+        //    lightingShader.getPtr()->setBool("isGlass", IsGlass);
+        //    if (baseTexture) {
+        //        renderContext->bindTexture(baseTexture->id, 0);
+        //        renderContext->bindVertexBuffer(mesh->vertexAttributeBufferID);
+        //        renderContext->bindIndexBuffer(mesh->indexBufferID);
+        //        renderContext->drawElements(mesh->numTriangle * 3, 0);
+        //    }
+        //}
+        //lightingShader.getPtr()->setBool("isGlass", true);
+        //
+
+        ////render second model
+        //lightingShader.getPtr()->setMat4("model", modelB);
+        //lightingShader.getPtr()->setBool("isMirror", true);
+        //baseTexture = ColorTextureMap["glass"];
+        //lightingShader.getPtr()->setVec3("objectColor", 1.0f, 0.0f, 0.0f);
+        //for (const Mesh* mesh : modelSample2->meshes) {
+        //    renderContext->bindTexture(baseTexture->id, 0);
+        //    renderContext->bindVertexBuffer(mesh->vertexAttributeBufferID);
+        //    renderContext->bindIndexBuffer(mesh->indexBufferID);
+        //    renderContext->drawElements(mesh->numTriangle * 3, 0);
+        //}
+
+        ////render third model
+        //lightingShader.getPtr()->setMat4("model", modelC);
+        //lightingShader.getPtr()->setVec3("objectColor", 1.0f, 1.0f, 1.0f);
+        //for (const Mesh* mesh : modelSample3->meshes) {       
+        //    baseTexture = nullptr;
+        //    if (mesh->nowName == "frame") {
+        //        lightingShader.getPtr()->setBool("isMirror", false);
+        //        baseTexture = ColorTextureMap["app"];
+        //    }
+        //    else {
+        //        lightingShader.getPtr()->setBool("isMirror", true);
+        //        baseTexture = ColorTextureMap["glass"];
+        //    }
+        //    renderContext->bindTexture(baseTexture->id, 0);
+        //    renderContext->bindVertexBuffer(mesh->vertexAttributeBufferID);
+        //    renderContext->bindIndexBuffer(mesh->indexBufferID);
+        //    renderContext->drawElements(mesh->numTriangle * 3, 0);
+        //}
         renderContext->bindVertexBuffer(0);
         renderContext->bindIndexBuffer(0);
         renderContext->endRendering();
@@ -193,6 +324,7 @@ unsigned int MeshRenderer::getTargetColorTextureID(int  attachment) {
         return 0;
     }
     return OriginFramebuffer.colorAttachments[attachment].texture->id;
+
 }
 
 FrameBufferInfo* MeshRenderer::getTargetFrameBuffer() {
@@ -200,8 +332,18 @@ FrameBufferInfo* MeshRenderer::getTargetFrameBuffer() {
 }
 
 MeshRenderer::~MeshRenderer() {
-    delete modelSample;
     delete modelSample1;
     delete modelSample2;
+    delete modelSample3;
+    delete fboColorTexture;
+    delete fboDepthTexture;
+    delete baseTexture;
+    delete normalTexture;
+    delete depthMap;
+    delete directiontLight;
+    for (PointLight* ptr : pointLights) {
+        delete ptr;
+    }
+    pointLights.clear();
 }
 NAMESPACE_END

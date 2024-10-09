@@ -13,6 +13,7 @@ enum TextureFormat
     RG,
     R,
     GRAY,
+    Depth,
     Depth24_Stencil8
 };
 
@@ -106,6 +107,8 @@ public:
     unsigned int width = 0;
     unsigned int height = 0;
     
+    bool useCubeMap = false;
+
     TextureFormat textureFormat = TextureFormat::RGBA;
 
     TextureUsage textureUsage = TextureUsage::ShaderRead;
@@ -114,7 +117,7 @@ public:
     // ------------------------------------------------------------------------
     Texture2D(const char* path);
 
-    Texture2D(const TextureUsage & usage, const TextureFormat & textureFormat, const int width, const int height, const unsigned char* data = nullptr);
+    Texture2D(const TextureUsage & usage, const TextureFormat & textureFormat, const int width, const int height, const unsigned char* data = nullptr, bool useCubeMao=false);
 
     void initTexture(const TextureUsage& usage, const TextureFormat& textureFormat, const int width, const int height, const unsigned char* data = nullptr);
 

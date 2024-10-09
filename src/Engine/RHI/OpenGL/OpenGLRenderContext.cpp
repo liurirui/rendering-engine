@@ -9,9 +9,9 @@ OpenGLRenderContext::OpenGLRenderContext(){
     this->setCurrentRenderContext(this);
 }
 
-Texture2D* OpenGLRenderContext::createTexture2D(const TextureUsage& usage, const TextureFormat& textureFormat, const int width, const int height) {
+Texture2D* OpenGLRenderContext::createTexture2D(const TextureUsage& usage, const TextureFormat& textureFormat, const int width, const int height, bool useCubeMap) {
 
-    Texture2D* texture2D = new Texture2D(usage, textureFormat, width, height);
+    Texture2D* texture2D = new Texture2D(usage, textureFormat, width, height ,nullptr,useCubeMap);
     
     return texture2D;
 }
@@ -50,7 +50,8 @@ void OpenGLRenderContext::beginRendering(FrameBufferInfo& fbo) {
         //depth texture
         if (fbo.depthStencilAttachment.texture) {
             glBindTexture(GL_TEXTURE_2D, fbo.depthStencilAttachment.texture->id);
-            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, fbo.depthStencilAttachment.texture->id, 0);
+            if (fbo.depthStencilAttachment.useStencil)  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, fbo.depthStencilAttachment.texture->id, 0);
+            else glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, fbo.depthStencilAttachment.texture->id, 0);
         }
     }
 

@@ -21,6 +21,8 @@ GLint getFormat(const TextureFormat& textureFormat) {
         return GL_RG;
     case TextureFormat::R:
         return GL_R;
+    case TextureFormat::Depth:
+        return GL_DEPTH_COMPONENT;
     case TextureFormat::Depth24_Stencil8:
         return GL_DEPTH_STENCIL;
     default:
@@ -42,6 +44,8 @@ GLint getInternalformat(const TextureFormat& textureFormat) {
         return GL_RG;
     case TextureFormat::R:
         return GL_R;
+    case TextureFormat::Depth:
+        return GL_DEPTH_COMPONENT;
     case TextureFormat::Depth24_Stencil8:
         return GL_DEPTH24_STENCIL8;
     default:
@@ -57,7 +61,8 @@ GLint getDataType(const TextureFormat& textureFormat) {
         return GL_UNSIGNED_BYTE;
     case TextureFormat::RGBA32F:
         return GL_FLOAT;
-
+    case TextureFormat::Depth:
+        return GL_UNSIGNED_INT;
     case TextureFormat::Depth24_Stencil8:
         return GL_UNSIGNED_INT_24_8;
     default:
@@ -100,8 +105,8 @@ Texture2D::Texture2D(const char* path) {
 
 };
 
-Texture2D::Texture2D(const TextureUsage& usage, const TextureFormat& textureFormat, const int width, const int height, const unsigned char* data) {
-
+Texture2D::Texture2D(const TextureUsage& usage, const TextureFormat& textureFormat, const int width, const int height, const unsigned char* data,bool useCubeMap) {
+    this->useCubeMap = useCubeMap;
     this->initTexture(usage, textureFormat, width, height, data);
 }
 
@@ -114,16 +119,26 @@ void Texture2D::initTexture(const TextureUsage& usage, const TextureFormat& text
 
     this->height = height;
     glGenTextures(1, &id);
-    glBindTexture(GL_TEXTURE_2D, id);
-    //GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height, GLint border, GLenum format, GLenum type, const void* pixels
-    glTexImage2D(GL_TEXTURE_2D, 0, getInternalformat(textureFormat), width, height, 0, getFormat(textureFormat), getDataType(textureFormat), data);
+    if (useCubeMap) {
+        glBindTexture(GL_TEXTURE_CUBE_MAP, id);
+        for (unsigned int i = 0; i < 6; ++i)  glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, getInternalformat(textureFormat), width, height, 0, getFormat(textureFormat), getDataType(textureFormat), data);
+    }
+    else {
+        glBindTexture(GL_TEXTURE_2D, id);
+        //GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height, GLint border, GLenum format, GLenum type, const void* pixels
+        glTexImage2D(GL_TEXTURE_2D, 0, getInternalformat(textureFormat), width, height, 0, getFormat(textureFormat), getDataType(textureFormat), data);
+    }
     //GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum format, GLenum type, const void* pixels
     //glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, getFormat(textureFormat), getDataType(textureFormat), data);
-    
+    if (textureFormat == TextureFormat::Depth) {
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+        GLfloat borderColor[] = { 1.0, 1.0, 1.0, 1.0 };
+        glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+    }
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, getTexelFilter(defaultSampler.minFilter));
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, getTexelFilter(defaultSampler.magFilter));
-
 
     glBindTexture(GL_TEXTURE_2D, 0);
 }

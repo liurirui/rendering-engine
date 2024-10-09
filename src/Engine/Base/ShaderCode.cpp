@@ -78,7 +78,7 @@ void main()
     // diffuse 
     vec3 norm = normalize(Normal);
     vec3 lightDir = normalize(lightPos - FragPos);
-    float diff = max(dot(norm, lightDir), 0.0);
+    float diff = max(dot(norm, lightDir), 0.0); 
     vec3 diffuse = diff * lightColor;
             
     vec3 result = (ambient + diffuse) * objectColor * baseColor.rgb*normalColor.rgb;
@@ -110,27 +110,53 @@ void main()
 }
 )";
 
+const char* Vert_depth_map = R"(
+#version 330 core
+layout (location = 0) in vec3 aPos;
+
+uniform mat4 lightSpaceMatrix;
+uniform mat4 model;
+
+void main()
+{
+    gl_Position = lightSpaceMatrix * model * vec4(aPos, 1.0);
+}
+)";
+
+const char* Frag_depth_map = R"(
+#version 330 core
+void main()
+{             
+    // gl_FragDepth = gl_FragCoord.z;
+}
+)";
+
+
 const char* Vertmodel_lighting = R"(
 #version 330 core
 layout (location = 0) in vec3 aPos;
 layout (location = 1) in vec3 aNormal;
 layout (location = 2) in vec2 aUV;
 
-out vec3 FragPos;
-out vec3 Normal;
-out vec2 UV;
+out VS_OUT{
+   vec3 FragPos;
+   vec3 Normal;
+   vec2 UV;
+   vec4 FragPosLightSpace;
+}vs_out;
 
 uniform mat4 model;
 uniform mat4 view;
 uniform mat4 projection;
+uniform mat4 lightSpaceMatrix;
 
 void main()
 {
-    FragPos = vec3(model * vec4(aPos, 1.0));
-    Normal = aNormal;
-    UV = aUV;
-
-    gl_Position = projection * view * vec4(FragPos, 1.0);
+    vs_out.FragPos = vec3(model * vec4(aPos, 1.0));
+    vs_out.Normal = aNormal;
+    vs_out.UV = aUV;
+    vs_out.FragPosLightSpace = lightSpaceMatrix * vec4(vs_out.FragPos, 1.0);
+    gl_Position = projection * view * vec4(vs_out.FragPos, 1.0);
 }
 )";
 
@@ -138,11 +164,15 @@ const char* Fragmodel_lighting = R"(
 #version 330 core
 layout (location = 0) out vec4 FragColor;
 
-in vec3 Normal; 
-in vec3 FragPos;
-in vec2 UV;
+in VS_OUT {
+    vec3 FragPos;
+    vec3 Normal;
+    vec2 UV;
+    vec4 FragPosLightSpace;
+} fs_in;
   
 uniform sampler2D baseTexture;
+uniform sampler2D shadowMap;
 
 struct Direction_Light {
     vec3 direction;
@@ -160,23 +190,27 @@ struct Point_Light {
     float quadratic;
 };
 uniform Point_Light point[4];
-uniform float shininess;
+
+uniform vec3 lightPos;
 uniform vec3 viewPos;
 uniform vec3 ambient;
 uniform vec3 diffuse;
 uniform vec3 specular;
+uniform float shininess;
+
 uniform bool isGlass;
 uniform bool isMirror;
 uniform vec3 objectColor;
 
 vec3 CalcDirLight(Direction_Light light, vec3 normal, vec3 viewDir);
 vec3 CalcPointLight(Point_Light light, vec3 normal, vec3 fragPos, vec3 viewDir);
+float ShadowCalculation(vec4 fragPosLightSpace);
 void main()
 {      
      if(!isMirror){
-        vec4 texColor = texture(baseTexture, UV);
-        vec3 norm = normalize(Normal);
-        vec3 viewDir = normalize(viewPos - FragPos); 
+        vec4 texColor = texture(baseTexture, fs_in.UV);
+        vec3 norm = normalize(fs_in.Normal);
+        vec3 viewDir = normalize(viewPos - fs_in.FragPos); 
         //ambient
         vec3 Ambient =ambient * texColor.rgb ;
 
@@ -185,16 +219,17 @@ void main()
         
         //Point Light 
         vec3 Point = vec3(0.0);
-        for(int i = 0; i < 4; i++) Point+=CalcPointLight(point[i], norm, FragPos, viewDir)*texColor.rgb;
+        for(int i = 0; i < 4; i++) Point+=CalcPointLight(point[i], norm, fs_in.FragPos, viewDir)*texColor.rgb;
 
         //lastColor
-        vec3 result = Point + Direction + Ambient;
-        FragColor=vec4 (result,1.0);
-        
+        //vec3 result = Point + Direction + Ambient;
+        float shadow = ShadowCalculation(fs_in.FragPosLightSpace);
+        vec3 result = (Ambient +  Point + (1.0 - shadow)* Direction);
+         FragColor=vec4 (result,1.0);
     }
     else{
-        vec3 I = normalize(FragPos - viewPos);
-        vec3 R = reflect(I, normalize(Normal));
+        vec3 I = normalize(fs_in.FragPos - viewPos);
+        vec3 R = reflect(I, normalize(fs_in.Normal));
         vec3 reflectColor = texture(baseTexture, R.xy).rgb*0.2+0.3*objectColor;
 
         FragColor = vec4(reflectColor, 0.1);
@@ -242,6 +277,41 @@ vec3 CalcPointLight(Point_Light light, vec3 normal, vec3 fragPos, vec3 viewDir)
     specularPoint *= attenuation;
     vec3 resultLight=( diffusePoint + specularPoint)* light.color * light.intensity;
     return resultLight;
+}
+
+float ShadowCalculation(vec4 fragPosLightSpace)
+{
+    // perform perspective divide
+    vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
+    // transform to [0,1] range
+    projCoords = projCoords * 0.5 + 0.5;
+    // get closest depth value from light's perspective (using [0,1] range fragPosLight as coords)
+    float closestDepth = texture(shadowMap, projCoords.xy).r; 
+    // get depth of current fragment from light's perspective
+    float currentDepth = projCoords.z;
+    // calculate bias (based on depth map resolution and slope)
+    vec3 normal = normalize(fs_in.Normal);
+    vec3 lightDir = normalize(lightPos - fs_in.FragPos);
+    float bias = max(0.05 * (1.0 - dot(normal, lightDir)), 0.005);
+    // check whether current frag pos is in shadow
+    // float shadow = currentDepth - bias > closestDepth  ? 1.0 : 0.0;
+    // PCF
+    float shadow = 0.0;
+    vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
+    for(int x = -1; x <= 1; ++x)
+    {
+        for(int y = -1; y <= 1; ++y)
+        {
+            float pcfDepth = texture(shadowMap, projCoords.xy + vec2(x, y) * texelSize).r; 
+            shadow += currentDepth - bias > pcfDepth  ? 1.0 : 0.0;        
+        }    
+    }
+    shadow /= 9.0;
+    
+    // keep the shadow at 0.0 when outside the far_plane region of the light's frustum.
+    if(projCoords.z > 1.0)  shadow = 0.0;
+        
+    return shadow;
 }
 )";
 

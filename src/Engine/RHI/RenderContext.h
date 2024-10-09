@@ -33,6 +33,7 @@ struct DepthStencilAttachment {
     AttachmentAction action = AttachmentAction::Clear;
     double depthClearValue = 1.0;
     uint32_t stencilClearValue = 0;
+    bool useStencil = true;
 
 };
 
@@ -151,7 +152,7 @@ public:
         return instance;
     }
 
-    virtual Texture2D * createTexture2D(const TextureUsage& usage, const TextureFormat& textureFormat, const int width, const int height) = 0;
+    virtual Texture2D * createTexture2D(const TextureUsage& usage, const TextureFormat& textureFormat, const int width, const int height,bool useCubeMap=false) = 0;
 
     virtual Texture2D * loadTexture2D(const char* path) = 0;
 

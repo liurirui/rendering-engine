@@ -2,6 +2,10 @@ extern const char* Vertbasic_lighting;
 
 extern const char* Fragbasic_lighting;
 
+extern const char* Vert_depth_map;
+
+extern const char* Frag_depth_map;
+
 extern const char* Vertlight_cube;
 
 extern const char* Fraglight_cube;
@@ -11,7 +15,6 @@ extern const char* Vertmodel_lighting;
 extern const char* Fragmodel_lighting;
 
 extern const char* Fragmodel_cube;
-
 
 extern const char* Frag_highlight;
 

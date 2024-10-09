@@ -42,8 +42,8 @@ BasePassRenderer::BasePassRenderer() {
 
     lightingShader = TRefCountPtr<Shader>(new Shader(Vertbasic_lighting, Fragbasic_lighting));
 
-    baseTexture = RenderContext::getInstance()->loadTexture2D("F:/RealTimeRenderEngineLatest/resources/textures/awesomeface.png");
-    normalTexture = RenderContext::getInstance()->loadTexture2D("F:/RealTimeRenderEngineLatest/resources/textures/brickwall_normal.jpg");
+    baseTexture = RenderContext::getInstance()->loadTexture2D("E:/learnRenderC++/resources/textures/awesomeface.png");
+    normalTexture = RenderContext::getInstance()->loadTexture2D("E: / learnRenderC++ / resources / textures / brickwall_normal.jpg");
 
     fboColorTexture = RenderContext::getInstance()->createTexture2D(TextureUsage::RenderTarget, TextureFormat::RGBA, RenderContext::getInstance()->windowsWidth,
         RenderContext::getInstance()->windowsHeight);
@@ -122,7 +122,7 @@ void BasePassRenderer::render(Camera* camera, RenderGraph & rg){
         renderContext->drawElements(mesh->numTriangle * 3, 0);
 
         renderContext->endRendering();
-    
+        
     });
 }
 

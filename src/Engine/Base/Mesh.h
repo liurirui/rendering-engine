@@ -32,7 +32,9 @@ NAMESPACE_START
         };
 
         std::string nowName;
-        
+        bool isTramslucent = false;
+        int modelNumber=0;
+
         unsigned int numVertex = 0;
         Vertex * vertices = nullptr;
         unsigned int vertexBufferID = 0;

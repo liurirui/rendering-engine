@@ -5,6 +5,7 @@
 #include <RHI/RenderContext.h>
 #include "Base/Model.h" // Include Mesh and Vertex definitions
 #include <unordered_map>
+#include"Base/Scene.h"
 class RenderGraph;
 
 NAMESPACE_START
@@ -26,9 +27,14 @@ private:
     //shader
     TRefCountPtr<Shader> lightingShader;
     TRefCountPtr<Shader> lightingShader_cube;
+    TRefCountPtr<Shader> depthMapShader;
 
     //FBO
     FrameBufferInfo OriginFramebuffer;
+    FrameBufferInfo DepthMapFramebuffer;
+
+    //Scene
+    Scene* scene=new Scene();
 
     //texture
     unordered_map<std::string, Texture2D*> ColorTextureMap;
@@ -36,17 +42,18 @@ private:
     Texture2D* fboDepthTexture = nullptr;
     Texture2D* baseTexture = nullptr;
     Texture2D* normalTexture = nullptr;
+    Texture2D* depthMap = nullptr;
 
     //Render pipeline status
-    GraphicsPipeline graphicsPipeline;
+    GraphicsPipeline graphicsPipeline, graphicsPipeline_DepthMap;
     DepthStencilState depthStencilState;
     
     const unsigned int SCR_WIDTH = 800;
     const unsigned int SCR_HEIGHT = 600;
     
-    Model* modelSample = nullptr;
     Model* modelSample1 = nullptr;
     Model* modelSample2 = nullptr;
+    Model* modelSample3 = nullptr;
 
     //light
     DirectionLight* directiontLight;
@@ -54,7 +61,7 @@ private:
 
     //cube
     unsigned int cubeVAO=0,cubeVBO=0;
-    float cubevertices[288] = {
+    float cubeVertices[288] = {
         // back face
         -1.0f, -1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 0.0f, 0.0f, // bottom-left
          1.0f,  1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 1.0f, 1.0f, // top-right
@@ -97,6 +104,17 @@ private:
          1.0f,  1.0f,  1.0f,  0.0f,  1.0f,  0.0f, 1.0f, 0.0f, // bottom-right
         -1.0f,  1.0f, -1.0f,  0.0f,  1.0f,  0.0f, 0.0f, 1.0f, // top-left
         -1.0f,  1.0f,  1.0f,  0.0f,  1.0f,  0.0f, 0.0f, 0.0f  // bottom-left        
+    };
+    unsigned int planeVAO = 0, planeVBO = 0;
+    float planeVertices[48] = {
+        // positions            // normals         // texcoords
+        -25.0f, -0.01f, -25.0f,  0.0f, 1.0f, 0.0f,   0.0f, 25.0f,
+        -25.0f, -0.01f,  25.0f,  0.0f, 1.0f, 0.0f,   0.0f,  0.0f,
+         25.0f, -0.01f,  25.0f,  0.0f, 1.0f, 0.0f,  25.0f,  0.0f,
+
+         -25.0f, -0.01f, -25.0f,  0.0f, 1.0f, 0.0f,   0.0f, 25.0f,
+         25.0f, -0.01f,  25.0f,  0.0f, 1.0f, 0.0f,  25.0f,  0.0f,
+         25.0f, -0.01f, -25.0f,  0.0f, 1.0f, 0.0f,  25.0f, 25.0f
     };
 };
 

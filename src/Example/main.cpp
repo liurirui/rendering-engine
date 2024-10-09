@@ -125,8 +125,8 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
     openGLRenderContext->windowsHeight = SRC_HEIGHT;
 
     BasePassRenderer* basePassRenderer = new BasePassRenderer;
-    Texture2D* texture = new Texture2D("E:/rendering-engine/resources/textures/background.jpg");
-    MeshRenderer* meshRenderer = new MeshRenderer("E:/rendering-engine/resources/objects/nanosuit/nanosuit.obj");
+    Texture2D* texture = new Texture2D("E:/resources/textures/background.jpg");
+    MeshRenderer* meshRenderer = new MeshRenderer("E:/resources/objects/nanosuit/nanosuit.obj");
     PostProcessRenderer* postprocessRenderer = new PostProcessRenderer;
     // render loop
     // -----------
@@ -157,8 +157,8 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
 
         glActiveTexture(GL_TEXTURE0);
         //glBindTexture(GL_TEXTURE_2D, basePassRenderer->getTargetColorTexture(0));	// use the color attachment texture as the texture of the quad plane
-        //glBindTexture(GL_TEXTURE_2D, meshRenderer->getTargetColorTextureID(0));
-        glBindTexture(GL_TEXTURE_2D, postprocessRenderer->getTargetColorTextureID(0));
+        glBindTexture(GL_TEXTURE_2D, meshRenderer->getTargetColorTextureID(0));
+        //glBindTexture(GL_TEXTURE_2D, postprocessRenderer->getTargetColorTextureID(0));
         glDrawArrays(GL_TRIANGLES, 0, 6);
 
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
