@@ -18,22 +18,27 @@ MeshRenderer::MeshRenderer(const std::string& modelPath) {
     modelSample2 = new Model(modelPath2);
     string modelPath3 = "E:/download_model/glass_11_2.fbx";
     modelSample3 = new Model(modelPath3);
-    Mesh *mesh = new Mesh();
-    scene->addMesh(mesh);
+   
     //Storing the model's mesh
+    Renderable* renderable = nullptr;
     for (Mesh* mesh : modelSample1->meshes) {
-        mesh->modelNumber = 1;
-        scene->addMesh(mesh);
+        renderable=new Renderable(mesh, false);
+        renderable->modelNumber = 1;
+        renderable->transform.setTransform(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.5f, 0.5f, 0.5f));
+        scene->addRenderable(renderable);
     }
     for (Mesh* mesh : modelSample2->meshes) {
-        mesh->modelNumber = 2;
-        mesh->isTramslucent = true;
-        scene->addMesh(mesh);
+        renderable = new Renderable(mesh, true);
+        renderable->modelNumber = 2;
+        renderable->transform.setTransform(glm::vec3(3.0f, 1.0f, 0.5f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(25.0f, 25.0f, 25.0f));
+        scene->addRenderable(renderable);
     }
     for (Mesh* mesh : modelSample3->meshes) {
-        mesh->modelNumber = 3;
-        if (mesh->nowName != "frame") mesh->isTramslucent = true;
-        scene->addMesh(mesh);
+        if (mesh->nowName == "frame")  renderable = new Renderable(mesh, false);
+        else  renderable = new Renderable(mesh, true);
+        renderable->modelNumber = 3;
+        renderable->transform.setTransform(glm::vec3(3.0f, 1.0f, -0.6f), glm::vec3(-90.0f, 0.0f, 0.0f), glm::vec3(0.01f, 0.01f, 0.01f));
+        scene->addRenderable(renderable);
     }
     depthMapShader = TRefCountPtr<Shader>(new Shader(Vert_depth_map, Frag_depth_map));
     lightingShader = TRefCountPtr<Shader>(new Shader(Vertmodel_lighting, Fragmodel_lighting));
@@ -115,41 +120,18 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
         renderContext->bindVertexBuffer(planeVAO);
         renderContext->drawArrays(0, 6);
 
-        // first modelMatrix(shadow)
-        glm::mat4 modelA = glm::mat4(1.0f);
-        modelA = glm::scale(modelA, glm::vec3(0.5f, 0.5f, 0.5f));
-       
-        //second modelMatrix(shadow)
-        glm::mat4 modelB = glm::mat4(1.0f);
-        modelB = glm::translate(modelB, glm::vec3(3.0f, 1.0f, 0.5f));
-        modelB = glm::scale(modelB, glm::vec3(25.0f));
-
-        //third modelMatrix(shadow)
-        glm::mat4 modelC = glm::mat4(1.0f);
-        modelC = glm::translate(modelC, glm::vec3(3.0f, 1.0f, -0.6f));
-        modelC = glm::scale(modelC, glm::vec3(0.01f));
-        modelC = glm::rotate(modelC, glm::radians(90.0f), glm::vec3(-1.0f, 0.0f, 0.0f));
-
-        glm::mat4 nowModel;
-        for (Mesh* mesh : scene->Opaque) {
-            if (mesh->modelNumber == 1) nowModel = modelA;
-            else if (mesh->modelNumber == 2) nowModel = modelB;
-            else if (mesh->modelNumber == 3) nowModel = modelC;
-            depthMapShader.getPtr()->setMat4("model", nowModel);
-            renderContext->bindVertexBuffer(mesh->vertexAttributeBufferID);
-            renderContext->bindIndexBuffer(mesh->indexBufferID);
-            renderContext->drawElements(mesh->numTriangle * 3, 0);
+        for (Renderable* renderable : scene->Opaque) {
+            depthMapShader.getPtr()->setMat4("model", renderable->transform.modelMatrix);
+            renderContext->bindVertexBuffer(renderable->mesh->vertexAttributeBufferID);
+            renderContext->bindIndexBuffer(renderable->mesh->indexBufferID);
+            renderContext->drawElements(renderable->mesh->numTriangle * 3, 0);
         }
 
-        for (Mesh* mesh : scene->Translucent) {
-            if (mesh->modelNumber == 1) nowModel = modelA;
-            else if (mesh->modelNumber == 2) nowModel = modelB;
-            else if (mesh->modelNumber == 3) nowModel = modelC;
-            depthMapShader.getPtr()->setMat4("model", nowModel);
-            scene->transparentModel[mesh] = nowModel;
-            renderContext->bindVertexBuffer(mesh->vertexAttributeBufferID);
-            renderContext->bindIndexBuffer(mesh->indexBufferID);
-            renderContext->drawElements(mesh->numTriangle * 3, 0);
+        for (Renderable* renderable : scene->Translucent) {
+            depthMapShader.getPtr()->setMat4("model", renderable->transform.modelMatrix);
+            renderContext->bindVertexBuffer(renderable->mesh->vertexAttributeBufferID);
+            renderContext->bindIndexBuffer(renderable->mesh->indexBufferID);
+            renderContext->drawElements(renderable->mesh->numTriangle * 3, 0);
         }
 
         // Start render scene
@@ -207,7 +189,7 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
         }
         
         //render plane
-        lightingShader.getPtr()->setMat4("model", modelA);
+        lightingShader.getPtr()->setMat4("model", model);
         baseTexture = ColorTextureMap["plane"];
         renderContext->bindVertexBuffer(planeVAO);
         renderContext->bindTexture(baseTexture->id, 0);
@@ -215,24 +197,21 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
 
         //Rendering Opaque Meshes
         lightingShader.getPtr()->setBool("isMirror", false);
-        for (Mesh* mesh : scene->Opaque) {
-            if (mesh->modelNumber == 1&& ColorTextureMap.find(mesh->nowName) != ColorTextureMap.end()) {
-                nowModel = modelA;
-                if (mesh->nowName == "Visor")  IsGlass = true;
+        for (Renderable* renderable : scene->Opaque) {
+            if (renderable->modelNumber == 1&& ColorTextureMap.find(renderable->mesh->nowName) != ColorTextureMap.end()) {
+                if (renderable->mesh->nowName == "Visor")  IsGlass = true;
                 else  IsGlass = false;
-                baseTexture = ColorTextureMap[mesh->nowName];
+                baseTexture = ColorTextureMap[renderable->mesh->nowName];
                 lightingShader.getPtr()->setBool("isGlass", IsGlass);
             }
-            else if (mesh->modelNumber == 3) {
-                nowModel = modelC;
-                baseTexture = ColorTextureMap["app"];
-            }
+            else if (renderable->modelNumber == 3)  baseTexture = ColorTextureMap["app"];
+           
             if (baseTexture) {
-                lightingShader.getPtr()->setMat4("model", nowModel);
+                lightingShader.getPtr()->setMat4("model", renderable->transform.modelMatrix);
                 renderContext->bindTexture(baseTexture->id, 0);
-                renderContext->bindVertexBuffer(mesh->vertexAttributeBufferID);
-                renderContext->bindIndexBuffer(mesh->indexBufferID);
-                renderContext->drawElements(mesh->numTriangle * 3, 0);
+                renderContext->bindVertexBuffer(renderable->mesh->vertexAttributeBufferID);
+                renderContext->bindIndexBuffer(renderable->mesh->indexBufferID);
+                renderContext->drawElements(renderable->mesh->numTriangle * 3, 0);
             }
             baseTexture = nullptr;
         }
@@ -243,23 +222,21 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
         //Rendering Translucent Meshes
         lightingShader.getPtr()->setBool("isGlass",true);
         lightingShader.getPtr()->setBool("isMirror", true);
-        for (Mesh* mesh : scene->Translucent) {
-           if (mesh->modelNumber == 2) {
-               nowModel = modelB;
+        for (Renderable* renderable : scene->Translucent) {
+           if (renderable->modelNumber == 2) {
                 lightingShader.getPtr()->setVec3("objectColor", 1.0f, 0.0f, 0.0f);
                 baseTexture = ColorTextureMap["glass"];
             }
-            else if (mesh->modelNumber == 3) {
-               nowModel = modelC;
+            else if (renderable->modelNumber == 3) {
                 lightingShader.getPtr()->setVec3("objectColor", 1.0f, 1.0f, 1.0f);
                 baseTexture = ColorTextureMap["glass"];
             }
             if (baseTexture) {
-                lightingShader.getPtr()->setMat4("model", nowModel);
+                lightingShader.getPtr()->setMat4("model", renderable->transform.modelMatrix);
                 renderContext->bindTexture(baseTexture->id, 0);
-                renderContext->bindVertexBuffer(mesh->vertexAttributeBufferID);
-                renderContext->bindIndexBuffer(mesh->indexBufferID);
-                renderContext->drawElements(mesh->numTriangle * 3, 0);
+                renderContext->bindVertexBuffer(renderable->mesh->vertexAttributeBufferID);
+                renderContext->bindIndexBuffer(renderable->mesh->indexBufferID);
+                renderContext->drawElements(renderable->mesh->numTriangle * 3, 0);
             }
             baseTexture = nullptr;
         }

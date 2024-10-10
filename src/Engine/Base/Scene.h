@@ -5,28 +5,20 @@
 #include <unordered_map>
 #include <glm/glm.hpp>
 #include "Mesh.h"
+#include"Renderable.h"
 NAMESPACE_START
 class Scene {
 public:
 	Scene() {};
-	~Scene() {};
-	void addMesh(Mesh* newMesh);
+	~Scene() ;
+	void addRenderable(Renderable* newMesh);
 	float calculateDistance(glm::vec3 cameraPosition, glm::vec3 meshPosition);
 	void sortTranslucentMeshes(glm::vec3 cameraPosition);
-	std::vector<Mesh*> Translucent;
-	std::vector<Mesh*> Opaque;
-
-	//transparent meshes' model matrix
-	std::unordered_map<Mesh*, glm::mat4> transparentModel;
-
-	//Calculate the bounding box center
-	glm::vec3 calculateBoundingBoxCenter(Mesh* mesh);
+	std::vector<Renderable*> Translucent;
+	std::vector<Renderable*> Opaque;
 
 private:
-	
 
 };
-
-
 
 NAMESPACE_END
