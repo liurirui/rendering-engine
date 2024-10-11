@@ -25,6 +25,7 @@ include ("${PROJECT_SOURCE_DIR}/FilterFolder.cmake")
 
 add_subdirectory("${THIRDPARTY_PATH}/glad")
 add_subdirectory("${THIRDPARTY_PATH}/stb_image")
+add_subdirectory("${THIRDPARTY_PATH}/imgui")
 
 add_subdirectory("${PROJECT_SOURCE_DIR}/src/Engine")
 
