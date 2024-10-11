@@ -17,6 +17,8 @@ public:
 	std::vector<Renderable*> Translucent;
 	std::vector<Renderable*> Opaque;
 
+	static std::string rootPath;
+
 private:
 
 };

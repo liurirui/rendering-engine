@@ -68,6 +68,7 @@ Shader* screenShader = nullptr;
 
 int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR lpCmdLine, _In_ int nShowCmd)
 {
+    Scene::rootPath = "F:/liurirui";
     // glfw: initialize and configure
     // ------------------------------
     glfwInit();
@@ -125,8 +126,11 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
     openGLRenderContext->windowsHeight = SRC_HEIGHT;
 
     BasePassRenderer* basePassRenderer = new BasePassRenderer;
-    Texture2D* texture = new Texture2D("E:/resources/textures/background.jpg");
-    MeshRenderer* meshRenderer = new MeshRenderer("E:/resources/objects/nanosuit/nanosuit.obj");
+    std::string texturepath = Scene::rootPath + "/resources/textures/background.jpg";
+    Texture2D* texture = new Texture2D(texturepath.c_str());
+
+    std::string objpath = Scene::rootPath + "/resources/objects/nanosuit/nanosuit.obj";
+    MeshRenderer* meshRenderer = new MeshRenderer(objpath);
     PostProcessRenderer* postprocessRenderer = new PostProcessRenderer;
     // render loop
     // -----------

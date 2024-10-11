@@ -2,6 +2,9 @@
 #include<iostream>
 #include <algorithm>
 NAMESPACE_START
+
+std::string Scene::rootPath = "";
+
 void Scene::addRenderable(Renderable* newRenderable) {
 	if (newRenderable == nullptr) {
 		std::cout << "Cannot add a null Renderable to the scene." << std::endl;
