@@ -41,8 +41,6 @@ private:
     Texture2D* fboColorTexture = nullptr;
     Texture2D* fboDepthTexture = nullptr;
     Texture2D* baseTexture = nullptr;
-    Texture2D* normalTexture = nullptr;
-    Texture2D* depthMap = nullptr;
 
     //Render pipeline status
     GraphicsPipeline graphicsPipeline, graphicsPipeline_DepthMap;

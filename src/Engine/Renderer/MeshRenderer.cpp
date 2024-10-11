@@ -37,7 +37,7 @@ MeshRenderer::MeshRenderer(const std::string& modelPath) {
         if (mesh->nowName == "frame")  renderable = new Renderable(mesh, false);
         else  renderable = new Renderable(mesh, true);
         renderable->modelNumber = 3;
-        renderable->transform.setTransform(glm::vec3(3.0f, 1.0f, -0.6f), glm::vec3(-90.0f, 0.0f, 0.0f), glm::vec3(0.01f, 0.01f, 0.01f));
+        renderable->transform.setTransform(glm::vec3(3.0f, 1.0f, -0.8f), glm::vec3(-90.0f, 0.0f, 0.0f), glm::vec3(0.01f, 0.01f, 0.01f));
         scene->addRenderable(renderable);
     }
     depthMapShader = TRefCountPtr<Shader>(new Shader(Vert_depth_map, Frag_depth_map));
@@ -70,14 +70,10 @@ MeshRenderer::MeshRenderer(const std::string& modelPath) {
     pipelineColorBlendAttachment.blendState.enabled = true;
     graphicsPipeline.rasterizationState.blendState.attachmentsBlendState.push_back(pipelineColorBlendAttachment);
 
-    depthMap = RenderContext::getInstance()->createTexture2D(TextureUsage::DepthStencil, TextureFormat::Depth, RenderContext::getInstance()->windowsWidth,
-        RenderContext::getInstance()->windowsHeight);
-    DepthMapFramebuffer.depthStencilAttachment.texture = depthMap;
-    DepthMapFramebuffer.depthStencilAttachment.useStencil = false;
+
     graphicsPipeline_DepthMap.shader = depthMapShader.getPtr();
     //graphicsPipeline_DepthMap.rasterizationState.cullMode = CullMode::Front;
     
-
     if (!cubeVBO) {
         cubeVBO = RenderContext::getInstance()->createVertexBuffer(cubeVertices, sizeof(cubeVertices));
     }
@@ -107,6 +103,8 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
     const char* passName = "modelPass";
     rg.addPass(passName, camera, [this, camera](RenderContext* renderContext) {
         //Rendering shadow maps
+        depthStencilState.depthTest = true;
+        depthStencilState.depthWrite = true;
         renderContext->beginRendering(directiontLight->getShadow()->DepthMapFramebuffer);
         renderContext->setDepthStencilState(depthStencilState);
         renderContext->bindPipeline(graphicsPipeline_DepthMap);
@@ -217,7 +215,9 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
         }
 
         //Sort transparent mesh from far to near
-        scene->sortTranslucentMeshes(camera->Position);
+        //scene->sortTranslucentMeshes(camera->Position);
+        depthStencilState.depthWrite = false;
+        renderContext->setDepthStencilState(depthStencilState);
 
         //Rendering Translucent Meshes
         lightingShader.getPtr()->setBool("isGlass",true);
@@ -267,8 +267,6 @@ MeshRenderer::~MeshRenderer() {
     delete fboColorTexture;
     delete fboDepthTexture;
     delete baseTexture;
-    delete normalTexture;
-    delete depthMap;
     delete directiontLight;
     for (PointLight* ptr : pointLights) {
         delete ptr;
