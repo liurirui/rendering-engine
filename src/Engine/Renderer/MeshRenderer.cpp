@@ -14,9 +14,9 @@ MeshRenderer::MeshRenderer(const std::string& modelPath) {
     depthStencilState.depthTest = true;
     depthStencilState.depthWrite = true;
     modelSample1 = new Model(modelPath);
-    string modelPath2 = "E:/download_model/cat_mask.fbx";
+    string modelPath2 = Scene::rootPath + "/resources/objects//cat_mask.fbx";
     modelSample2 = new Model(modelPath2);
-    string modelPath3 = "E:/download_model/glass_11_2.fbx";
+    string modelPath3 = Scene::rootPath + "/resources/objects//glass_11_2.fbx";
     modelSample3 = new Model(modelPath3);
    
     //Storing the model's mesh
@@ -43,16 +43,15 @@ MeshRenderer::MeshRenderer(const std::string& modelPath) {
     depthMapShader = TRefCountPtr<Shader>(new Shader(Vert_depth_map, Frag_depth_map));
     lightingShader = TRefCountPtr<Shader>(new Shader(Vertmodel_lighting, Fragmodel_lighting));
     lightingShader_cube= TRefCountPtr<Shader>(new Shader(Vertmodel_lighting, Fragmodel_cube));
-
-    ColorTextureMap["hands"] = RenderContext::getInstance()->loadTexture2D("E:/resources/objects/nanosuit/hand_dif.png");
-    ColorTextureMap["Visor"] = RenderContext::getInstance()->loadTexture2D("E:/resources/objects/nanosuit/glass_dif.png");
-    ColorTextureMap["Body"] = RenderContext::getInstance()->loadTexture2D("E:/resources/objects/nanosuit/body_dif.png");
-    ColorTextureMap["Helmet"] = RenderContext::getInstance()->loadTexture2D("E:/resources/objects/nanosuit/helmet_diff.png");
-    ColorTextureMap["Legs"] = RenderContext::getInstance()->loadTexture2D("E:/resources/objects/nanosuit/leg_dif.png");
-    ColorTextureMap["Arms"] = RenderContext::getInstance()->loadTexture2D("E:/resources/objects/nanosuit/arm_dif.png");
-    ColorTextureMap["glass"] = RenderContext::getInstance()->loadTexture2D("E:/resources/textures/skybox/back.jpg");
-    ColorTextureMap["app"] = RenderContext::getInstance()->loadTexture2D("E:/resources/textures/background.jpg");
-    ColorTextureMap["plane"]= RenderContext::getInstance()->loadTexture2D("E:/resources/textures/wood.png");
+    ColorTextureMap["hands"] = RenderContext::getInstance()->loadTexture2D((Scene::rootPath + "/resources/objects/nanosuit/hand_dif.png").c_str());
+    ColorTextureMap["Visor"] = RenderContext::getInstance()->loadTexture2D((Scene::rootPath + "/resources/objects/nanosuit/glass_dif.png").c_str());
+    ColorTextureMap["Body"] = RenderContext::getInstance()->loadTexture2D((Scene::rootPath + "/resources/objects/nanosuit/body_dif.png").c_str());
+    ColorTextureMap["Helmet"] = RenderContext::getInstance()->loadTexture2D((Scene::rootPath + "/resources/objects/nanosuit/helmet_diff.png").c_str());
+    ColorTextureMap["Legs"] = RenderContext::getInstance()->loadTexture2D((Scene::rootPath + "/resources/objects/nanosuit/leg_dif.png").c_str());
+    ColorTextureMap["Arms"] = RenderContext::getInstance()->loadTexture2D((Scene::rootPath + "/resources/objects/nanosuit/arm_dif.png").c_str());
+    ColorTextureMap["glass"] = RenderContext::getInstance()->loadTexture2D((Scene::rootPath + "/resources/textures/skybox/back.jpg").c_str());
+    ColorTextureMap["app"] = RenderContext::getInstance()->loadTexture2D((Scene::rootPath + "/resources/textures/background.jpg").c_str());
+    ColorTextureMap["plane"]= RenderContext::getInstance()->loadTexture2D((Scene::rootPath + "/resources/textures/wood.png").c_str());
 
     //set  Originframebuffer's Texture Attachments
     fboColorTexture = RenderContext::getInstance()->createTexture2D(TextureUsage::RenderTarget, TextureFormat::RGBA32F, RenderContext::getInstance()->windowsWidth,

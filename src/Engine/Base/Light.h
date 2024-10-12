@@ -23,7 +23,7 @@ public:
 
     FrameBufferInfo DepthMapFramebuffer;
     Texture2D* depthMap = nullptr;
-    float near_plane = 1.0f, far_plane = 20.0f;
+    const float near_plane = 1.0f, far_plane = 25.0f;
     const unsigned int SCR_WIDTH = 800;
     const unsigned int SCR_HEIGHT = 600;
     ~Shadow() { };
@@ -83,7 +83,7 @@ public:
 
     // 实现定向光的阴影视图矩阵计算
     glm::mat4 calculateLightSpaceMatrix() {
-        glm::mat4 lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, 1.0f, 25.0f);
+        glm::mat4 lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, shadow->near_plane, shadow->far_plane);
 
         glm::vec3 lightPos = -direction * 10.0f;  // 光源的位置可以根据方向拉远一定的距离
         glm::vec3 target = glm::vec3(0.0f, 0.0f, 0.0f);  // 看向场景中心

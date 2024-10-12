@@ -214,7 +214,7 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
     if (!glfwInit())
         return 1;
 
-    Scene::rootPath = "F:/liurirui";
+    Scene::rootPath = "E:/";
 
     // Decide GL+GLSL versions
 #if defined(IMGUI_IMPL_OPENGL_ES2)
@@ -244,6 +244,9 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
     if (window == nullptr)
         return 1;
     glfwMakeContextCurrent(window);
+    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+    glfwSetCursorPosCallback(window, mouse_callback);
+    glfwSetScrollCallback(window, scroll_callback);
     glfwSwapInterval(1); // Enable vsync
 
         // glad: load all OpenGL function pointers
@@ -333,7 +336,7 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
     while (!glfwWindowShouldClose(window))
 #endif
     {
-
+        
         /////
         // Poll and handle events (inputs, window resize, etc.)
         // You can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to tell if dear imgui wants to use your inputs.
@@ -378,6 +381,7 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
             ImGui::End();
         }
+        
 
         // 3. Show another simple window.
         if (show_another_window)
@@ -390,7 +394,7 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
         }
 
         // Rendering
-        ImGui::Render();
+        
         int display_w, display_h;
         glfwGetFramebufferSize(window, &display_w, &display_h);
         glViewport(0, 0, display_w, display_h);
@@ -408,7 +412,6 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
         // input
         // -----
         processInput(window);
-
         RenderGraph renderGraph;
 
         //basePassRenderer->render(&camera, renderGraph);
@@ -427,7 +430,7 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
         glBindTexture(GL_TEXTURE_2D, meshRenderer->getTargetColorTextureID(0));
         //glBindTexture(GL_TEXTURE_2D, postprocessRenderer->getTargetColorTextureID(0));
         glDrawArrays(GL_TRIANGLES, 0, 6);
-
+        ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
         glfwSwapBuffers(window);
