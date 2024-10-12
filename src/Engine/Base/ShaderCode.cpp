@@ -211,6 +211,7 @@ void main()
 {      
      if(!isMirror){
         vec4 texColor = texture(baseTexture, fs_in.UV);
+        texColor.rgb=pow(texColor.rgb, vec3(2.2));  
         vec3 norm = normalize(fs_in.Normal);
         vec3 viewDir = normalize(viewPos - fs_in.FragPos); 
         //ambient
@@ -227,14 +228,13 @@ void main()
         //vec3 result = Point + Direction + Ambient;
         float shadow = ShadowCalculation(fs_in.FragPosLightSpace);
         vec3 result = (Ambient +  Point + (1.0 - shadow)* Direction);
-        result= pow(result, vec3(2.2));  
         FragColor=vec4 (result,1.0);
     }
     else{
-        vec3 I = normalize(fs_in.FragPos - viewPos);
+        vec3 I = normalize(viewPos - fs_in.FragPos);
         vec3 R = reflect(I, normalize(fs_in.Normal));
-        vec3 reflectColor = texture(baseTexture, R.xy).rgb*0.2+0.3*objectColor;
-
+        vec3 reflectColor = pow(texture(baseTexture, R.xy * 0.5 + 0.5).rgb, vec3(2.2)) * 0.3 + 0.2 * objectColor;
+        reflectColor =min(reflectColor,1.0f);
         FragColor = vec4(reflectColor, 0.1);
     }
 }
@@ -347,7 +347,7 @@ void main()
 {
     vec3 texColor = texture(scene, TexCoords).rgb;
     float brightness = dot(texColor, vec3(0.2126, 0.7152, 0.0722));
-    if(brightness > 0.8)
+    if(brightness > 1.5)
         FragColor = vec4(texColor, 1.0);
     else
         FragColor = vec4(0.0, 0.0, 0.0, 1.0);
@@ -496,101 +496,29 @@ layout (location = 0) out vec4 FragColor;
 
 in vec2 TexCoords;
 
-uniform sampler2D sceneTexture;
-uniform float iTime;
-//create a uniform for resolution
+uniform sampler2D sceneTexture; // 初始场景纹理
+uniform vec2 rippleCenter;      // 波纹中心（通常是屏幕坐标）
+uniform float time;             // 时间变量，控制波纹扩展
+uniform float waveAmplitude;    // 波纹振幅
+uniform float waveFrequency;    // 波纹频率
+uniform float waveSpeed;        // 波纹扩展速度
 
-//create a speed
-float speed = 0.3;
-vec2 iResolution=vec2(800,600);
-#define MAX_RADIUS 2
+void main() {
+    // 计算当前片段距离波纹中心的距离
+    vec2 uv = TexCoords - rippleCenter;
+    float dist = length(uv);
 
+    // 基于距离计算波纹形状，使用正弦波模拟
+    float ripple = sin(dist * waveFrequency - time * waveSpeed) * waveAmplitude / (dist + 1.0); 
 
-//create a hash12 func
-float hash12(vec2 p)
-{
-    vec3 p3  = fract(vec3(p.xyx) * .1031);
-    p3 += dot(p3, p3.yzx + 19.19);
-    return fract((p3.x + p3.y) * p3.z);
-}
+    // 调整 UV 纹理坐标，根据波纹效果动态变形
+    vec2 rippleTexCoords = TexCoords + uv * ripple;
+    rippleTexCoords = clamp(rippleTexCoords, vec2(0.0), vec2(1.0));  // 防止纹理坐标超出范围
 
-//create a hash22 func
-vec2 hash22(vec2 p)
-{
-    vec3 p3 = fract(vec3(p.xyx) * vec3(.1031, .1030, .0973));
-    p3 += dot(p3, p3.yzx+19.19);
-    return fract((p3.xx+p3.yz)*p3.zy);
-}
+    // 采样场景纹理
+    vec4 sceneColor = texture(sceneTexture, rippleTexCoords);
 
-
-void main()
-{
-    //calculate the resolution for the grid cell division
-    float resolution = 10;
-    //normalize the fragCoord and multiply the resolution to extend the uv
-    vec2 uv = TexCoords.xy / iResolution.y * resolution;
-    //Grid Cell Division
-    vec2 p0 = floor(uv);
-    //create a finalCol to store the color
-    vec3 finalCol = vec3(0.0);
-
-    //create a v2 to store the circles's effect
-    vec2 circles = vec2(0.);
-
-    for(int j = -MAX_RADIUS;j<= MAX_RADIUS;++j)
-    {
-        for(int i = -MAX_RADIUS;i<= MAX_RADIUS;++i)
-        {
-            //move the p0 to the center of the cell
-            vec2 pi = p0 + vec2(i, j);
-
-            vec2 p = pi+hash22(pi);
-
-            //create a time factor and distance calculation
-            float t = fract(iTime * speed+hash12(pi));
-            vec2 v = p - uv;
-
-            float d = length(v) - (float(MAX_RADIUS)+1)*t;
-            
-            //d = sin(d*31)*smoothstep(-0.6, -0.3, d) * smoothstep(0., -0.3, d);
-            //d *= (1 - t) * (1 - t);
-
-            float h = 1e-3;
-            float d1 = d - h;
-            float d2 = d + h;
-            float p1 = sin(31.*d1)*smoothstep(-0.6, -0.3, d1) * smoothstep(0., -0.3, d1);
-            float p2 = sin(31.*d2)*smoothstep(-0.6, -0.3, d2) * smoothstep(0., -0.3, d2);
-            float gradient = (p2 - p1) / (2 * h);
-            d = gradient * (1 - t) * (1 - t);
-
-
-            vec3 col = vec3(1.0);
-            finalCol += col*d;
-
-            circles += 0.5 * normalize(v) * d;
-
-        }
-
-    }
-
-    //finalCol /= float((MAX_RADIUS*2+1)*(MAX_RADIUS*2+1));
-
-    circles /= float((MAX_RADIUS*2+1)*(MAX_RADIUS*2+1));
-    //cal the normal by the circles : x^2 + y^2 + z^2 = 1;
-    vec3 normal = vec3(circles, sqrt(1.0 - dot(circles, circles)));
-    //cal the instensity of the benduv
-    float tempVal = smoothstep(0.1, 0.6, abs(fract(0.05*iTime+0.5)*2-1));
-    float intensity = mix(0.01,0.15,tempVal);
-    //cal the bend uv
-    vec2 bendUV = uv/resolution - intensity*normal.xy;
-    finalCol = texture(sceneTexture, bendUV).rgb;
-
-    //cal the specular
-    //create half vector
-    vec3 halfVector = vec3(1.0, 0.7, 0.5);
-    float specular = 5 * pow(clamp(dot(normal, normalize(halfVector)), 0., 1.), 6.);
-
-
-    FragColor = vec4(finalCol, 1.0)+specular;
+    // 输出最终的颜色
+    FragColor = sceneColor;
 }
 )";

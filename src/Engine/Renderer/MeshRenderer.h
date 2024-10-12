@@ -23,6 +23,10 @@ public:
     unsigned int getTargetColorTextureID(int  attachment);
     FrameBufferInfo* getTargetFrameBuffer();
 
+    //light
+    DirectionLight* directionLight;
+    vector<PointLight*> pointLights;
+
 private:
     //shader
     TRefCountPtr<Shader> lightingShader;
@@ -49,16 +53,12 @@ private:
     const unsigned int SCR_WIDTH = 800;
     const unsigned int SCR_HEIGHT = 600;
 
-    
-    
     //model
     Model* modelSample1 = nullptr;
     Model* modelSample2 = nullptr;
     Model* modelSample3 = nullptr;
 
-    //light
-    DirectionLight* directiontLight;
-    vector<PointLight*> pointLights;
+    
 
     //cube
     unsigned int cubeVAO=0,cubeVBO=0;

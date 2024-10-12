@@ -92,7 +92,7 @@ PostProcessRenderer::PostProcessRenderer() {
         RenderContext::getInstance()->windowsHeight);
     ColorAttachment rippleColorAttachment;
     rippleColorAttachment.attachment = 0;
-    rippleColorAttachment.texture = fboCartoonTexture;
+    rippleColorAttachment.texture = fboRippleTexture;
     rippleColorAttachment.clearColor = glm::vec4(1, 1, 1, 1);
     RippleFramebuffer.colorAttachments.emplace_back(std::move(rippleColorAttachment));
 
@@ -213,43 +213,47 @@ void PostProcessRenderer::render(RenderGraph& rg, FrameBufferInfo* sceneFBO) {
 
     //Cartoon effect
     const char* CartoonPassName = "CartoonPass";
-    rg.addPass(CartoonPassName, sceneFBO, [this, sceneFBO](RenderContext* renderContext) {
-        //Radial Blur
+    rg.addPass(CartoonPassName, bloomTexture, [this](RenderContext* renderContext) {
         renderContext->beginRendering(CartoonFramebuffer);
         CartoonShader.getPtr()->use();
        int errorCode = glGetError(); 
         renderContext->bindVertexBuffer(quadVAO);
         CartoonShader.getPtr()->setInt("sceneTexture", 0);
-        renderContext->bindTexture(sceneFBO->colorAttachments[0].texture->id, 0);
+        renderContext->bindTexture(bloomTexture->id, 0);
         renderContext->drawArrays(0, 6);
         renderContext->endRendering();
         });
 
-    ////Ripple effect
-    //const char* RipplePassName = "RipplePass";
-    //rg.addPass(RipplePassName, sceneTexture, [this, sceneTexture](RenderContext* renderContext) {
-    //    //Radial Blur
-    //    renderContext->beginRendering(RippleFramebuffer);
-    //    int errorCode = glGetError();
-    //    RippleShader.getPtr()->use();
-    //    errorCode = glGetError();
-    //    renderContext->bindVertexBuffer(quadVAO);
-    //    RippleShader.getPtr()->setFloat("iTime", time);
-    //    RippleShader.getPtr()->setInt("sceneTexture", 0);
-    //    renderContext->bindTexture(sceneTexture->id, 0);
-    //    renderContext->drawArrays(0, 6);
-    //    renderContext->endRendering();
-    //    });
+    //Ripple effect
+    const char* RipplePassName = "RipplePass";
+    rg.addPass(RipplePassName, bloomTexture, [this](RenderContext* renderContext) {
+        //Radial Blur
+        renderContext->beginRendering(RippleFramebuffer);
+        int errorCode = glGetError();
+        RippleShader.getPtr()->use();
+        errorCode = glGetError();
+        renderContext->bindVertexBuffer(quadVAO);
+        RippleShader.getPtr()->setVec2("rippleCenter", glm::vec2(0.5f, 0.5f));
+        RippleShader.getPtr()->setFloat("time", time);
+        RippleShader.getPtr()->setFloat("waveAmplitude", 0.02f);
+        RippleShader.getPtr()->setFloat("waveFrequency", 20.0f);
+        RippleShader.getPtr()->setFloat("waveSpeed", 5.0f);
+        RippleShader.getPtr()->setInt("sceneTexture", 0);
+        renderContext->bindTexture(bloomTexture->id, 0);
+        renderContext->drawArrays(0, 6);
+        renderContext->endRendering();
+        });
 
    
 }
 
 unsigned int PostProcessRenderer::getTargetColorTextureID(int  attachment, int effectNo) {
     switch (effectNo) {
-    case 1:  useFrameBufferInfo = &BloomFramebuffer;  break;
-    case 2:  useFrameBufferInfo = &RadialFramebuffer; break;
+    case 1:  useFrameBufferInfo = &BloomFramebuffer;   break;
+    case 2:  useFrameBufferInfo = &RadialFramebuffer;  break;
     case 3:  useFrameBufferInfo = &MotionFramebufferB; break;
-    default:  useFrameBufferInfo = &CartoonFramebuffer; break;
+    case 4:  useFrameBufferInfo = &CartoonFramebuffer; break;
+    case 5:  useFrameBufferInfo = &RippleFramebuffer;  break;
     }
     if (attachment >= useFrameBufferInfo->colorAttachments.size()) {
         return 0;

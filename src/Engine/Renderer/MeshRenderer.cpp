@@ -91,11 +91,11 @@ MeshRenderer::MeshRenderer(const std::string& modelPath) {
         RenderContext::getInstance()->setUpVertexBufferLayoutInfo(planeVBO, planeVAO, 3, 8 * sizeof(float), 1, 3);
         RenderContext::getInstance()->setUpVertexBufferLayoutInfo(planeVBO, planeVAO, 2, 8 * sizeof(float), 2, 6);
     }
-    directiontLight = new DirectionLight(glm::vec3(-0.5f, -0.8f, -0.5f), glm::vec3(1.5f, 1.5f, 1.5f), 1.0f);
-    pointLights.push_back(new PointLight(glm::vec3(0.0f, 12.0f, 1.5f), glm::vec3(10.0f, 0.0f, 0.0f), 0.4f));
-    pointLights.push_back(new PointLight(glm::vec3(-2.0f, 0.5f, -3.0f), glm::vec3(0.0f, 10.0f, 0.0f), 0.4f));
-    pointLights.push_back(new PointLight(glm::vec3(3.0f, 8.5f, 1.0f), glm::vec3(0.0f, 0.0f, 12.0f), 0.4f));
-    pointLights.push_back(new PointLight(glm::vec3(-8.0f, 2.4f, -1.0f), glm::vec3(6.0f, 6.0f, 6.0f), 0.2f));
+    directionLight = new DirectionLight(glm::vec3(-0.5f, -0.8f, -0.5f), glm::vec3(2.0f, 2.0f, 2.0f), 1.0f);
+    pointLights.push_back(new PointLight(glm::vec3(0.0f, 12.0f, 1.5f), glm::vec3(15.0f, 0.0f, 0.0f), 0.8f));
+    pointLights.push_back(new PointLight(glm::vec3(-2.0f, 0.5f, -3.0f), glm::vec3(0.0f, 15.0f, 0.0f), 0.8f));
+    pointLights.push_back(new PointLight(glm::vec3(3.0f, 8.5f, 1.0f), glm::vec3(0.0f, 0.0f, 30.0f), 0.6f));
+    pointLights.push_back(new PointLight(glm::vec3(-8.0f, 2.4f, -1.0f), glm::vec3(6.0f, 6.0f, 6.0f), 0.6f));
 }
 
 void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
@@ -104,13 +104,13 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
         //Rendering shadow maps
         depthStencilState.depthTest = true;
         depthStencilState.depthWrite = true;
-        renderContext->beginRendering(directiontLight->getShadow()->DepthMapFramebuffer);
+        renderContext->beginRendering(directionLight->getShadow()->DepthMapFramebuffer);
         renderContext->setDepthStencilState(depthStencilState);
         renderContext->bindPipeline(graphicsPipeline_DepthMap);
         depthMapShader.getPtr()->use();
         int errorCode = glGetError();
         glm::mat4 model = glm::mat4(1.0f);
-        depthMapShader.getPtr()->setMat4("lightSpaceMatrix",directiontLight->calculateLightSpaceMatrix());
+        depthMapShader.getPtr()->setMat4("lightSpaceMatrix",directionLight->calculateLightSpaceMatrix());
         depthMapShader.getPtr()->setMat4("model", model);
 
         //plane(shadow)
@@ -145,11 +145,11 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
         lightingShader_cube.getPtr()->setMat4("view", view);
 
         //Render a large point light source to act as a unidirectional light source
-        static glm::vec3 directionPos = directiontLight->getDirection()*(-80.0f);
+        static glm::vec3 directionPos = directionLight->getDirection()*(-80.0f);
         light_model = glm::translate(light_model, directionPos);
         light_model = glm::scale(light_model, glm::vec3(3.0f, 3.0f, 3.0f));
         lightingShader_cube.getPtr()->setMat4("model", light_model);
-        lightingShader_cube.getPtr()->setVec3("lightColor", directiontLight->getColor());
+        lightingShader_cube.getPtr()->setVec3("lightColor", directionLight->getColor());
         renderContext->bindVertexBuffer(cubeVAO);
         renderContext->drawArrays(0, 36);
 
@@ -170,11 +170,11 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
         lightingShader.getPtr()->setMat4("view", view);
         // light properties
         lightingShader.getPtr()->setVec3("viewPos", camera->Position);
-        lightingShader.getPtr()->setVec3("lightPos", directiontLight->getDirection()*(-10.0f));
-        lightingShader.getPtr()->setMat4("lightSpaceMatrix", directiontLight->calculateLightSpaceMatrix());
-        lightingShader.getPtr()->setVec3("light.direction", directiontLight->getDirection());
-        lightingShader.getPtr()->setVec3("light.color", directiontLight->getColor());
-        lightingShader.getPtr()->setFloat("light.intensity", directiontLight->getIntensity());
+        lightingShader.getPtr()->setVec3("lightPos", directionLight->getDirection()*(-10.0f));
+        lightingShader.getPtr()->setMat4("lightSpaceMatrix", directionLight->calculateLightSpaceMatrix());
+        lightingShader.getPtr()->setVec3("light.direction", directionLight->getDirection());
+        lightingShader.getPtr()->setVec3("light.color", directionLight->getColor());
+        lightingShader.getPtr()->setFloat("light.intensity", directionLight->getIntensity());
         lightingShader.getPtr()->setVec3("ambient", 0.3f, 0.3f, 0.3f);
         lightingShader.getPtr()->setVec3("diffuse", 0.6f, 0.6f, 0.6f);
         lightingShader.getPtr()->setVec3("specular", 1.0f, 1.0f, 1.0f);
@@ -185,7 +185,7 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
         bool IsGlass = false;
         lightingShader.getPtr()->setInt("baseTexture", 0);
         lightingShader.getPtr()->setInt("shadowMap", 1);
-        renderContext->bindTexture(directiontLight->getShadow()->depthMap->id, 1);
+        renderContext->bindTexture(directionLight->getShadow()->depthMap->id, 1);
         for (int i = 0; i<pointLights.size(); ++i) {
             lightingShader.getPtr()->setVec3(("point[" + std::to_string(i) + "].position").c_str(), pointLights[i]->getPosition());
             lightingShader.getPtr()->setVec3(("point[" + std::to_string(i) + "].color").c_str(), pointLights[i]->getColor());
@@ -232,7 +232,7 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
         lightingShader.getPtr()->setBool("isMirror", true);
         for (Renderable* renderable : scene->Translucent) {
            if (renderable->modelNumber == 2) {
-                lightingShader.getPtr()->setVec3("objectColor", 1.0f, 0.0f, 0.0f);
+                lightingShader.getPtr()->setVec3("objectColor", 0.0f, 0.0f, 10.0f);
                 baseTexture = ColorTextureMap["glass"];
             }
             else if (renderable->modelNumber == 3) {
@@ -275,7 +275,7 @@ MeshRenderer::~MeshRenderer() {
     delete fboColorTexture;
     delete fboDepthTexture;
     delete baseTexture;
-    delete directiontLight;
+    delete directionLight;
     for (PointLight* ptr : pointLights) {
         delete ptr;
     }

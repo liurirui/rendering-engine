@@ -11,7 +11,7 @@ public:
     ~PostProcessRenderer();
     virtual void render(RenderGraph& rg, FrameBufferInfo* sceneFBO);
     unsigned int getTargetColorTextureID(int  attachment,int effectNo );
-
+    float time=0;
 private:
     //shader
     TRefCountPtr<Shader> HightLightShader;
