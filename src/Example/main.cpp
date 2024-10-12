@@ -9,6 +9,7 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include <Engine/Base/Camera.h>
+#include<Engine/Base/Light.h>
 #include <Engine/RHI/OpenGL/OpenGLRenderContext.h>
 #include<Engine/Renderer/RenderGraph/RenderGraph.h>
 #include<Engine/Renderer/BasePassRenderer.h>
@@ -149,6 +150,7 @@ int asdasdasdsa(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_
     std::string objpath = Scene::rootPath + "/resources/objects/nanosuit/nanosuit.obj";
     MeshRenderer* meshRenderer = new MeshRenderer(objpath);
     PostProcessRenderer* postprocessRenderer = new PostProcessRenderer;
+    
     // render loop
     // -----------
     while (!glfwWindowShouldClose(window))
@@ -371,7 +373,7 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
             static float f = 0.0f;
             static int counter = 0;
 
-            ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
+            ImGui::Begin("Hello, world! Hold down the 'Alt' key");                          // Create a window called "Hello, world!" and append into it.
 
             ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
             ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
@@ -385,6 +387,7 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
             ImGui::SameLine();
             ImGui::Text("counter = %d", counter);
 
+            //Provides the option to select post-processing
             ImGui::Text("Select Post-processing Effect");
             ImGui::RadioButton("Origin", &useEffect, 0);
             ImGui::SameLine(0, 10);
@@ -396,6 +399,24 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
             ImGui::SameLine(0, 10);
             ImGui::RadioButton("Cartoon", &useEffect, 4);
 
+            ImGui::RadioButton("Ripple", &useEffect, 5);
+            
+            //Provides option to turn directional lights on and off
+            ImGui::Text("Switch of Direction Light");
+            if (ImGui::RadioButton("ON", meshRenderer->directionLight->Switch)) {
+                if (!meshRenderer->directionLight->Switch) {
+                    meshRenderer->directionLight->turnOn();
+                }
+            }
+
+            ImGui::SameLine(0, 10);
+
+            if (ImGui::RadioButton("OFF", !meshRenderer->directionLight->Switch)) {
+                if (meshRenderer->directionLight->Switch) {
+                    meshRenderer->directionLight->turnOff();
+                }
+            }
+            
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
             ImGui::End();
         }
@@ -426,7 +447,7 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
         float currentFrame = static_cast<float>(glfwGetTime());
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
-
+        postprocessRenderer->time = lastFrame;
         // input
         // -----
         processInput(window);
