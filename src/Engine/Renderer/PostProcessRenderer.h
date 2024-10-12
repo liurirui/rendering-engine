@@ -10,7 +10,7 @@ public:
     PostProcessRenderer();
     ~PostProcessRenderer();
     virtual void render(RenderGraph& rg, FrameBufferInfo* sceneFBO);
-    unsigned int getTargetColorTextureID(int  attachment);
+    unsigned int getTargetColorTextureID(int  attachment,int effectNo );
 
 private:
     //shader
@@ -32,6 +32,7 @@ private:
     FrameBufferInfo CartoonFramebuffer;
     FrameBufferInfo RippleFramebuffer;
     FrameBufferInfo* NowFramebuffer;
+    FrameBufferInfo* useFrameBufferInfo;
 
     GraphicsPipeline PostProcessRenderer_graphicsPipeline;
     DepthStencilState PostProcessRenderer_depthStencilState;

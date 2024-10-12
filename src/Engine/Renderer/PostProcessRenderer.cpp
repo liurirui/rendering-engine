@@ -243,12 +243,18 @@ void PostProcessRenderer::render(RenderGraph& rg, FrameBufferInfo* sceneFBO) {
 
    
 }
-unsigned int PostProcessRenderer::getTargetColorTextureID(int  attachment) {
 
-    if (attachment >= BloomFramebuffer.colorAttachments.size()) {
+unsigned int PostProcessRenderer::getTargetColorTextureID(int  attachment, int effectNo) {
+    switch (effectNo) {
+    case 1:  useFrameBufferInfo = &BloomFramebuffer;  break;
+    case 2:  useFrameBufferInfo = &RadialFramebuffer; break;
+    case 3:  useFrameBufferInfo = &MotionFramebufferB; break;
+    default:  useFrameBufferInfo = &CartoonFramebuffer; break;
+    }
+    if (attachment >= useFrameBufferInfo->colorAttachments.size()) {
         return 0;
     }
-    return BloomFramebuffer.colorAttachments[attachment].texture->id;
+    return useFrameBufferInfo->colorAttachments[attachment].texture->id;
 }
 
 PostProcessRenderer::~PostProcessRenderer() {

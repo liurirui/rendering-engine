@@ -61,7 +61,7 @@ MeshRenderer::MeshRenderer(const std::string& modelPath) {
     ColorAttachment colorAttachment;
     colorAttachment.attachment = 0;
     colorAttachment.texture = fboColorTexture;
-    colorAttachment.clearColor = glm::vec4(0.2, 0.1, 0.3, 1);
+    colorAttachment.clearColor = glm::vec4(0.1, 0.05, 0.15, 1);
     OriginFramebuffer.colorAttachments.emplace_back(std::move(colorAttachment));
     OriginFramebuffer.depthStencilAttachment.texture = fboDepthTexture;
     graphicsPipeline.shader = lightingShader.getPtr();
@@ -95,7 +95,7 @@ MeshRenderer::MeshRenderer(const std::string& modelPath) {
     pointLights.push_back(new PointLight(glm::vec3(0.0f, 12.0f, 1.5f), glm::vec3(10.0f, 0.0f, 0.0f), 0.4f));
     pointLights.push_back(new PointLight(glm::vec3(-2.0f, 0.5f, -3.0f), glm::vec3(0.0f, 10.0f, 0.0f), 0.4f));
     pointLights.push_back(new PointLight(glm::vec3(3.0f, 8.5f, 1.0f), glm::vec3(0.0f, 0.0f, 12.0f), 0.4f));
-    pointLights.push_back(new PointLight(glm::vec3(-8.0f, 2.4f, -1.0f), glm::vec3(10.0f, 10.0f, 10.0f), 0.2f));
+    pointLights.push_back(new PointLight(glm::vec3(-8.0f, 2.4f, -1.0f), glm::vec3(6.0f, 6.0f, 6.0f), 0.2f));
 }
 
 void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
@@ -144,6 +144,15 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
         lightingShader_cube.getPtr()->setMat4("projection", projection);
         lightingShader_cube.getPtr()->setMat4("view", view);
 
+        //Render a large point light source to act as a unidirectional light source
+        static glm::vec3 directionPos = directiontLight->getDirection()*(-80.0f);
+        light_model = glm::translate(light_model, directionPos);
+        light_model = glm::scale(light_model, glm::vec3(3.0f, 3.0f, 3.0f));
+        lightingShader_cube.getPtr()->setMat4("model", light_model);
+        lightingShader_cube.getPtr()->setVec3("lightColor", directiontLight->getColor());
+        renderContext->bindVertexBuffer(cubeVAO);
+        renderContext->drawArrays(0, 36);
+
         //render light cube
         for (int i = 0; i < pointLights.size(); i++) {
             light_model = glm::mat4(1.0f);
@@ -172,6 +181,7 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
         lightingShader.getPtr()->setVec3("objectColor", 1.0f, 1.0f, 1.0f);
         lightingShader.getPtr()->setFloat("shininess", 32.0f);
         lightingShader.getPtr()->setBool("isMirror", false);
+        lightingShader.getPtr()->setBool("isGlass", false);
         bool IsGlass = false;
         lightingShader.getPtr()->setInt("baseTexture", 0);
         lightingShader.getPtr()->setInt("shadowMap", 1);
@@ -193,7 +203,6 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
         renderContext->drawArrays(0, 6);
 
         //Rendering Opaque Meshes
-        lightingShader.getPtr()->setBool("isMirror", false);
         for (Renderable* renderable : scene->Opaque) {
             if (renderable->modelNumber == 1&& ColorTextureMap.find(renderable->mesh->nowName) != ColorTextureMap.end()) {
                 if (renderable->mesh->nowName == "Visor")  IsGlass = true;

@@ -24,7 +24,9 @@ uniform sampler2D screenTexture;
 void main()
 {
     vec3 col = texture(screenTexture, TexCoords).rgb;
-    FragColor = vec4(col, 1.0);
+    vec3 gammaCorrectedColor = pow(col, vec3(1.0 / 2.2));
+
+    FragColor = vec4(gammaCorrectedColor, 1.0);
 } 
 )";
 
@@ -225,7 +227,8 @@ void main()
         //vec3 result = Point + Direction + Ambient;
         float shadow = ShadowCalculation(fs_in.FragPosLightSpace);
         vec3 result = (Ambient +  Point + (1.0 - shadow)* Direction);
-         FragColor=vec4 (result,1.0);
+        result= pow(result, vec3(2.2));  
+        FragColor=vec4 (result,1.0);
     }
     else{
         vec3 I = normalize(fs_in.FragPos - viewPos);
@@ -393,8 +396,7 @@ void main()
     vec3 hdrColor = texture(scene, TexCoords).rgb;      
     vec3 bloomColor = texture(bloomBlur, TexCoords).rgb;
     hdrColor += bloomColor;
-    vec3 result = vec3(1.0) - exp(-hdrColor);
-    FragColor = vec4(result, 1.0);
+    FragColor = vec4(hdrColor, 1.0);
 }
 )";
 
@@ -412,10 +414,17 @@ void main() {
     vec2 dir = TexCoords - center; 
     vec4 color = texture(sceneTexture, TexCoords);
 
+    //Avoid smearing caused by too bright light sources
+    float threshold = 1.0; 
+    color.rgb = min(color.rgb, vec3(threshold)); 
+
     float totalWeight = 1.0;
     for (float i = 1.0; i <= 10.0; i++) {
         vec2 offset = dir * (float(i) / 10 )* strength;
-        color += texture(sceneTexture, TexCoords - offset) * 0.1;
+        vec4 sampleColor = texture(sceneTexture, TexCoords - offset);
+        //Sampling as a blur color also has to be limited
+        sampleColor = min(sampleColor, vec4(threshold)); 
+        color += sampleColor * 0.1;
         totalWeight += 0.1;
     }
 
@@ -435,7 +444,16 @@ uniform sampler2D lastTexture;
 void main() {
     vec3 color = texture(sceneTexture, TexCoords).rgb;
     vec3 blur  = texture(lastTexture, TexCoords).rgb;
-    FragColor=vec4(0.1*color+0.9*blur,1.0);
+     
+    //Avoid smearing caused by too bright light sources
+    float threshold = 1.0; 
+    color = min(color, vec3(threshold)); 
+    blur = min(blur, vec3(threshold));
+
+    // Interpolate the current frame and the previous frame to achieve the effect of motion blur
+    vec3 result = mix(color, blur, 0.9f); 
+
+    FragColor=vec4(result,1.0);
 }
 )";
 

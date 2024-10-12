@@ -295,7 +295,9 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
     //ImFont* font = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\ArialUni.ttf", 18.0f, nullptr, io.Fonts->GetGlyphRangesJapanese());
     //IM_ASSERT(font != nullptr);
 
-
+    //Decide which effect to use
+    int useEffect = 0;
+    
     // Our state
     bool show_demo_window = true;
     bool show_another_window = false;
@@ -365,6 +367,7 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
 
         // 2. Show a simple window that we create ourselves. We use a Begin/End pair to create a named window.
         {
+            ImGui::SetNextWindowSize(ImVec2(400, 300));
             static float f = 0.0f;
             static int counter = 0;
 
@@ -381,6 +384,17 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
                 counter++;
             ImGui::SameLine();
             ImGui::Text("counter = %d", counter);
+
+            ImGui::Text("Select Post-processing Effect");
+            ImGui::RadioButton("Origin", &useEffect, 0);
+            ImGui::SameLine(0, 10);
+            ImGui::RadioButton("Bloom", &useEffect, 1);
+            ImGui::SameLine(0, 10);
+            ImGui::RadioButton("Radial", &useEffect, 2);
+            ImGui::SameLine(0, 10);
+            ImGui::RadioButton("Motion", &useEffect, 3);
+            ImGui::SameLine(0, 10);
+            ImGui::RadioButton("Cartoon", &useEffect, 4);
 
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
             ImGui::End();
@@ -420,6 +434,7 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
 
         //basePassRenderer->render(&camera, renderGraph);
         meshRenderer->render(&camera, renderGraph);
+        if(useEffect!=0)
         postprocessRenderer->render(renderGraph, meshRenderer->getTargetFrameBuffer());
         renderGraph.execute(openGLRenderContext);
 
@@ -431,8 +446,10 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
 
         glActiveTexture(GL_TEXTURE0);
         //glBindTexture(GL_TEXTURE_2D, basePassRenderer->getTargetColorTexture(0));	// use the color attachment texture as the texture of the quad plane
+        if(useEffect==0)
         glBindTexture(GL_TEXTURE_2D, meshRenderer->getTargetColorTextureID(0));
-        //glBindTexture(GL_TEXTURE_2D, postprocessRenderer->getTargetColorTextureID(0));
+        else 
+        glBindTexture(GL_TEXTURE_2D, postprocessRenderer->getTargetColorTextureID(0,useEffect));
         glDrawArrays(GL_TRIANGLES, 0, 6);
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
