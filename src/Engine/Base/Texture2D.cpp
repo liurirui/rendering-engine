@@ -70,16 +70,20 @@ GLint getDataType(const TextureFormat& textureFormat) {
     }
 }
 
-GLint getTexelFilter(const TexelFilter& texelFilter) {
-    switch (texelFilter)
-    {
-    case TexelFilter::Linear:
-        return GL_LINEAR;
-    case TexelFilter::Nearest:
-        return GL_NEAREST;
-    default:
-        return GL_LINEAR;
+GLint getTexelFilter(const TexelFilter& texelFilter, const MipmapMode& mipmapMode) {
+    if (mipmapMode == MipmapMode::None) {
+        // No Mipmap
+        return texelFilter == TexelFilter::Linear ? GL_LINEAR : GL_NEAREST;
     }
+    else if (mipmapMode == MipmapMode::Nearest) {
+        // use Nearest Mipmap
+        return texelFilter == TexelFilter::Linear ? GL_LINEAR_MIPMAP_NEAREST : GL_NEAREST_MIPMAP_NEAREST;
+    }
+    else if (mipmapMode == MipmapMode::Linear) {
+        // use Linear Mipmap
+        return texelFilter == TexelFilter::Linear ? GL_LINEAR_MIPMAP_LINEAR : GL_NEAREST_MIPMAP_LINEAR;
+    }
+    else   return GL_LINEAR;
 }
 
 Texture2D::Texture2D(const char* path) {
@@ -131,14 +135,21 @@ void Texture2D::initTexture(const TextureUsage& usage, const TextureFormat& text
     //GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum format, GLenum type, const void* pixels
     //glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, getFormat(textureFormat), getDataType(textureFormat), data);
     if (textureFormat == TextureFormat::Depth) {
+        defaultSampler.mipmapMode = MipmapMode::None;
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
         GLfloat borderColor[] = { 1.0, 1.0, 1.0, 1.0 };
         glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
-    }
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, getTexelFilter(defaultSampler.minFilter));
 
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, getTexelFilter(defaultSampler.magFilter));
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, getTexelFilter(defaultSampler.minFilter, defaultSampler.mipmapMode));
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, getTexelFilter(defaultSampler.magFilter, defaultSampler.mipmapMode));
+    }
+    else {
+        defaultSampler.mipmapMode = MipmapMode::Linear;
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, getTexelFilter(defaultSampler.minFilter, defaultSampler.mipmapMode));
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, getTexelFilter(defaultSampler.magFilter, defaultSampler.mipmapMode));
+        glGenerateMipmap(GL_TEXTURE_2D);
+    }
 
     glBindTexture(GL_TEXTURE_2D, 0);
 }
