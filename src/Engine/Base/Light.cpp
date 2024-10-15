@@ -24,7 +24,8 @@ void Shadow::initPoint() {
 Light::Light(LightType type, const glm::vec3& color, float intensity) {
     this->type = type;
     this->color = color;
-    this->colorOrigin = color;
+    this->colorOn = color;
+    this->colorOff = glm::clamp(color, glm::vec3(0.0f), glm::vec3(1.0f))* 0.1f;
     this->intensity = intensity;
     this->intensityOrigin = intensity;
     this->shadow = new Shadow(type);
@@ -59,15 +60,13 @@ void Light::setIntensity(float intensity) {
 }
 
 void Light::turnOn() {
-    setColor(colorOrigin);
+    setColor(colorOn);
     setIntensity(intensityOrigin);
-    Switch = true;
 }
 
 void Light::turnOff() {
-    setColor(glm::vec3(0.1f)*color);
+    setColor(colorOff);
     setIntensity(0.0f);
-    Switch = false;
 }
 
 DirectionLight::DirectionLight(const glm::vec3& direction, const glm::vec3& color, float intensity)
@@ -107,8 +106,8 @@ PointLight::PointLight(const glm::vec3& position, const glm::vec3& color, float 
 
 PointLight::~PointLight() {}
 
-glm::vec3 PointLight::getPosition() const { 
-    return position; 
+glm::vec3& PointLight::getPosition() { 
+    return this->position; 
 }
 
 void PointLight::setPosition(const glm::vec3& position) { 

@@ -57,7 +57,8 @@ public:
 protected:
     LightType type;             // 光的类型
     glm::vec3 color;            // 光的颜色
-    glm::vec3 colorOrigin;      // 记录光开启时的颜色
+    glm::vec3 colorOn;          // 光开启时的颜色
+    glm::vec3 colorOff;          // 光关闭时的颜色
     float intensity;            // 光的强度
     float intensityOrigin;      // 记录光开启时的强度
     Shadow* shadow = nullptr;   // 阴影
@@ -86,7 +87,7 @@ public:
     PointLight(const glm::vec3& position, const glm::vec3& color, float intensity);
     ~PointLight();
 
-    glm::vec3 getPosition() const;
+    glm::vec3& getPosition();
     void setPosition(const glm::vec3& position);
 
     float getConstantAttenuation() const;

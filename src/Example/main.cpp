@@ -17,6 +17,7 @@
 #include<Engine/Renderer/PostProcessRenderer.h>
 
 #include <iostream>
+#include<array>
 
 #include<Engine/Base/Constants.h>
 
@@ -385,7 +386,7 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
             ImGui::Checkbox("Another Window", &show_another_window);
 
             ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
-            ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
+            ImGui::ColorEdit3("Background Color", (float*)&(meshRenderer->getTargetFrameBuffer()->colorAttachments[0].clearColor)); // Edit 3 floats representing a color
 
             if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
                 counter++;
@@ -406,22 +407,37 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
 
             ImGui::RadioButton("Ripple", &useEffect, 5);
             
-            //Provides option to turn directional lights on and off
-            ImGui::Text("Switch of Direction Light");
-            if (ImGui::RadioButton("ON", meshRenderer->directionLight->Switch)) {
-                if (!meshRenderer->directionLight->Switch) {
-                    meshRenderer->directionLight->turnOn();
+            if (ImGui::CollapsingHeader("Lights Control")) {
+                //directionLight 
+                ImGui::Text("Directional Light:");
+                ImGui::Indent(ImGui::GetFontSize() * 2);
+                if (ImGui::Checkbox("Directional Light", &(meshRenderer->directionLight->Switch))) {
+                    if (meshRenderer->directionLight->Switch) meshRenderer->directionLight->turnOn();
+                    else   meshRenderer->directionLight->turnOff();
                 }
-            }
+                ImGui::Unindent();
 
-            ImGui::SameLine(0, 10);
-
-            if (ImGui::RadioButton("OFF", !meshRenderer->directionLight->Switch)) {
-                if (meshRenderer->directionLight->Switch) {
-                    meshRenderer->directionLight->turnOff();
+                //pointLight
+                ImGui::Text("Point Lights:");
+                ImGui::Indent(ImGui::GetFontSize() * 2);
+                // 4 pointLights switch
+                static const std::array<std::string, 4> nameLight = { "red", "green", "blue", "white" };
+                string name = "light ";
+                for (int i = 0; i < 4; i++) {
+                    if (ImGui::CollapsingHeader((name + nameLight[i]).c_str())) {
+                        //Control the light source on and off
+                        if (ImGui::Checkbox(("On / Off##" + nameLight[i]).c_str(), &(meshRenderer->pointLights[i]->Switch))) {
+                            if (meshRenderer->pointLights[i]->Switch)    meshRenderer->pointLights[i]->turnOn();
+                            else  meshRenderer->pointLights[i]->turnOff();
+                        }
+                        //Control the position of light sources
+                        ImGui::SliderFloat((name + nameLight[i] + "X").c_str(), &((meshRenderer->pointLights[i]->getPosition()).x), -10.0f, 10.0f);
+                        ImGui::SliderFloat((name + nameLight[i] + "Y").c_str(), &((meshRenderer->pointLights[i]->getPosition()).y), 0.0f, 10.0f);
+                        ImGui::SliderFloat((name + nameLight[i] + "Z").c_str(), &((meshRenderer->pointLights[i]->getPosition()).z), -10.0f, 10.0f);
+                    }
                 }
+                ImGui::Unindent();
             }
-            
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
             ImGui::End();
         }

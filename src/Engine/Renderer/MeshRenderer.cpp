@@ -95,10 +95,10 @@ MeshRenderer::MeshRenderer(const std::string& modelPath) {
         RenderContext::getInstance()->setUpVertexBufferLayoutInfo(planeVBO, planeVAO, 2, 8 * sizeof(float), 2, 6);
     }
     directionLight = new DirectionLight(glm::vec3(-0.5f, -0.8f, -0.5f), glm::vec3(2.0f, 2.0f, 2.0f), 1.0f);
-    pointLights.push_back(new PointLight(glm::vec3(0.0f, 12.0f, 1.5f), glm::vec3(15.0f, 0.0f, 0.0f), 0.8f));
-    pointLights.push_back(new PointLight(glm::vec3(-2.0f, 0.5f, -3.0f), glm::vec3(0.0f, 15.0f, 0.0f), 0.8f));
-    pointLights.push_back(new PointLight(glm::vec3(3.0f, 8.5f, 1.0f), glm::vec3(0.0f, 0.0f, 20.0f), 0.8f));
-    pointLights.push_back(new PointLight(glm::vec3(-8.0f, 2.4f, -1.0f), glm::vec3(6.0f, 6.0f, 6.0f), 0.6f));
+    pointLights.push_back(new PointLight(glm::vec3(0.0f, 6.0f, 5.0f), glm::vec3(15.0f, 0.0f, 0.0f), 0.8f));
+    pointLights.push_back(new PointLight(glm::vec3(-2.0f, 1.0f, -3.0f), glm::vec3(0.0f, 15.0f, 0.0f), 0.8f));
+    pointLights.push_back(new PointLight(glm::vec3(3.0f, 8.5f, 0.0f), glm::vec3(0.0f, 0.0f, 25.0f), 0.8f));
+    pointLights.push_back(new PointLight(glm::vec3(-8.0f, 3.0f, -1.0f), glm::vec3(6.0f, 6.0f, 6.0f), 0.6f));
 }
 
 void MeshRenderer::render(Camera* camera, RenderGraph& rg) {

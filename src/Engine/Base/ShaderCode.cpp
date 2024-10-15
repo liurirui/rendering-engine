@@ -373,9 +373,9 @@ in vec2 TexCoords;
 uniform sampler2D image;
 
 uniform bool horizontal;
-uniform float weight[] = float[] (0.2270270270, 0.1945945946, 0.1216216216, 
-                                   0.0540540541, 0.0162162162, 0.0070000000, 
-                                   0.0030000000, 0.0010000000, 0.0005000000);
+float weight[] = float[] (0.2270270270, 0.1945945946, 0.1216216216, 
+                            0.0540540541, 0.0162162162, 0.0070000000, 
+                            0.0030000000, 0.0010000000, 0.0005000000);
 void main()
 {             
      vec2 tex_offset = 1.0 / textureSize(image, 0); // gets size of single texel
