@@ -125,33 +125,41 @@ void Texture2D::initTexture(const TextureUsage& usage, const TextureFormat& text
     glGenTextures(1, &id);
     if (useCubeMap) {
         glBindTexture(GL_TEXTURE_CUBE_MAP, id);
+
         for (unsigned int i = 0; i < 6; ++i)  glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, getInternalformat(textureFormat), width, height, 0, getFormat(textureFormat), getDataType(textureFormat), data);
+        defaultSampler.mipmapMode = MipmapMode::None;
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, getTexelFilter(defaultSampler.minFilter, defaultSampler.mipmapMode));
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, getTexelFilter(defaultSampler.minFilter, defaultSampler.mipmapMode));
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
     }
     else {
         glBindTexture(GL_TEXTURE_2D, id);
         //GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height, GLint border, GLenum format, GLenum type, const void* pixels
         glTexImage2D(GL_TEXTURE_2D, 0, getInternalformat(textureFormat), width, height, 0, getFormat(textureFormat), getDataType(textureFormat), data);
-    }
-    //GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum format, GLenum type, const void* pixels
-    //glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, getFormat(textureFormat), getDataType(textureFormat), data);
-    if (textureFormat == TextureFormat::Depth) {
-        defaultSampler.mipmapMode = MipmapMode::None;
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-        GLfloat borderColor[] = { 1.0, 1.0, 1.0, 1.0 };
-        glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
 
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, getTexelFilter(defaultSampler.minFilter, defaultSampler.mipmapMode));
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, getTexelFilter(defaultSampler.magFilter, defaultSampler.mipmapMode));
-    }
-    else {
-        defaultSampler.mipmapMode = MipmapMode::Linear;
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, getTexelFilter(defaultSampler.minFilter, defaultSampler.mipmapMode));
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, getTexelFilter(defaultSampler.magFilter, defaultSampler.mipmapMode));
-        glGenerateMipmap(GL_TEXTURE_2D);
-    }
+        //GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum format, GLenum type, const void* pixels
+        //glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, getFormat(textureFormat), getDataType(textureFormat), data);
+        if (textureFormat == TextureFormat::Depth) {
+            defaultSampler.mipmapMode = MipmapMode::None;
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+            GLfloat borderColor[] = { 1.0, 1.0, 1.0, 1.0 };
+            glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
 
-    glBindTexture(GL_TEXTURE_2D, 0);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, getTexelFilter(defaultSampler.minFilter, defaultSampler.mipmapMode));
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, getTexelFilter(defaultSampler.magFilter, defaultSampler.mipmapMode));
+        }
+        else {
+            defaultSampler.mipmapMode = MipmapMode::Linear;
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, getTexelFilter(defaultSampler.minFilter, defaultSampler.mipmapMode));
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, getTexelFilter(defaultSampler.magFilter, defaultSampler.mipmapMode));
+            glGenerateMipmap(GL_TEXTURE_2D);
+        }
+        glBindTexture(GL_TEXTURE_2D, 0);
+    }
 }
 
 Texture2D::~Texture2D() {

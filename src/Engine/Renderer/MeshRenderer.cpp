@@ -18,7 +18,7 @@ MeshRenderer::MeshRenderer(const std::string& modelPath) {
     modelSample2 = new Model(modelPath2);
     string modelPath3 = Scene::rootPath + "/resources/objects//glass_11_2.fbx";
     modelSample3 = new Model(modelPath3);
-   
+
     //Storing the model's mesh
     Renderable* renderable = nullptr;
     for (Mesh* mesh : modelSample1->meshes) {
@@ -40,9 +40,12 @@ MeshRenderer::MeshRenderer(const std::string& modelPath) {
         renderable->transform.setTransform(glm::vec3(3.0f, 1.0f, -0.8f), glm::vec3(-90.0f, 0.0f, 0.0f), glm::vec3(0.01f, 0.01f, 0.01f));
         scene->addRenderable(renderable);
     }
+
+    //Shader
     depthMapShader = TRefCountPtr<Shader>(new Shader(Vert_depth_map, Frag_depth_map));
     lightingShader = TRefCountPtr<Shader>(new Shader(Vertmodel_lighting, Fragmodel_lighting));
     lightingShader_cube= TRefCountPtr<Shader>(new Shader(Vertmodel_lighting, Fragmodel_cube));
+
     ColorTextureMap["hands"] = RenderContext::getInstance()->loadTexture2D((Scene::rootPath + "/resources/objects/nanosuit/hand_dif.png").c_str());
     ColorTextureMap["Visor"] = RenderContext::getInstance()->loadTexture2D((Scene::rootPath + "/resources/objects/nanosuit/glass_dif.png").c_str());
     ColorTextureMap["Body"] = RenderContext::getInstance()->loadTexture2D((Scene::rootPath + "/resources/objects/nanosuit/body_dif.png").c_str());
@@ -94,7 +97,7 @@ MeshRenderer::MeshRenderer(const std::string& modelPath) {
     directionLight = new DirectionLight(glm::vec3(-0.5f, -0.8f, -0.5f), glm::vec3(2.0f, 2.0f, 2.0f), 1.0f);
     pointLights.push_back(new PointLight(glm::vec3(0.0f, 12.0f, 1.5f), glm::vec3(15.0f, 0.0f, 0.0f), 0.8f));
     pointLights.push_back(new PointLight(glm::vec3(-2.0f, 0.5f, -3.0f), glm::vec3(0.0f, 15.0f, 0.0f), 0.8f));
-    pointLights.push_back(new PointLight(glm::vec3(3.0f, 8.5f, 1.0f), glm::vec3(0.0f, 0.0f, 30.0f), 0.6f));
+    pointLights.push_back(new PointLight(glm::vec3(3.0f, 8.5f, 1.0f), glm::vec3(0.0f, 0.0f, 20.0f), 0.8f));
     pointLights.push_back(new PointLight(glm::vec3(-8.0f, 2.4f, -1.0f), glm::vec3(6.0f, 6.0f, 6.0f), 0.6f));
 }
 
@@ -104,16 +107,18 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
         //Rendering shadow maps
         depthStencilState.depthTest = true;
         depthStencilState.depthWrite = true;
+        int errorCode = glGetError();
         renderContext->beginRendering(directionLight->getShadow()->DepthMapFramebuffer);
         renderContext->setDepthStencilState(depthStencilState);
         renderContext->bindPipeline(graphicsPipeline_DepthMap);
+        errorCode = glGetError();
         depthMapShader.getPtr()->use();
-        int errorCode = glGetError();
+        errorCode = glGetError();
         glm::mat4 model = glm::mat4(1.0f);
-        depthMapShader.getPtr()->setMat4("lightSpaceMatrix",directionLight->calculateLightSpaceMatrix());
-        depthMapShader.getPtr()->setMat4("model", model);
-
+        depthMapShader.getPtr()->setMat4("lightSpaceMatrix",directionLight->LightSpaceMatrix);
+        
         //plane(shadow)
+        depthMapShader.getPtr()->setMat4("model", model);
         renderContext->bindVertexBuffer(planeVAO);
         renderContext->drawArrays(0, 6);
 
@@ -130,7 +135,8 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
             renderContext->bindIndexBuffer(renderable->mesh->indexBufferID);
             renderContext->drawElements(renderable->mesh->numTriangle * 3, 0);
         }
-
+        renderContext->endRendering();
+        
         // Start render scene
         renderContext->beginRendering(OriginFramebuffer);
         renderContext->setDepthStencilState(depthStencilState);
@@ -138,9 +144,7 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
         glm::mat4 light_model=glm::mat4(1.0f);
         glm::mat4 projection = glm::perspective(glm::radians(camera->Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
         glm::mat4 view = camera->GetViewMatrix();
-        errorCode = glGetError();
         lightingShader_cube.getPtr()->use();
-        errorCode = glGetError();
         lightingShader_cube.getPtr()->setMat4("projection", projection);
         lightingShader_cube.getPtr()->setMat4("view", view);
 
@@ -163,15 +167,13 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
             renderContext->bindVertexBuffer(cubeVAO);
             renderContext->drawArrays(0, 36);
         }
-        
         lightingShader.getPtr()->use();
-        errorCode = glGetError();
         lightingShader.getPtr()->setMat4("projection", projection);
         lightingShader.getPtr()->setMat4("view", view);
         // light properties
         lightingShader.getPtr()->setVec3("viewPos", camera->Position);
         lightingShader.getPtr()->setVec3("lightPos", directionLight->getDirection()*(-10.0f));
-        lightingShader.getPtr()->setMat4("lightSpaceMatrix", directionLight->calculateLightSpaceMatrix());
+        lightingShader.getPtr()->setMat4("lightSpaceMatrix", directionLight->LightSpaceMatrix);
         lightingShader.getPtr()->setVec3("light.direction", directionLight->getDirection());
         lightingShader.getPtr()->setVec3("light.color", directionLight->getColor());
         lightingShader.getPtr()->setFloat("light.intensity", directionLight->getIntensity());
@@ -186,7 +188,7 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
         lightingShader.getPtr()->setInt("baseTexture", 0);
         lightingShader.getPtr()->setInt("shadowMap", 1);
         renderContext->bindTexture(directionLight->getShadow()->depthMap->id, 1);
-        for (int i = 0; i<pointLights.size(); ++i) {
+        for (int i = 0; i<pointLights.size(); i++) {
             lightingShader.getPtr()->setVec3(("point[" + std::to_string(i) + "].position").c_str(), pointLights[i]->getPosition());
             lightingShader.getPtr()->setVec3(("point[" + std::to_string(i) + "].color").c_str(), pointLights[i]->getColor());
             lightingShader.getPtr()->setFloat(("point[" + std::to_string(i) + "].intensity").c_str(), pointLights[i]->getIntensity());
@@ -222,7 +224,8 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
             baseTexture = nullptr;
         }
 
-        //Sort transparent mesh from far to near
+        //Using the method of disabling depth writingand then rendering the transparent grid instead of sorting the transparent grid 
+        // can also correctly render the transparent grid
         //scene->sortTranslucentMeshes(camera->Position);
         depthStencilState.depthWrite = false;
         renderContext->setDepthStencilState(depthStencilState);
@@ -248,7 +251,6 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
             }
             baseTexture = nullptr;
         }
-
         renderContext->bindVertexBuffer(0);
         renderContext->bindIndexBuffer(0);
         renderContext->endRendering();

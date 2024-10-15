@@ -13,11 +13,11 @@
 NAMESPACE_START
 
     // ------------------------------------------------------------------------
-    Shader::Shader(const char* vertexCode, const char* fragmentCode)
+    Shader::Shader(const char* vertexCode, const char* fragmentCode, const char* geometryCode)
     {
     
         // 2. compile shaders
-        unsigned int vertex, fragment;
+        unsigned int vertex, fragment, geometry;
         // vertex shader
         vertex = glCreateShader(GL_VERTEX_SHADER);
         glShaderSource(vertex, 1, &vertexCode, NULL);
@@ -28,16 +28,27 @@ NAMESPACE_START
         glShaderSource(fragment, 1, &fragmentCode, NULL);
         glCompileShader(fragment);
         checkCompileErrors(fragment, "FRAGMENT");
+        //If geometry shader code is provided, compile the geometry shader
+        if (geometryCode != nullptr)
+        {
+            geometry = glCreateShader(GL_GEOMETRY_SHADER);
+            glShaderSource(geometry, 1, &geometryCode, NULL);
+            glCompileShader(geometry);
+            checkCompileErrors(geometry, "GEOMETRY");
+        }
+
         // shader Program
         ID = glCreateProgram();
         glAttachShader(ID, vertex);
         glAttachShader(ID, fragment);
+        if (geometryCode != nullptr)   glAttachShader(ID, geometry);
+           
         glLinkProgram(ID);
         checkCompileErrors(ID, "PROGRAM");
         // delete the shaders as they're linked into our program now and no longer necessary
         glDeleteShader(vertex);
         glDeleteShader(fragment);
-
+        if (geometryCode != nullptr)    glDeleteShader(geometry);    
     }
     // activate the shader
     // ------------------------------------------------------------------------

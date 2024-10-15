@@ -15,7 +15,7 @@ public:
     unsigned int ID;
     // constructor generates the shader on the fly
     // ------------------------------------------------------------------------
-    Shader(const char* vertexCode, const char* fragmentCode);
+    Shader(const char* vertexCode, const char* fragmentCode,const char* geometryPath = nullptr);
 
     // activate the shader
     // ------------------------------------------------------------------------

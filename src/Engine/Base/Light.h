@@ -17,9 +17,10 @@ public:
     ~Shadow();
     FrameBufferInfo DepthMapFramebuffer;   
     Texture2D* depthMap = nullptr;
-    const float near_plane = 1.0f, far_plane = 25.0f;
-    const unsigned int SCR_WIDTH = 800;
-    const unsigned int SCR_HEIGHT = 600;
+    float near_plane = 1.0f, far_plane = 25.0f;
+    const unsigned int SHADOW_WIDTH = 800;
+    const unsigned int SHADOW_HEIGHT = 600;
+    const unsigned int SHADOW_CUBE = 1024;
 
 
 private:
@@ -72,7 +73,8 @@ public:
     glm::vec3 getDirection() const;
 
     // 实现定向光的阴影视图矩阵计算
-    glm::mat4 calculateLightSpaceMatrix();
+    void calculateLightSpaceMatrix();
+    glm::mat4 LightSpaceMatrix;
     
 private:
     glm::vec3 direction;  // 定向光的方向
@@ -92,23 +94,8 @@ public:
     float getQuadraticAttenuation() const;
     void setAttenuation(float constant, float linear, float quadratic);
 
-    glm::mat4 calculateShadowViewMatrix(int faceIndex) {
-        float aspect = shadow->SCR_WIDTH / shadow->SCR_HEIGHT;
-        glm::mat4 lightProjection = glm::perspective(glm::radians(90.0f), aspect, 1.0f, 25.0f);
-        glm::vec3 up;
-        glm::vec3 target;
-        // 点光源的六个方向：+X, -X, +Y, -Y, +Z, -Z
-        switch (faceIndex) {
-        case 0: target = position + glm::vec3(1.0f, 0.0f, 0.0f); up = glm::vec3(0.0f, -1.0f, 0.0f); break; // +X
-        case 1: target = position + glm::vec3(-1.0f, 0.0f, 0.0f); up = glm::vec3(0.0f, -1.0f, 0.0f); break; // -X
-        case 2: target = position + glm::vec3(0.0f, 1.0f, 0.0f); up = glm::vec3(0.0f, 0.0f, 1.0f); break;  // +Y
-        case 3: target = position + glm::vec3(0.0f, -1.0f, 0.0f); up = glm::vec3(0.0f, 0.0f, -1.0f); break; // -Y
-        case 4: target = position + glm::vec3(0.0f, 0.0f, 1.0f); up = glm::vec3(0.0f, -1.0f, 0.0f); break;  // +Z
-        case 5: target = position + glm::vec3(0.0f, 0.0f, -1.0f); up = glm::vec3(0.0f, -1.0f, 0.0f); break; // -Z
-        }
-        glm::mat4 lightViewMatrix = glm::lookAt(position, target, up);
-        return lightProjection * lightViewMatrix;
-    }
+    glm::mat4 calculateShadowViewMatrix(int faceIndex);
+    std::vector<glm::mat4> shadowTransforms;
     
 private:
     glm::vec3 position;   // 点光源的位置

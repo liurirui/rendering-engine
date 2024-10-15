@@ -1,6 +1,7 @@
 #include"OpenGLRenderContext.h"
 #include <glad.h>
 #include<Base/Texture2D.h>
+#include<iostream>
 
 
 NAMESPACE_START
@@ -50,15 +51,43 @@ void OpenGLRenderContext::beginRendering(FrameBufferInfo& fbo) {
         //depth texture
         if (fbo.depthStencilAttachment.texture) {
             glBindTexture(GL_TEXTURE_2D, fbo.depthStencilAttachment.texture->id);
-            if (fbo.depthStencilAttachment.useStencil)  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, fbo.depthStencilAttachment.texture->id, 0);
-            else glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, fbo.depthStencilAttachment.texture->id, 0);
+            if (fbo.depthStencilAttachment.useStencil) {
+                // 使用 glFramebufferTexture 绑定立方体深度-模板缓冲区
+                if (fbo.depthStencilAttachment.texture->useCubeMap) {
+                    glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, fbo.depthStencilAttachment.texture->id, 0);
+                }
+                else {
+                    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, fbo.depthStencilAttachment.texture->id, 0);
+                }
+            }
+            else {
+                // 仅使用深度缓冲区
+                if (fbo.depthStencilAttachment.texture->useCubeMap) {
+                    glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, fbo.depthStencilAttachment.texture->id, 0);
+                }
+                else {
+                    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, fbo.depthStencilAttachment.texture->id, 0);
+                }
+            }
+            /*if (fbo.depthStencilAttachment.useStencil)  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, fbo.depthStencilAttachment.texture->id, 0);
+            else glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, fbo.depthStencilAttachment.texture->id, 0);*/
         }
     }
 
     glBindFramebuffer(GL_FRAMEBUFFER, fbo.id);
-    static const GLenum kDrawBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3,
-        GL_COLOR_ATTACHMENT4, GL_COLOR_ATTACHMENT5, GL_COLOR_ATTACHMENT6,GL_COLOR_ATTACHMENT7 };
-    glDrawBuffers(fbo.colorAttachments.size(), kDrawBuffers); // 指定绘制到两个颜色附件
+
+    if (fbo.colorAttachments.empty()) {
+        // 如果没有颜色附件，禁用颜色缓冲输出
+        glDrawBuffer(GL_NONE);
+        glReadBuffer(GL_NONE);
+    }
+    else {
+        static const GLenum kDrawBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3,
+            GL_COLOR_ATTACHMENT4, GL_COLOR_ATTACHMENT5, GL_COLOR_ATTACHMENT6, GL_COLOR_ATTACHMENT7 };
+        glDrawBuffers(fbo.colorAttachments.size(), kDrawBuffers);
+    }
+
+    // 清除颜色缓冲
     for (auto& colorAttachment : fbo.colorAttachments) {
         if (colorAttachment.action == AttachmentAction::Clear) {
             GLuint attachments[] = { GL_COLOR_ATTACHMENT0 + colorAttachment.attachment };
