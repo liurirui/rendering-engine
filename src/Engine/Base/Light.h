@@ -102,7 +102,7 @@ private:
     glm::vec3 position;   // 点光源的位置
     float constant = 1.0f;       // 衰减常数项
     float linear = 0.09f;         // 衰减线性项
-    float quadratic = 0.032;      // 衰减二次项
+    float quadratic = 0.032f;      // 衰减二次项
 };
 
 

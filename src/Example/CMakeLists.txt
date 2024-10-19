@@ -38,5 +38,7 @@ include_directories(${assimp_INCLUDE_DIRS})
 find_package(imgui)
 include_directories(${imgui_INCLUDE_DIRS})
 
+find_package(ImGuiFileDialog)
+include_directories(${ImGuiFileDialog_INCLUDE_DIRS})
 
-target_link_libraries(example ${engine_LIBRARIES} ${glad_LIBRARIES} ${glfw_LIBRARIES} ${stb_image_LIBRARIES} ${assimp_LIBRARIES} ${imgui_LIBRARIES})
+target_link_libraries(example ${engine_LIBRARIES} ${glad_LIBRARIES} ${glfw_LIBRARIES} ${stb_image_LIBRARIES} ${assimp_LIBRARIES} ${imgui_LIBRARIES} ${ImGuiFileDialog_LIBRARIES})

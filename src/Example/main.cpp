@@ -26,6 +26,7 @@
 
 #include <assimp/camera.h>
 #include <assimp/mesh.h>
+#include <ImGuiFileDialog.h>
 #include <Engine/Base/ShaderCode.h>
 
 #if defined(_MSC_VER) && (_MSC_VER >= 1900) && !defined(IMGUI_DISABLE_WIN32_FUNCTIONS)

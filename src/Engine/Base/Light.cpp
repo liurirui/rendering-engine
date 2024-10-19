@@ -133,7 +133,7 @@ void PointLight::setAttenuation(float constant, float linear, float quadratic) {
 }
 
 glm::mat4 PointLight::calculateShadowViewMatrix(int faceIndex) {
-    float aspect = shadow->SHADOW_CUBE / shadow->SHADOW_CUBE;
+    float aspect = (float)shadow->SHADOW_CUBE / (float)shadow->SHADOW_CUBE;
     glm::mat4 lightProjection = glm::perspective(glm::radians(90.0f), aspect, shadow->near_plane, shadow->far_plane);
     glm::vec3 up;
     glm::vec3 target;
