@@ -10,51 +10,14 @@
 #include <glm/gtc/type_ptr.hpp>
 
 NAMESPACE_START
-MeshRenderer::MeshRenderer(const std::string& modelPath) {
+MeshRenderer::MeshRenderer() {
     depthStencilState.depthTest = true;
     depthStencilState.depthWrite = true;
-    modelSample1 = new Model(modelPath);
-    string modelPath2 = Scene::rootPath + "/resources/objects//cat_mask.fbx";
-    modelSample2 = new Model(modelPath2);
-    string modelPath3 = Scene::rootPath + "/resources/objects//glass_11_2.fbx";
-    modelSample3 = new Model(modelPath3);
-
-    //Storing the model's mesh
-    Renderable* renderable = nullptr;
-    for (Mesh* mesh : modelSample1->meshes) {
-        renderable=new Renderable(mesh, false);
-        renderable->modelNumber = 1;
-        renderable->transform.setTransform(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.5f, 0.5f, 0.5f));
-        scene->addRenderable(renderable);
-    }
-    for (Mesh* mesh : modelSample2->meshes) {
-        renderable = new Renderable(mesh, true);
-        renderable->modelNumber = 2;
-        renderable->transform.setTransform(glm::vec3(3.0f, 1.0f, 0.5f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(25.0f, 25.0f, 25.0f));
-        scene->addRenderable(renderable);
-    }
-    for (Mesh* mesh : modelSample3->meshes) {
-        if (mesh->nowName == "frame")  renderable = new Renderable(mesh, false);
-        else  renderable = new Renderable(mesh, true);
-        renderable->modelNumber = 3;
-        renderable->transform.setTransform(glm::vec3(3.0f, 1.0f, -0.8f), glm::vec3(-90.0f, 0.0f, 0.0f), glm::vec3(0.01f, 0.01f, 0.01f));
-        scene->addRenderable(renderable);
-    }
 
     //Shader
     depthMapShader = TRefCountPtr<Shader>(new Shader(Vert_depth_map, Frag_depth_map));
     lightingShader = TRefCountPtr<Shader>(new Shader(Vertmodel_lighting, Fragmodel_lighting));
     lightingShader_cube= TRefCountPtr<Shader>(new Shader(Vertmodel_lighting, Fragmodel_cube));
-
-    ColorTextureMap["hands"] = RenderContext::getInstance()->loadTexture2D((Scene::rootPath + "/resources/objects/nanosuit/hand_dif.png").c_str());
-    ColorTextureMap["Visor"] = RenderContext::getInstance()->loadTexture2D((Scene::rootPath + "/resources/objects/nanosuit/glass_dif.png").c_str());
-    ColorTextureMap["Body"] = RenderContext::getInstance()->loadTexture2D((Scene::rootPath + "/resources/objects/nanosuit/body_dif.png").c_str());
-    ColorTextureMap["Helmet"] = RenderContext::getInstance()->loadTexture2D((Scene::rootPath + "/resources/objects/nanosuit/helmet_diff.png").c_str());
-    ColorTextureMap["Legs"] = RenderContext::getInstance()->loadTexture2D((Scene::rootPath + "/resources/objects/nanosuit/leg_dif.png").c_str());
-    ColorTextureMap["Arms"] = RenderContext::getInstance()->loadTexture2D((Scene::rootPath + "/resources/objects/nanosuit/arm_dif.png").c_str());
-    ColorTextureMap["glass"] = RenderContext::getInstance()->loadTexture2D((Scene::rootPath + "/resources/textures/skybox/back.jpg").c_str());
-    ColorTextureMap["app"] = RenderContext::getInstance()->loadTexture2D((Scene::rootPath + "/resources/textures/background.jpg").c_str());
-    ColorTextureMap["plane"]= RenderContext::getInstance()->loadTexture2D((Scene::rootPath + "/resources/textures/wood.png").c_str());
 
     //set  Originframebuffer's Texture Attachments
     fboColorTexture = RenderContext::getInstance()->createTexture2D(TextureUsage::RenderTarget, TextureFormat::RGBA32F, RenderContext::getInstance()->windowsWidth,
@@ -95,10 +58,10 @@ MeshRenderer::MeshRenderer(const std::string& modelPath) {
         RenderContext::getInstance()->setUpVertexBufferLayoutInfo(planeVBO, planeVAO, 2, 8 * sizeof(float), 2, 6);
     }
     directionLight = new DirectionLight(glm::vec3(-0.5f, -0.8f, -0.5f), glm::vec3(2.0f, 2.0f, 2.0f), 1.0f);
-    pointLights.push_back(new PointLight(glm::vec3(0.0f, 6.0f, 5.0f), glm::vec3(15.0f, 0.0f, 0.0f), 0.8f));
-    pointLights.push_back(new PointLight(glm::vec3(-2.0f, 1.0f, -3.0f), glm::vec3(0.0f, 15.0f, 0.0f), 0.8f));
-    pointLights.push_back(new PointLight(glm::vec3(3.0f, 8.5f, 0.0f), glm::vec3(0.0f, 0.0f, 25.0f), 0.8f));
-    pointLights.push_back(new PointLight(glm::vec3(-8.0f, 3.0f, -1.0f), glm::vec3(6.0f, 6.0f, 6.0f), 0.6f));
+    pointLights.push_back(new PointLight(glm::vec3(0.0f, 6.0f, 5.0f), glm::vec3(15.0f, 0.0f, 0.0f), 0.4f));
+    pointLights.push_back(new PointLight(glm::vec3(-2.0f, 1.0f, -3.0f), glm::vec3(0.0f, 15.0f, 0.0f), 0.4f));
+    pointLights.push_back(new PointLight(glm::vec3(3.0f, 8.5f, 0.0f), glm::vec3(0.0f, 0.0f, 25.0f), 0.4f));
+    pointLights.push_back(new PointLight(glm::vec3(-8.0f, 3.0f, -1.0f), glm::vec3(6.0f, 6.0f, 6.0f), 0.3f));
 }
 
 void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
@@ -199,21 +162,24 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
         
         //render plane
         lightingShader.getPtr()->setMat4("model", model);
-        baseTexture = ColorTextureMap["plane"];
+        baseTexture = scene->ColorTextureMap["plane"];
         renderContext->bindVertexBuffer(planeVAO);
         renderContext->bindTexture(baseTexture->id, 0);
         renderContext->drawArrays(0, 6);
 
         //Rendering Opaque Meshes
         for (Renderable* renderable : scene->Opaque) {
-            if (renderable->modelNumber == 1&& ColorTextureMap.find(renderable->mesh->nowName) != ColorTextureMap.end()) {
+            if (renderable->modelNumber != 1 && renderable->modelNumber != 2 && scene->ColorTextureMap.find(renderable->mesh->nowName) != scene->ColorTextureMap.end()) {
                 if (renderable->mesh->nowName == "Visor")  IsGlass = true;
                 else  IsGlass = false;
-                baseTexture = ColorTextureMap[renderable->mesh->nowName];
+                baseTexture = scene->ColorTextureMap[renderable->mesh->nowName];
                 lightingShader.getPtr()->setBool("isGlass", IsGlass);
             }
-            else if (renderable->modelNumber == 3)  baseTexture = ColorTextureMap["app"];
-           
+
+            else if (renderable->modelNumber == 1)  baseTexture = scene->ColorTextureMap["app"];
+
+            else if (renderable->modelNumber == 8)  baseTexture = scene->ColorTextureMap["Backpack"];
+
             if (baseTexture) {
                 lightingShader.getPtr()->setMat4("model", renderable->transform.modelMatrix);
                 renderContext->bindTexture(baseTexture->id, 0);
@@ -234,13 +200,13 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
         lightingShader.getPtr()->setBool("isGlass",true);
         lightingShader.getPtr()->setBool("isMirror", true);
         for (Renderable* renderable : scene->Translucent) {
-           if (renderable->modelNumber == 2) {
-                lightingShader.getPtr()->setVec3("objectColor", 0.0f, 0.0f, 10.0f);
-                baseTexture = ColorTextureMap["glass"];
-            }
-            else if (renderable->modelNumber == 3) {
+            if (renderable->modelNumber == 1) {
                 lightingShader.getPtr()->setVec3("objectColor", 1.0f, 1.0f, 1.0f);
-                baseTexture = ColorTextureMap["glass"];
+                baseTexture = scene->ColorTextureMap["glass"];
+            }
+            else if (renderable->modelNumber == 2) {
+                lightingShader.getPtr()->setVec3("objectColor", 0.0f, 0.0f, 10.0f);
+                baseTexture = scene->ColorTextureMap["glass"];
             }
             if (baseTexture) {
                 lightingShader.getPtr()->setMat4("model", renderable->transform.modelMatrix);
@@ -271,9 +237,6 @@ FrameBufferInfo* MeshRenderer::getTargetFrameBuffer() {
 }
 
 MeshRenderer::~MeshRenderer() {
-    delete modelSample1;
-    delete modelSample2;
-    delete modelSample3;
     delete fboColorTexture;
     delete fboDepthTexture;
     delete baseTexture;

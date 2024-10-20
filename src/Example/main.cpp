@@ -60,6 +60,7 @@ glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
 
 //Controls whether the cursor is visible
 static bool isCursorVisible = false;
+static bool isWindowOpen = false;
 
 //int main(int argc, char* argv[])
 
@@ -150,7 +151,7 @@ int asdasdasdsa(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_
     Texture2D* texture = new Texture2D(texturepath.c_str());
 
     std::string objpath = Scene::rootPath + "/resources/objects/nanosuit/nanosuit.obj";
-    MeshRenderer* meshRenderer = new MeshRenderer(objpath);
+    MeshRenderer* meshRenderer = new MeshRenderer();
     PostProcessRenderer* postprocessRenderer = new PostProcessRenderer;
     
     // render loop
@@ -308,7 +309,7 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
     int useEffect = 0;
     
     // Our state
-    bool show_demo_window = true;
+    bool show_demo_window = false;
     bool show_another_window = false;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
@@ -338,7 +339,7 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
     Texture2D* texture = new Texture2D(texturepath.c_str());
 
     std::string objpath = Scene::rootPath + "/resources/objects/nanosuit/nanosuit.obj";
-    MeshRenderer* meshRenderer = new MeshRenderer(objpath);
+    MeshRenderer* meshRenderer = new MeshRenderer();
     PostProcessRenderer* postprocessRenderer = new PostProcessRenderer;
 
     // Main loop
@@ -377,23 +378,58 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
         // 2. Show a simple window that we create ourselves. We use a Begin/End pair to create a named window.
         {
             ImGui::SetNextWindowSize(ImVec2(400, 300));
-            static float f = 0.0f;
-            static int counter = 0;
+            // Flag for file dialog
+            static bool openFileDialog = false;
+            // store selected file path
+            static std::string selectedFilePath = "";
 
-            ImGui::Begin("Hello, world! Hold down the 'Alt' key");                          // Create a window called "Hello, world!" and append into it.
-
+            // Create a window called "Hello, world!" and append into it.
+            isWindowOpen = ImGui::Begin("Hello, world! Hold down the 'Alt' key");
             ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
             ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
             ImGui::Checkbox("Another Window", &show_another_window);
 
-            ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
             ImGui::ColorEdit3("Background Color", (float*)&(meshRenderer->getTargetFrameBuffer()->colorAttachments[0].clearColor)); // Edit 3 floats representing a color
 
-            if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
-                counter++;
-            ImGui::SameLine();
-            ImGui::Text("counter = %d", counter);
+            ImVec4 buttonColor = ImVec4(1.0f, 0.4f, 0.f, 1.0f);      // Color of button
+            ImVec4 hoveredColor = ImVec4(0.4f, 0.15f, 0.15f, 1.0f);  // Color on hover
+            ImVec4 activeColor = ImVec4(0.8f, 0.15f, 0.0f, 1.0f);    // Color when pressed
 
+            // Ó¦ÓÃÑÕÉ«
+            ImGui::PushStyleColor(ImGuiCol_Button, buttonColor);
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, hoveredColor);
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, activeColor);
+
+            if (ImGui::Button("Load Model or Texture", ImVec2(160, 30)))  openFileDialog = true;
+
+
+            ImGui::PopStyleColor(3);
+
+            if (openFileDialog) {
+                // Create a FileDialogConfig  object
+                IGFD::FileDialogConfig config;
+                config.path = "/resources/";               // Set the path location when the folder is opened
+                config.countSelectionMax = 1;              // Allow a file to be opened
+                config.flags = ImGuiFileDialogFlags_None;  // no special mark
+
+                // Enter the parameters and open the file selection dialog box
+                ImGuiFileDialog::Instance()->OpenDialog("ChooseFileDlgKey", "Choose File", ".fbx,.obj,.dae,.png,.jpg,.jpeg,.bmp", config);
+                openFileDialog = false;
+            }
+
+            // Display the file selection dialog and process the selection results
+            if (ImGuiFileDialog::Instance()->Display("ChooseFileDlgKey")) {
+                // If selects a file
+                if (ImGuiFileDialog::Instance()->IsOk()) {
+                    // Get the path of the selected file
+                    selectedFilePath = ImGuiFileDialog::Instance()->GetFilePathName();
+
+                    //Adds the model of the selected file to the scene
+                    meshRenderer->scene->createModel(selectedFilePath);
+                }
+                ImGuiFileDialog::Instance()->Close();
+            }
+            
             //Provides the option to select post-processing
             ImGui::Text("Select Post-processing Effect");
             ImGui::RadioButton("Origin", &useEffect, 0);
@@ -539,20 +575,24 @@ void processInput(GLFWwindow *window)
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
         camera.ProcessKeyboard(RIGHT, deltaTime);
 
-    if (glfwGetKey(window, GLFW_KEY_LEFT_ALT) == GLFW_PRESS) {
-        if (!isCursorVisible)
-        {
-            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL); // Show Cursor
-            isCursorVisible = true;
+    //Control whether the cursor should be hidden
+    if (!isWindowOpen) {             //When the window is not expanded
+        if (glfwGetKey(window, GLFW_KEY_LEFT_ALT) == GLFW_PRESS) {
+            if (!isCursorVisible)    //Press "Alt" when the cursor is not visible
+            {
+                glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL); // Show Cursor
+                isCursorVisible = true;
+            }
         }
-    }
-    else
-    {
-        if (isCursorVisible)
+        else if (isCursorVisible)   //Not holding "Alt"
         {
-            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED); // Hide  Cursor
+            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);         // Hide  Cursor
             isCursorVisible = false;
         }
+    }
+    else if (!isCursorVisible) {    //When the window is expanded
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);              //Show Currsor
+        isCursorVisible = true;
     }
 }
 

@@ -17,7 +17,7 @@ class PointLight;
 
 class MeshRenderer {
 public:
-    MeshRenderer(const std::string& modelPath);
+    MeshRenderer();
     ~MeshRenderer();
     virtual void render(Camera* camera, RenderGraph& rg);
     unsigned int getTargetColorTextureID(int  attachment);
@@ -26,6 +26,9 @@ public:
     //light
     DirectionLight* directionLight;
     vector<PointLight*> pointLights;
+
+    //Scene
+    Scene* scene = new Scene();
 
 private:
     //shader
@@ -37,11 +40,7 @@ private:
     FrameBufferInfo OriginFramebuffer;
     FrameBufferInfo DepthMapFramebuffer;
 
-    //Scene
-    Scene* scene=new Scene();
-
-    //texture
-    unordered_map<std::string, Texture2D*> ColorTextureMap;
+    //Texture
     Texture2D* fboColorTexture = nullptr;
     Texture2D* fboDepthTexture = nullptr;
     Texture2D* baseTexture = nullptr;
@@ -58,7 +57,6 @@ private:
     Model* modelSample2 = nullptr;
     Model* modelSample3 = nullptr;
 
-    
 
     //cube
     unsigned int cubeVAO=0,cubeVBO=0;
