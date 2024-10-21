@@ -379,7 +379,7 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
         {
             ImGui::SetNextWindowSize(ImVec2(400, 300));
             // Flag for file dialog
-            static bool openFileDialog = false;
+            static bool openModelDialog = false, openTextureDialog = false;
             // store selected file path
             static std::string selectedFilePath = "";
 
@@ -395,41 +395,61 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
             ImVec4 hoveredColor = ImVec4(0.4f, 0.15f, 0.15f, 1.0f);  // Color on hover
             ImVec4 activeColor = ImVec4(0.8f, 0.15f, 0.0f, 1.0f);    // Color when pressed
 
-            // Ó¦ÓÃÑÕÉ«
-            ImGui::PushStyleColor(ImGuiCol_Button, buttonColor);
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, hoveredColor);
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, activeColor);
+           // Reusable function to apply button colors
+            auto setButtonStyle = [&]() {
+                ImGui::PushStyleColor(ImGuiCol_Button, buttonColor);
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, hoveredColor);
+                ImGui::PushStyleColor(ImGuiCol_ButtonActive, activeColor);
+            };
 
-            if (ImGui::Button("Load Model or Texture", ImVec2(160, 30)))  openFileDialog = true;
-
-
+            setButtonStyle();
+            if (ImGui::Button("Load Model", ImVec2(160, 30)))  openModelDialog = true;
             ImGui::PopStyleColor(3);
 
-            if (openFileDialog) {
-                // Create a FileDialogConfig  object
+            if (openModelDialog) {
                 IGFD::FileDialogConfig config;
-                config.path = "/resources/";               // Set the path location when the folder is opened
-                config.countSelectionMax = 1;              // Allow a file to be opened
-                config.flags = ImGuiFileDialogFlags_None;  // no special mark
+                config.path = "/resources/objects/";                // Default folder path for model selection
+                config.countSelectionMax = 1;                       // Allow only one file to be selected
+                config.flags = ImGuiFileDialogFlags_None;           // No special flags
 
-                // Enter the parameters and open the file selection dialog box
-                ImGuiFileDialog::Instance()->OpenDialog("ChooseFileDlgKey", "Choose File", ".fbx,.obj,.dae,.png,.jpg,.jpeg,.bmp", config);
-                openFileDialog = false;
+                // Open model file dialog
+                ImGuiFileDialog::Instance()->OpenDialog("ChooseModelDlgKey", "Choose Model", ".obj,.fbx,.dae", config);
+                openModelDialog = false;
             }
 
-            // Display the file selection dialog and process the selection results
-            if (ImGuiFileDialog::Instance()->Display("ChooseFileDlgKey")) {
-                // If selects a file
+            // Process selected model file
+            if (ImGuiFileDialog::Instance()->Display("ChooseModelDlgKey")) {
                 if (ImGuiFileDialog::Instance()->IsOk()) {
-                    // Get the path of the selected file
                     selectedFilePath = ImGuiFileDialog::Instance()->GetFilePathName();
-
-                    //Adds the model of the selected file to the scene
-                    meshRenderer->scene->createModel(selectedFilePath);
+                    meshRenderer->scene->createModel(selectedFilePath);   // Add model to the scene
                 }
                 ImGuiFileDialog::Instance()->Close();
             }
             
+            setButtonStyle();
+            if (ImGui::Button("Change Floor Texture", ImVec2(160, 30))) openTextureDialog = true;
+            ImGui::PopStyleColor(3);
+
+            if (openTextureDialog) {
+                IGFD::FileDialogConfig config;
+                config.path = "/resources/textures/";               // Default folder path for texture selection
+                config.countSelectionMax = 1;                       // Allow only one file to be selected
+                config.flags = ImGuiFileDialogFlags_None;           // No special flags
+
+                // Open texture file dialog
+                ImGuiFileDialog::Instance()->OpenDialog("ChooseTextureDlgKey", "Choose Texture", ".png,.jpg,.jpeg,.bmp", config);
+                openTextureDialog = false;
+            }
+
+            // Process selected texture file
+            if (ImGuiFileDialog::Instance()->Display("ChooseTextureDlgKey")) {
+                if (ImGuiFileDialog::Instance()->IsOk()) {
+                    selectedFilePath = ImGuiFileDialog::Instance()->GetFilePathName();
+                    meshRenderer->scene->loadFloorTexture(selectedFilePath);  // Load texture to the scene
+                }
+                ImGuiFileDialog::Instance()->Close();
+            }
+
             //Provides the option to select post-processing
             ImGui::Text("Select Post-processing Effect");
             ImGui::RadioButton("Origin", &useEffect, 0);

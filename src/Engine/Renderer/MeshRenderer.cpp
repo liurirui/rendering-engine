@@ -86,14 +86,14 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
         renderContext->drawArrays(0, 6);
 
         for (Renderable* renderable : scene->Opaque) {
-            depthMapShader.getPtr()->setMat4("model", renderable->transform.modelMatrix);
+            depthMapShader.getPtr()->setMat4("model", renderable->transform->modelMatrix);
             renderContext->bindVertexBuffer(renderable->mesh->vertexAttributeBufferID);
             renderContext->bindIndexBuffer(renderable->mesh->indexBufferID);
             renderContext->drawElements(renderable->mesh->numTriangle * 3, 0);
         }
 
         for (Renderable* renderable : scene->Translucent) {
-            depthMapShader.getPtr()->setMat4("model", renderable->transform.modelMatrix);
+            depthMapShader.getPtr()->setMat4("model", renderable->transform->modelMatrix);
             renderContext->bindVertexBuffer(renderable->mesh->vertexAttributeBufferID);
             renderContext->bindIndexBuffer(renderable->mesh->indexBufferID);
             renderContext->drawElements(renderable->mesh->numTriangle * 3, 0);
@@ -162,9 +162,8 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
         
         //render plane
         lightingShader.getPtr()->setMat4("model", model);
-        baseTexture = scene->ColorTextureMap["plane"];
         renderContext->bindVertexBuffer(planeVAO);
-        renderContext->bindTexture(baseTexture->id, 0);
+        renderContext->bindTexture(scene->floor->id, 0);
         renderContext->drawArrays(0, 6);
 
         //Rendering Opaque Meshes
@@ -181,7 +180,7 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
             else if (renderable->modelNumber == 8)  baseTexture = scene->ColorTextureMap["Backpack"];
 
             if (baseTexture) {
-                lightingShader.getPtr()->setMat4("model", renderable->transform.modelMatrix);
+                lightingShader.getPtr()->setMat4("model", renderable->transform->modelMatrix);
                 renderContext->bindTexture(baseTexture->id, 0);
                 renderContext->bindVertexBuffer(renderable->mesh->vertexAttributeBufferID);
                 renderContext->bindIndexBuffer(renderable->mesh->indexBufferID);
@@ -209,7 +208,7 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
                 baseTexture = scene->ColorTextureMap["glass"];
             }
             if (baseTexture) {
-                lightingShader.getPtr()->setMat4("model", renderable->transform.modelMatrix);
+                lightingShader.getPtr()->setMat4("model", renderable->transform->modelMatrix);
                 renderContext->bindTexture(baseTexture->id, 0);
                 renderContext->bindVertexBuffer(renderable->mesh->vertexAttributeBufferID);
                 renderContext->bindIndexBuffer(renderable->mesh->indexBufferID);

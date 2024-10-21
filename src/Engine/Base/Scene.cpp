@@ -33,6 +33,7 @@ void Scene::loadTexture() {
 	ColorTextureMap["Backpack"] = RenderContext::getInstance()->loadTexture2D((Scene::rootPath + "/resources/objects/backpack/diffuse.jpg").c_str());
 	ColorTextureMap["Cyborg"] = RenderContext::getInstance()->loadTexture2D((Scene::rootPath + "/resources/objects/cyborg/cyborg_diffuse.png").c_str());
 	ColorTextureMap["VampireMesh"] = RenderContext::getInstance()->loadTexture2D((Scene::rootPath + "/resources/objects/vampire/textures/Vampire_diffuse.png").c_str());
+	floor = RenderContext::getInstance()->loadTexture2D((Scene::rootPath + "/resources/textures/wood.png").c_str());       //Initialize the texture of the floor
 }
 
 float Scene::calculateDistance(glm::vec3 cameraPosition,glm::vec3 meshPosition) {
@@ -57,43 +58,43 @@ void Scene::storeMeshes(Model* newModel) {
 			if (mesh->nowName == "frame")  renderable = new Renderable(mesh, false);
 			else  renderable = new Renderable(mesh, true);
 			renderable->modelNumber = 1;
-			renderable->transform.setTransform(glm::vec3(3.0f, 1.0f, -0.8f), glm::vec3(-90.0f, 0.0f, 0.0f), glm::vec3(0.01f, 0.01f, 0.01f));
+			renderable->transform->setTransform(glm::vec3(3.0f, 1.0f, -0.8f), glm::vec3(-90.0f, 0.0f, 0.0f), glm::vec3(0.01f, 0.01f, 0.01f));
 		}
 		else if (mesh->nowName == "mask") {
 			renderable = new Renderable(mesh, true);
 			renderable->modelNumber = 2;
-			renderable->transform.setTransform(glm::vec3(3.0f, 1.0f, 0.5f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(25.0f, 25.0f, 25.0f));
+			renderable->transform->setTransform(glm::vec3(3.0f, 1.0f, 0.5f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(25.0f, 25.0f, 25.0f));
 		}
 		else if (mesh->nowName == "hands" || mesh->nowName == "Visor" || mesh->nowName == "Body" ||
-			mesh->nowName == "Helmet" || mesh->nowName == "Legs" || mesh->nowName == "Arms") {
+			mesh->nowName == "Helmet" || mesh->nowName == "Legs" || mesh->nowName == "Arms"|| mesh->nowName == "Lights") {
 			renderable = new Renderable(mesh, false);
 			renderable->modelNumber = 3;
-			renderable->transform.setTransform(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.5f, 0.5f, 0.5f));
+			renderable->transform->setTransform(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.5f, 0.5f, 0.5f));
 		}
 		else if (mesh->nowName=="Mars_Cube.002") {
 			renderable = new Renderable(mesh, false);
 			renderable->modelNumber = 4;
-			renderable->transform.setTransform(glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.5f, 0.5f, 0.5f));
+			renderable->transform->setTransform(glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.5f, 0.5f, 0.5f));
 		}
 		else if (mesh->nowName == "Cube") {
 			renderable = new Renderable(mesh, false);
 			renderable->modelNumber = 5;
-			renderable->transform.setTransform(glm::vec3(-3.0f, 1.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.5f, 0.5f, 0.5f));
+			renderable->transform->setTransform(glm::vec3(-3.0f, 1.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.5f, 0.5f, 0.5f));
 		}
 		else if (mesh->nowName == "Cyborg") {
 			renderable = new Renderable(mesh, false);
 			renderable->modelNumber = 6;
-			renderable->transform.setTransform(glm::vec3(-3.0f,0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f, 1.0f, 1.0f));
+			renderable->transform->setTransform(glm::vec3(-3.0f,0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f, 1.0f, 1.0f));
 		}
 		else if (mesh->nowName == "VampireMesh") {
 			renderable = new Renderable(mesh, false);
 			renderable->modelNumber = 7;
-			renderable->transform.setTransform(glm::vec3(1.0f, 0.0f, -6.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.035f, 0.035f, 0.035f));
+			renderable->transform->setTransform(glm::vec3(1.0f, 0.0f, -6.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.035f, 0.035f, 0.035f));
 		}
 		else {
 			renderable = new Renderable(mesh, false);
 			renderable->modelNumber = 8;
-			renderable->transform.setTransform(glm::vec3(3.0f, 1.0f, 2.5f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.75f, 0.75f, 0.75f));
+			renderable->transform->setTransform(glm::vec3(3.0f, 1.0f, 2.5f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.75f, 0.75f, 0.75f));
 		}
 		if (renderable) {
 			addRenderable(renderable);
@@ -103,6 +104,14 @@ void Scene::storeMeshes(Model* newModel) {
 
 void Scene::createModel(const std::string& modelPath){
 	storeMeshes(new Model(modelPath));
+}
+
+void Scene::loadFloorTexture(const std::string& TexturePath) {
+	if (floor) {
+		delete floor;
+		floor = nullptr;  // Avoid dangling pointer problems
+	}
+	floor= RenderContext::getInstance()->loadTexture2D(TexturePath.c_str());
 }
 
 Scene::~Scene() {

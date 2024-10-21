@@ -2,12 +2,15 @@
 NAMESPACE_START
 Renderable::Renderable() {}
 
-Renderable::~Renderable() { delete mesh; }
+Renderable::~Renderable() { 
+    delete mesh; 
+    delete transform;
+}
 
 Renderable::Renderable(Mesh* meshNow, bool NowisTranslucentNow) {
 	mesh = meshNow;
 	isTranslucent = NowisTranslucentNow;
-    calculateCenter();
+    //calculateCenter();
 }
 
 void Renderable::calculateCenter() {
@@ -23,7 +26,7 @@ void Renderable::calculateCenter() {
 
 glm::vec3  Renderable::getWorldCenter(){
     if (needCaculateWorldCenter) {
-        worldBoundingBoxCenter = transform.modelMatrix * glm::vec4(boundingBoxCenter, 1.0);
+        worldBoundingBoxCenter = transform->modelMatrix * glm::vec4(boundingBoxCenter, 1.0);
         needCaculateWorldCenter = false;
     }
     return worldBoundingBoxCenter;

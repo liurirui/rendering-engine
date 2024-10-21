@@ -52,12 +52,6 @@ private:
     const unsigned int SCR_WIDTH = 800;
     const unsigned int SCR_HEIGHT = 600;
 
-    //model
-    Model* modelSample1 = nullptr;
-    Model* modelSample2 = nullptr;
-    Model* modelSample3 = nullptr;
-
-
     //cube
     unsigned int cubeVAO=0,cubeVBO=0;
     float cubeVertices[288] = {

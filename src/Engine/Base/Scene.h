@@ -19,13 +19,16 @@ public:
 	void storeMeshes(Model* newModel);
 	void createModel(const std::string& modelPath);
 	void loadTexture();
+	void loadFloorTexture(const std::string& TexturePath);
 
 	//mesh
 	std::vector<Renderable*> Translucent;
 	std::vector<Renderable*> Opaque;
 
+
 	//texture
 	unordered_map<std::string, Texture2D*> ColorTextureMap;
+	Texture2D* floor = nullptr;
 
 	static std::string rootPath;
 

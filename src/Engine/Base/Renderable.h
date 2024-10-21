@@ -19,7 +19,7 @@ public:
     glm::vec3 getWorldCenter();
 
     Mesh* mesh;
-    Transform transform;
+    Transform* transform = new Transform();
     bool isTranslucent = false;
     int modelNumber = 0;
     glm::vec3 boundingBoxCenter=glm::vec3(0.0f,0.0f,0.0f);     //The center coordinates of the bounding box
