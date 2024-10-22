@@ -10,59 +10,8 @@
 #include <glm/gtc/type_ptr.hpp>
 
 NAMESPACE_START
-MeshRenderer::MeshRenderer() {
-    depthStencilState.depthTest = true;
-    depthStencilState.depthWrite = true;
-
-    //Shader
-    depthMapShader = TRefCountPtr<Shader>(new Shader(Vert_depth_map, Frag_depth_map));
-    lightingShader = TRefCountPtr<Shader>(new Shader(Vertmodel_lighting, Fragmodel_lighting));
-    lightingShader_cube= TRefCountPtr<Shader>(new Shader(Vertmodel_lighting, Fragmodel_cube));
-
-    //set  Originframebuffer's Texture Attachments
-    fboColorTexture = RenderContext::getInstance()->createTexture2D(TextureUsage::RenderTarget, TextureFormat::RGBA32F, RenderContext::getInstance()->windowsWidth,
-        RenderContext::getInstance()->windowsHeight);
-    fboDepthTexture = RenderContext::getInstance()->createTexture2D(TextureUsage::DepthStencil, TextureFormat::Depth24_Stencil8, RenderContext::getInstance()->windowsWidth,
-        RenderContext::getInstance()->windowsHeight);
-    ColorAttachment colorAttachment;
-    colorAttachment.attachment = 0;
-    colorAttachment.texture = fboColorTexture;
-    colorAttachment.clearColor = glm::vec4(0.1, 0.05, 0.15, 1);
-    OriginFramebuffer.colorAttachments.emplace_back(std::move(colorAttachment));
-    OriginFramebuffer.depthStencilAttachment.texture = fboDepthTexture;
-    graphicsPipeline.shader = lightingShader.getPtr();
-    PipelineColorBlendAttachment pipelineColorBlendAttachment;
-    pipelineColorBlendAttachment.blendState.enabled = true;
-    graphicsPipeline.rasterizationState.blendState.attachmentsBlendState.push_back(pipelineColorBlendAttachment);
-
-
-    graphicsPipeline_DepthMap.shader = depthMapShader.getPtr();
-    //graphicsPipeline_DepthMap.rasterizationState.cullMode = CullMode::Front;
-    
-    if (!cubeVBO) {
-        cubeVBO = RenderContext::getInstance()->createVertexBuffer(cubeVertices, sizeof(cubeVertices));
-    }
-    if (!cubeVAO) {
-        cubeVAO = RenderContext::getInstance()->createVertexBufferLayoutInfo(cubeVBO);
-        RenderContext::getInstance()->setUpVertexBufferLayoutInfo(cubeVBO, cubeVAO, 3, 8 * sizeof(float), 0, 0);
-        RenderContext::getInstance()->setUpVertexBufferLayoutInfo(cubeVBO, cubeVAO, 3, 8 * sizeof(float), 1, 3);
-        RenderContext::getInstance()->setUpVertexBufferLayoutInfo(cubeVBO, cubeVAO, 2, 8 * sizeof(float), 2, 6);
-    }
-    if (!planeVBO) {
-        planeVBO = RenderContext::getInstance()->createVertexBuffer(planeVertices, sizeof(planeVertices));
-    }
-    if (!planeVAO) {
-        planeVAO = RenderContext::getInstance()->createVertexBufferLayoutInfo(planeVBO);
-        RenderContext::getInstance()->setUpVertexBufferLayoutInfo(planeVBO, planeVAO, 3, 8 * sizeof(float), 0, 0);
-        RenderContext::getInstance()->setUpVertexBufferLayoutInfo(planeVBO, planeVAO, 3, 8 * sizeof(float), 1, 3);
-        RenderContext::getInstance()->setUpVertexBufferLayoutInfo(planeVBO, planeVAO, 2, 8 * sizeof(float), 2, 6);
-    }
-    directionLight = new DirectionLight(glm::vec3(-0.5f, -0.8f, -0.5f), glm::vec3(2.0f, 2.0f, 2.0f), 1.0f);
-    pointLights.push_back(new PointLight(glm::vec3(0.0f, 6.0f, 5.0f), glm::vec3(15.0f, 0.0f, 0.0f), 0.4f));
-    pointLights.push_back(new PointLight(glm::vec3(-2.0f, 1.0f, -3.0f), glm::vec3(0.0f, 15.0f, 0.0f), 0.4f));
-    pointLights.push_back(new PointLight(glm::vec3(3.0f, 8.5f, 0.0f), glm::vec3(0.0f, 0.0f, 25.0f), 0.4f));
-    pointLights.push_back(new PointLight(glm::vec3(-8.0f, 3.0f, -1.0f), glm::vec3(6.0f, 6.0f, 6.0f), 0.3f));
-}
+MeshRenderer::MeshRenderer(const std::vector<Renderable*>& translucentMeshes, const std::vector<Renderable*>& opaqueMeshes)
+    : translucentMeshes(translucentMeshes), opaqueMeshes(opaqueMeshes){}
 
 void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
     const char* passName = "modelPass";
@@ -85,14 +34,14 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
         renderContext->bindVertexBuffer(planeVAO);
         renderContext->drawArrays(0, 6);
 
-        for (Renderable* renderable : scene->Opaque) {
+        for (Renderable* renderable : opaqueMeshes) {
             depthMapShader.getPtr()->setMat4("model", renderable->transform->modelMatrix);
             renderContext->bindVertexBuffer(renderable->mesh->vertexAttributeBufferID);
             renderContext->bindIndexBuffer(renderable->mesh->indexBufferID);
             renderContext->drawElements(renderable->mesh->numTriangle * 3, 0);
         }
 
-        for (Renderable* renderable : scene->Translucent) {
+        for (Renderable* renderable : translucentMeshes) {
             depthMapShader.getPtr()->setMat4("model", renderable->transform->modelMatrix);
             renderContext->bindVertexBuffer(renderable->mesh->vertexAttributeBufferID);
             renderContext->bindIndexBuffer(renderable->mesh->indexBufferID);
@@ -163,21 +112,21 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
         //render plane
         lightingShader.getPtr()->setMat4("model", model);
         renderContext->bindVertexBuffer(planeVAO);
-        renderContext->bindTexture(scene->floor->id, 0);
+        renderContext->bindTexture(floor->id, 0);
         renderContext->drawArrays(0, 6);
 
         //Rendering Opaque Meshes
-        for (Renderable* renderable : scene->Opaque) {
-            if (renderable->modelNumber != 1 && renderable->modelNumber != 2 && scene->ColorTextureMap.find(renderable->mesh->nowName) != scene->ColorTextureMap.end()) {
+        for (Renderable* renderable : opaqueMeshes) {
+            if (renderable->modelNumber != 1 && renderable->modelNumber != 2 && ColorTextureMap.find(renderable->mesh->nowName) != ColorTextureMap.end()) {
                 if (renderable->mesh->nowName == "Visor")  IsGlass = true;
                 else  IsGlass = false;
-                baseTexture = scene->ColorTextureMap[renderable->mesh->nowName];
+                baseTexture = ColorTextureMap[renderable->mesh->nowName];
                 lightingShader.getPtr()->setBool("isGlass", IsGlass);
             }
 
-            else if (renderable->modelNumber == 1)  baseTexture = scene->ColorTextureMap["app"];
+            else if (renderable->modelNumber == 1)  baseTexture = ColorTextureMap["app"];
 
-            else if (renderable->modelNumber == 8)  baseTexture = scene->ColorTextureMap["Backpack"];
+            else if (renderable->modelNumber == 8)  baseTexture = ColorTextureMap["Backpack"];
 
             if (baseTexture) {
                 lightingShader.getPtr()->setMat4("model", renderable->transform->modelMatrix);
@@ -198,14 +147,14 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
         //Rendering Translucent Meshes
         lightingShader.getPtr()->setBool("isGlass",true);
         lightingShader.getPtr()->setBool("isMirror", true);
-        for (Renderable* renderable : scene->Translucent) {
+        for (Renderable* renderable : translucentMeshes) {
             if (renderable->modelNumber == 1) {
                 lightingShader.getPtr()->setVec3("objectColor", 1.0f, 1.0f, 1.0f);
-                baseTexture = scene->ColorTextureMap["glass"];
+                baseTexture = ColorTextureMap["glass"];
             }
             else if (renderable->modelNumber == 2) {
                 lightingShader.getPtr()->setVec3("objectColor", 0.0f, 0.0f, 10.0f);
-                baseTexture = scene->ColorTextureMap["glass"];
+                baseTexture = ColorTextureMap["glass"];
             }
             if (baseTexture) {
                 lightingShader.getPtr()->setMat4("model", renderable->transform->modelMatrix);

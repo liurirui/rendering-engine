@@ -86,9 +86,9 @@ void DirectionLight::setDirection(const glm::vec3& direction) {
 }
 
 void DirectionLight::calculateLightSpaceMatrix() {
-    glm::mat4 lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, shadow->near_plane, shadow->far_plane);
+    glm::mat4 lightProjection = glm::ortho(-25.0f, 25.0f, -25.0f, 25.0f, shadow->near_plane, shadow->far_plane);
 
-    glm::vec3 lightPos = -direction * 10.0f;  // 光源的位置可以根据方向拉远一定的距离
+    glm::vec3 lightPos = -direction * 25.0f;  // 光源的位置可以根据方向拉远一定的距离
     glm::vec3 target = glm::vec3(0.0f, 0.0f, 0.0f);  // 看向场景中心
     glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);  // 上方向（Y轴向上）
 

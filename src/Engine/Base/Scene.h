@@ -5,34 +5,44 @@
 #include <unordered_map>
 #include <glm/glm.hpp>
 #include<string>
+#include "Base/Light.h"
 #include "Mesh.h"
 #include"Model.h"
-#include"Renderable.h"
+#include"Base/Renderable.h"
+#include"Renderer/MeshRenderer.h"
+#include "Base/ShaderCode.h"
+#include"Camera.h"
 NAMESPACE_START
 class Scene {
 public:
 	Scene();
 	~Scene() ;
 	void addRenderable(Renderable* newMesh);
-	float calculateDistance(glm::vec3 cameraPosition, glm::vec3 meshPosition);
-	void sortTranslucentMeshes(glm::vec3 cameraPosition);
 	void storeMeshes(Model* newModel);
 	void createModel(const std::string& modelPath);
-	void loadTexture();
 	void loadFloorTexture(const std::string& TexturePath);
+	void updateMeshTransform();
+
+	float calculateDistance(glm::vec3 cameraPosition, glm::vec3 meshPosition);
+	void sortTranslucentMeshes(glm::vec3 cameraPosition);
+
+
+	//Interface function
+	void Start();
+	void Update();
+	void Render(Camera* camera, RenderGraph& rg);
 
 	//mesh
 	std::vector<Renderable*> Translucent;
 	std::vector<Renderable*> Opaque;
 
+	//model
+	vector<Model*> model;
 
-	//texture
-	unordered_map<std::string, Texture2D*> ColorTextureMap;
-	Texture2D* floor = nullptr;
-
+	//Renderer
+	MeshRenderer* meshRenderer = nullptr;
+	
 	static std::string rootPath;
-
-	int modelNo=1;                 //模型序号，记录网格属于哪个模型，便于绑定对应变换矩阵
 
 private:
 

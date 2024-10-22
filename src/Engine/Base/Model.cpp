@@ -8,7 +8,7 @@ Model::Model(string const& path, bool gamma ) : gammaCorrection(gamma)
     loadModel(path);
 }
 Model::~Model() {
-
+    delete transform;
 }
 
 void Model::loadModel(string const& path)

@@ -17,7 +17,7 @@ public:
     ~Shadow();
     FrameBufferInfo DepthMapFramebuffer;   
     Texture2D* depthMap = nullptr;
-    float near_plane = 1.0f, far_plane = 25.0f;
+    float near_plane = 1.0f, far_plane = 60.0f;
     const unsigned int SHADOW_WIDTH = 800;
     const unsigned int SHADOW_HEIGHT = 600;
     const unsigned int SHADOW_CUBE = 1024;
@@ -52,16 +52,16 @@ public:
 
     void turnOff();
 
-    bool Switch = true;         // 灯的状态
+    bool Switch = true;         // light status
 
 protected:
-    LightType type;             // 光的类型
-    glm::vec3 color;            // 光的颜色
-    glm::vec3 colorOn;          // 光开启时的颜色
-    glm::vec3 colorOff;          // 光关闭时的颜色
-    float intensity;            // 光的强度
-    float intensityOrigin;      // 记录光开启时的强度
-    Shadow* shadow = nullptr;   // 阴影
+    LightType type;            
+    glm::vec3 color;            
+    glm::vec3 colorOn;           // The color when the light source is on
+    glm::vec3 colorOff;          // The color when the light source is off
+    float intensity;           
+    float intensityOrigin;      // the intensity of the light when it is turned on
+    Shadow* shadow = nullptr;   
 };
 
 
@@ -73,12 +73,12 @@ public:
     void setDirection(const glm::vec3& direction);
     glm::vec3 getDirection() const;
 
-    // 实现定向光的阴影视图矩阵计算
+    // Shadow view matrix calculation for directional light
     void calculateLightSpaceMatrix();
     glm::mat4 LightSpaceMatrix;
     
 private:
-    glm::vec3 direction;  // 定向光的方向
+    glm::vec3 direction;  // Direction of directional light
 };
 
 
@@ -99,10 +99,10 @@ public:
     std::vector<glm::mat4> shadowTransforms;
     
 private:
-    glm::vec3 position;   // 点光源的位置
-    float constant = 1.0f;       // 衰减常数项
-    float linear = 0.09f;         // 衰减线性项
-    float quadratic = 0.032f;      // 衰减二次项
+    glm::vec3 position;          // The position of the point light source
+    float constant = 1.0f;       // Decay constant term
+    float linear = 0.09f;        // decay linear term
+    float quadratic = 0.032f;    // decay quadratic term
 };
 
 

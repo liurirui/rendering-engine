@@ -9,7 +9,8 @@ public:
 	Transform();
 	~Transform();
 	//Update data and model matrix
-	void setTransform(glm::vec3 position, glm::vec3 rotation, glm::vec3 scale);
+	void initialization(glm::vec3 position, glm::vec3 rotation, glm::vec3 scale);
+	void calculateMatrix();
 
 	glm::vec3 Position = glm::vec3(0.0f);
 	glm::vec3 Rotation = glm::vec3(0.0f);

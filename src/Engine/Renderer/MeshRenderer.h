@@ -1,11 +1,10 @@
 #pragma once
-
 #include <Base/Constants.h>
 #include<Base/TRefCountPtr.h>
 #include <RHI/RenderContext.h>
 #include "Base/Model.h" // Include Mesh and Vertex definitions
 #include <unordered_map>
-#include"Base/Scene.h"
+#include"Base/Renderable.h"
 class RenderGraph;
 
 NAMESPACE_START
@@ -17,7 +16,8 @@ class PointLight;
 
 class MeshRenderer {
 public:
-    MeshRenderer();
+    friend class Scene;
+    MeshRenderer(const std::vector<Renderable*>& translucentMeshes, const std::vector<Renderable*>& opaqueMeshes);
     ~MeshRenderer();
     virtual void render(Camera* camera, RenderGraph& rg);
     unsigned int getTargetColorTextureID(int  attachment);
@@ -27,8 +27,9 @@ public:
     DirectionLight* directionLight;
     vector<PointLight*> pointLights;
 
-    //Scene
-    Scene* scene = new Scene();
+    //Model mesh textures that need to be stored in advance
+    unordered_map<std::string, Texture2D*> ColorTextureMap;
+    Texture2D* floor = nullptr;
 
 private:
     //shader
@@ -45,9 +46,15 @@ private:
     Texture2D* fboDepthTexture = nullptr;
     Texture2D* baseTexture = nullptr;
 
+  
+
     //Render pipeline status
     GraphicsPipeline graphicsPipeline, graphicsPipeline_DepthMap;
     DepthStencilState depthStencilState;
+
+    //Accept  Scene's RenderableContainer reference
+    const std::vector<Renderable*>& translucentMeshes;  
+    const std::vector<Renderable*>& opaqueMeshes;       
     
     const unsigned int SCR_WIDTH = 800;
     const unsigned int SCR_HEIGHT = 600;

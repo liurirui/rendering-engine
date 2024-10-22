@@ -7,6 +7,7 @@
 #include <vector>
 #include"Mesh.h"
 #include"Shader.h"
+#include"Transform.h"
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
@@ -19,10 +20,15 @@ public:
     string directory;
     bool gammaCorrection;
 
+    Transform* transform = new Transform();
+    int modelNumber;
+    bool isTransformDirty = false;
+
     Model(string const& path, bool gamma = false);
     ~Model();
 
 private:
+
     void loadModel(const std::string& path);
     void processNode(aiNode* node, const aiScene* scene);
     Mesh* processMesh(aiMesh* mesh, const aiScene* scene);

@@ -8,6 +8,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+#include<Engine/Base/Scene.h>
 #include <Engine/Base/Camera.h>
 #include<Engine/Base/Light.h>
 #include <Engine/RHI/OpenGL/OpenGLRenderContext.h>
@@ -150,10 +151,10 @@ int asdasdasdsa(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_
     std::string texturepath = Scene::rootPath + "/resources/textures/background.jpg";
     Texture2D* texture = new Texture2D(texturepath.c_str());
 
-    std::string objpath = Scene::rootPath + "/resources/objects/nanosuit/nanosuit.obj";
-    MeshRenderer* meshRenderer = new MeshRenderer();
+    Scene* scene = new Scene;
+    scene->Start();
     PostProcessRenderer* postprocessRenderer = new PostProcessRenderer;
-    
+     scene->createModel(scene->rootPath + "/resources/objects/nanosuit/nanosuit.obj");
     // render loop
     // -----------
     while (!glfwWindowShouldClose(window))
@@ -171,8 +172,10 @@ int asdasdasdsa(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_
         RenderGraph renderGraph;
         
         //basePassRenderer->render(&camera, renderGraph);
-        meshRenderer->render(&camera, renderGraph);
-        postprocessRenderer->render(renderGraph, meshRenderer->getTargetFrameBuffer());
+        scene->Update();
+        scene->Render(&camera, renderGraph);
+
+        postprocessRenderer->render(renderGraph, scene->meshRenderer->getTargetFrameBuffer());
         renderGraph.execute(openGLRenderContext);
 
         glDisable(GL_DEPTH_TEST); // disable depth test so screen-space quad isn't discarded due to depth test.
@@ -183,7 +186,7 @@ int asdasdasdsa(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_
 
         glActiveTexture(GL_TEXTURE0);
         //glBindTexture(GL_TEXTURE_2D, basePassRenderer->getTargetColorTexture(0));	// use the color attachment texture as the texture of the quad plane
-        glBindTexture(GL_TEXTURE_2D, meshRenderer->getTargetColorTextureID(0));
+        glBindTexture(GL_TEXTURE_2D, scene->meshRenderer->getTargetColorTextureID(0));
         //glBindTexture(GL_TEXTURE_2D, postprocessRenderer->getTargetColorTextureID(0));
         glDrawArrays(GL_TRIANGLES, 0, 6);
 
@@ -192,13 +195,11 @@ int asdasdasdsa(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
-
+    delete scene;
     delete basePassRenderer;
     delete texture;
-    delete meshRenderer;
     delete postprocessRenderer;
     delete openGLRenderContext;
-
     glDeleteVertexArrays(1, &quadVAO);
 
     // glfw: terminate, clearing all previously allocated GLFW resources.
@@ -247,7 +248,7 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
       const char* glsl_version = "#version 330";
      glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
      glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    //glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);  // 3.2+ only
+     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);  // 3.2+ only
     //glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);            // 3.0+ only
 #endif
 
@@ -336,11 +337,12 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
 
     BasePassRenderer* basePassRenderer = new BasePassRenderer;
     std::string texturepath = Scene::rootPath + "/resources/textures/background.jpg";
-    Texture2D* texture = new Texture2D(texturepath.c_str());
+    
+    Scene* scene = new Scene;
 
-    std::string objpath = Scene::rootPath + "/resources/objects/nanosuit/nanosuit.obj";
-    MeshRenderer* meshRenderer = new MeshRenderer();
     PostProcessRenderer* postprocessRenderer = new PostProcessRenderer;
+
+    scene->Start();
 
     // Main loop
 #ifdef __EMSCRIPTEN__
@@ -389,7 +391,7 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
             ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
             ImGui::Checkbox("Another Window", &show_another_window);
 
-            ImGui::ColorEdit3("Background Color", (float*)&(meshRenderer->getTargetFrameBuffer()->colorAttachments[0].clearColor)); // Edit 3 floats representing a color
+            ImGui::ColorEdit3("Background Color", (float*)&(scene->meshRenderer->getTargetFrameBuffer()->colorAttachments[0].clearColor)); // Edit 3 floats representing a color
 
             ImVec4 buttonColor = ImVec4(1.0f, 0.4f, 0.f, 1.0f);      // Color of button
             ImVec4 hoveredColor = ImVec4(0.4f, 0.15f, 0.15f, 1.0f);  // Color on hover
@@ -421,7 +423,7 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
             if (ImGuiFileDialog::Instance()->Display("ChooseModelDlgKey")) {
                 if (ImGuiFileDialog::Instance()->IsOk()) {
                     selectedFilePath = ImGuiFileDialog::Instance()->GetFilePathName();
-                    meshRenderer->scene->createModel(selectedFilePath);   // Add model to the scene
+                    scene->createModel(selectedFilePath);   // Add model to the scene
                 }
                 ImGuiFileDialog::Instance()->Close();
             }
@@ -445,9 +447,39 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
             if (ImGuiFileDialog::Instance()->Display("ChooseTextureDlgKey")) {
                 if (ImGuiFileDialog::Instance()->IsOk()) {
                     selectedFilePath = ImGuiFileDialog::Instance()->GetFilePathName();
-                    meshRenderer->scene->loadFloorTexture(selectedFilePath);  // Load texture to the scene
+                    scene->loadFloorTexture(selectedFilePath);  // Load texture to the scene
                 }
                 ImGuiFileDialog::Instance()->Close();
+            }
+
+            if (!scene->model.empty()) {
+                if (ImGui::CollapsingHeader("Model Control")) {
+                    ImGui::Indent(ImGui::GetFontSize() * 2);
+                    for (int i = 0; i < scene->model.size(); i++) {
+                        if (ImGui::CollapsingHeader(("Model " + to_string(i + 1) + " Control").c_str())) {
+                            ImGui::Indent(ImGui::GetFontSize() * 2);
+                            if (ImGui::CollapsingHeader(("Model " + to_string(i + 1) + " Position").c_str())) {
+                                if (ImGui::SliderFloat(("Position X##" + to_string(i)).c_str(), &((scene->model[i]->transform->Position).x), -10.0f, 10.0f))  scene->model[i]->isTransformDirty = true;
+                                if (ImGui::SliderFloat(("Position Y##" + to_string(i)).c_str(), &((scene->model[i]->transform->Position).y), 0.0f, 10.0f))  scene->model[i]->isTransformDirty = true;
+                                if (ImGui::SliderFloat(("Position Z##" + to_string(i)).c_str(), &((scene->model[i]->transform->Position).z), -10.0f, 10.0f))  scene->model[i]->isTransformDirty = true;
+                            }
+                            if (ImGui::CollapsingHeader(("Model " + to_string(i + 1) + " Rotation").c_str())) {
+                                if (ImGui::SliderFloat(("Rotation X##" + to_string(i)).c_str(), &((scene->model[i]->transform->Rotation).x), -90.0f, 90.0f))  scene->model[i]->isTransformDirty = true;
+                                if (ImGui::SliderFloat(("Rotation Y##" + to_string(i)).c_str(), &((scene->model[i]->transform->Rotation).y), -90.0f, 90.0f))  scene->model[i]->isTransformDirty = true;
+                                if (ImGui::SliderFloat(("Rotation Z##" + to_string(i)).c_str(), &((scene->model[i]->transform->Rotation).z), -90.0f, 90.0f))  scene->model[i]->isTransformDirty = true;
+                            }
+                            if (ImGui::CollapsingHeader(("Model " + to_string(i + 1) + " Scale").c_str())) {
+                                float uniformScale = scene->model[i]->transform->Scale.x;
+                                if (ImGui::SliderFloat(("Model Scale##" + to_string(i)).c_str(), &uniformScale, 0.05f, 5.0f)) {
+                                    scene->model[i]->transform->Scale = glm::vec3(uniformScale);
+                                    scene->model[i]->isTransformDirty = true;
+                                }
+                            }
+                            ImGui::Unindent();
+                        }
+                    }
+                    ImGui::Unindent();
+                }
             }
 
             //Provides the option to select post-processing
@@ -468,9 +500,9 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
                 //directionLight 
                 ImGui::Text("Directional Light:");
                 ImGui::Indent(ImGui::GetFontSize() * 2);
-                if (ImGui::Checkbox("Directional Light", &(meshRenderer->directionLight->Switch))) {
-                    if (meshRenderer->directionLight->Switch) meshRenderer->directionLight->turnOn();
-                    else   meshRenderer->directionLight->turnOff();
+                if (ImGui::Checkbox("Directional Light", &(scene->meshRenderer->directionLight->Switch))) {
+                    if (scene->meshRenderer->directionLight->Switch) scene->meshRenderer->directionLight->turnOn();
+                    else   scene->meshRenderer->directionLight->turnOff();
                 }
                 ImGui::Unindent();
 
@@ -483,14 +515,14 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
                 for (int i = 0; i < 4; i++) {
                     if (ImGui::CollapsingHeader((name + nameLight[i]).c_str())) {
                         //Control the light source on and off
-                        if (ImGui::Checkbox(("On / Off##" + nameLight[i]).c_str(), &(meshRenderer->pointLights[i]->Switch))) {
-                            if (meshRenderer->pointLights[i]->Switch)    meshRenderer->pointLights[i]->turnOn();
-                            else  meshRenderer->pointLights[i]->turnOff();
+                        if (ImGui::Checkbox(("On / Off##" + nameLight[i]).c_str(), &(scene->meshRenderer->pointLights[i]->Switch))) {
+                            if (scene->meshRenderer->pointLights[i]->Switch)    scene->meshRenderer->pointLights[i]->turnOn();
+                            else  scene->meshRenderer->pointLights[i]->turnOff();
                         }
                         //Control the position of light sources
-                        ImGui::SliderFloat((name + nameLight[i] + "X").c_str(), &((meshRenderer->pointLights[i]->getPosition()).x), -10.0f, 10.0f);
-                        ImGui::SliderFloat((name + nameLight[i] + "Y").c_str(), &((meshRenderer->pointLights[i]->getPosition()).y), 0.0f, 10.0f);
-                        ImGui::SliderFloat((name + nameLight[i] + "Z").c_str(), &((meshRenderer->pointLights[i]->getPosition()).z), -10.0f, 10.0f);
+                        ImGui::SliderFloat((name + nameLight[i] + "X").c_str(), &((scene->meshRenderer->pointLights[i]->getPosition()).x), -10.0f, 10.0f);
+                        ImGui::SliderFloat((name + nameLight[i] + "Y").c_str(), &((scene->meshRenderer->pointLights[i]->getPosition()).y), 0.0f, 10.0f);
+                        ImGui::SliderFloat((name + nameLight[i] + "Z").c_str(), &((scene->meshRenderer->pointLights[i]->getPosition()).z), -10.0f, 10.0f);
                     }
                 }
                 ImGui::Unindent();
@@ -532,9 +564,11 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
         RenderGraph renderGraph;
 
         //basePassRenderer->render(&camera, renderGraph);
-        meshRenderer->render(&camera, renderGraph);
+        scene->Update();
+        scene->Render(&camera, renderGraph);
+
         if(useEffect!=0)
-        postprocessRenderer->render(renderGraph, meshRenderer->getTargetFrameBuffer());
+        postprocessRenderer->render(renderGraph, scene->meshRenderer->getTargetFrameBuffer());
         renderGraph.execute(openGLRenderContext);
 
         glDisable(GL_DEPTH_TEST); // disable depth test so screen-space quad isn't discarded due to depth test.
@@ -546,7 +580,7 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
         glActiveTexture(GL_TEXTURE0);
         //glBindTexture(GL_TEXTURE_2D, basePassRenderer->getTargetColorTexture(0));	// use the color attachment texture as the texture of the quad plane
         if(useEffect==0)
-        glBindTexture(GL_TEXTURE_2D, meshRenderer->getTargetColorTextureID(0));
+        glBindTexture(GL_TEXTURE_2D, scene->meshRenderer->getTargetColorTextureID(0));
         else 
         glBindTexture(GL_TEXTURE_2D, postprocessRenderer->getTargetColorTextureID(0,useEffect));
         glDrawArrays(GL_TRIANGLES, 0, 6);
@@ -558,10 +592,8 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
 #ifdef __EMSCRIPTEN__
     EMSCRIPTEN_MAINLOOP_END;
 #endif
-
+    delete scene;
     delete basePassRenderer;
-    delete texture;
-    delete meshRenderer;
     delete postprocessRenderer;
     delete openGLRenderContext;
 

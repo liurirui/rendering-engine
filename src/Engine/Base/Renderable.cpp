@@ -3,7 +3,6 @@ NAMESPACE_START
 Renderable::Renderable() {}
 
 Renderable::~Renderable() { 
-    delete mesh; 
     delete transform;
 }
 
@@ -11,6 +10,10 @@ Renderable::Renderable(Mesh* meshNow, bool NowisTranslucentNow) {
 	mesh = meshNow;
 	isTranslucent = NowisTranslucentNow;
     //calculateCenter();
+}
+
+void Renderable::setTransformFromModel(Model* model) {
+    *transform = *model->transform;
 }
 
 void Renderable::calculateCenter() {
