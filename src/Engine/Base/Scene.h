@@ -37,7 +37,7 @@ public:
 	std::vector<Renderable*> Opaque;
 
 	//model
-	vector<Model*> model;
+	std::vector<Model*> model;
 
 	//Renderer
 	MeshRenderer* meshRenderer = nullptr;

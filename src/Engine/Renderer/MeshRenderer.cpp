@@ -54,7 +54,7 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
         renderContext->setDepthStencilState(depthStencilState);
         renderContext->bindPipeline(graphicsPipeline);
         glm::mat4 light_model=glm::mat4(1.0f);
-        glm::mat4 projection = glm::perspective(glm::radians(camera->Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+        glm::mat4 projection = glm::perspective(glm::radians(camera->Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 1000.0f);
         glm::mat4 view = camera->GetViewMatrix();
         lightingShader_cube.getPtr()->use();
         lightingShader_cube.getPtr()->setMat4("projection", projection);
@@ -79,6 +79,7 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
             renderContext->bindVertexBuffer(cubeVAO);
             renderContext->drawArrays(0, 36);
         }
+
         lightingShader.getPtr()->use();
         lightingShader.getPtr()->setMat4("projection", projection);
         lightingShader.getPtr()->setMat4("view", view);
@@ -114,6 +115,7 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
         renderContext->bindVertexBuffer(planeVAO);
         renderContext->bindTexture(floor->id, 0);
         renderContext->drawArrays(0, 6);
+
 
         //Rendering Opaque Meshes
         for (Renderable* renderable : opaqueMeshes) {

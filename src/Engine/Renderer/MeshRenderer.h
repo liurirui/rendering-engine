@@ -25,10 +25,10 @@ public:
 
     //light
     DirectionLight* directionLight;
-    vector<PointLight*> pointLights;
+    std::vector<PointLight*> pointLights;
 
     //Model mesh textures that need to be stored in advance
-    unordered_map<std::string, Texture2D*> ColorTextureMap;
+    std::unordered_map<std::string, Texture2D*> ColorTextureMap;
     Texture2D* floor = nullptr;
 
 private:

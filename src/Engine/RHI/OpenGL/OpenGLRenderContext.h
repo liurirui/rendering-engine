@@ -21,6 +21,8 @@ public:
 
     virtual void endRendering() override;
 
+    virtual void drawLines(int first, int numVertex) override;
+
     virtual void drawArrays(int first, int numVertex) override;
 
     virtual void drawElements(unsigned int count, const void* indices) override;

@@ -4,9 +4,8 @@
 NAMESPACE_START
 
 std::string Scene::rootPath = "";
-Scene:: Scene() {
-	createModel(rootPath + "/resources/objects/nanosuit/nanosuit.obj");
-}
+Scene:: Scene() {}
+
 void Scene::addRenderable(Renderable* newRenderable) {
 	if (newRenderable == nullptr) {
 		std::cout << "Cannot add a null Renderable to the scene." << std::endl;
@@ -17,7 +16,6 @@ void Scene::addRenderable(Renderable* newRenderable) {
 	}
 	else if(!newRenderable->isTranslucent)Opaque.push_back(newRenderable);
 }
-
 
 float Scene::calculateDistance(glm::vec3 cameraPosition,glm::vec3 meshPosition) {
 	return glm::length(cameraPosition - meshPosition);
@@ -157,6 +155,14 @@ void Scene::Start() {
 	PipelineColorBlendAttachment pipelineColorBlendAttachment_DepthMap;
 	pipelineColorBlendAttachment_DepthMap.blendState.enabled = true;
 	meshRenderer->graphicsPipeline_DepthMap.rasterizationState.blendState.attachmentsBlendState.push_back(pipelineColorBlendAttachment);
+	meshRenderer->graphicsPipeline_DepthMap.rasterizationState.cullMode = CullMode::Back;
+
+	meshRenderer->directionLight = new DirectionLight(glm::vec3(-0.5f, -0.8f, -0.5f), glm::vec3(2.0f, 2.0f, 2.0f), 1.0f);
+	meshRenderer->pointLights.push_back(new PointLight(glm::vec3(0.0f, 6.0f, 5.0f), glm::vec3(15.0f, 0.0f, 0.0f), 0.4f));
+	meshRenderer->pointLights.push_back(new PointLight(glm::vec3(-2.0f, 1.0f, -3.0f), glm::vec3(0.0f, 15.0f, 0.0f), 0.4f));
+	meshRenderer->pointLights.push_back(new PointLight(glm::vec3(3.0f, 8.5f, 0.0f), glm::vec3(0.0f, 0.0f, 25.0f), 0.4f));
+	meshRenderer->pointLights.push_back(new PointLight(glm::vec3(-8.0f, 3.0f, -1.0f), glm::vec3(6.0f, 6.0f, 6.0f), 0.3f));
+
 	if (!meshRenderer->cubeVBO) {
 		meshRenderer->cubeVBO = RenderContext::getInstance()->createVertexBuffer(meshRenderer->cubeVertices, sizeof(meshRenderer->cubeVertices));
 	}
@@ -175,11 +181,6 @@ void Scene::Start() {
 		RenderContext::getInstance()->setUpVertexBufferLayoutInfo(meshRenderer->planeVBO, meshRenderer->planeVAO, 3, 8 * sizeof(float), 1, 3);
 		RenderContext::getInstance()->setUpVertexBufferLayoutInfo(meshRenderer->planeVBO, meshRenderer->planeVAO, 2, 8 * sizeof(float), 2, 6);
 	}
-	meshRenderer->directionLight = new DirectionLight(glm::vec3(-0.5f, -0.8f, -0.5f), glm::vec3(2.0f, 2.0f, 2.0f), 1.0f);
-	meshRenderer->pointLights.push_back(new PointLight(glm::vec3(0.0f, 6.0f, 5.0f), glm::vec3(15.0f, 0.0f, 0.0f), 0.4f));
-	meshRenderer->pointLights.push_back(new PointLight(glm::vec3(-2.0f, 1.0f, -3.0f), glm::vec3(0.0f, 15.0f, 0.0f), 0.4f));
-	meshRenderer->pointLights.push_back(new PointLight(glm::vec3(3.0f, 8.5f, 0.0f), glm::vec3(0.0f, 0.0f, 25.0f), 0.4f));
-	meshRenderer->pointLights.push_back(new PointLight(glm::vec3(-8.0f, 3.0f, -1.0f), glm::vec3(6.0f, 6.0f, 6.0f), 0.3f));
 }
 
 void Scene::Update() {

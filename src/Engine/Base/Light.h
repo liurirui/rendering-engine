@@ -17,7 +17,7 @@ public:
     ~Shadow();
     FrameBufferInfo DepthMapFramebuffer;   
     Texture2D* depthMap = nullptr;
-    float near_plane = 1.0f, far_plane = 60.0f;
+    float near_plane = 12.0f, far_plane = 75.0f;
     const unsigned int SHADOW_WIDTH = 800;
     const unsigned int SHADOW_HEIGHT = 600;
     const unsigned int SHADOW_CUBE = 1024;
@@ -76,7 +76,7 @@ public:
     // Shadow view matrix calculation for directional light
     void calculateLightSpaceMatrix();
     glm::mat4 LightSpaceMatrix;
-    
+ 
 private:
     glm::vec3 direction;  // Direction of directional light
 };

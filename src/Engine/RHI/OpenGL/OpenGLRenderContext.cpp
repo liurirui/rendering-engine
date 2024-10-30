@@ -252,6 +252,10 @@ void OpenGLRenderContext::setUpVertexBufferLayoutInfo(unsigned int vertexBufferI
     glVertexAttribPointer(location, size, GL_FLOAT, GL_FALSE, stride, (void*)(offset * sizeof(float)));
 }
 
+void OpenGLRenderContext::drawLines(int first, int numVertex) {
+    glDrawArrays(GL_LINES, first, numVertex);
+}
+
 void OpenGLRenderContext::drawArrays(int first, int numVertex) {
 
     glDrawArrays(GL_TRIANGLES, first, numVertex);

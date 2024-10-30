@@ -182,6 +182,8 @@ public:
 
     virtual void setUpVertexBufferLayoutInfo(unsigned int vertexBufferID, unsigned int vertexBufferLayoutID, int size, int stride, int location, int offset = 0) = 0;
 
+    virtual void drawLines(int first, int numVertex)=0;
+
     virtual void drawArrays(int first, int numVertex) = 0;
 
     virtual void drawElements(unsigned int count, const void* indices) = 0;
