@@ -42,3 +42,8 @@ find_package(ImGuiFileDialog)
 include_directories(${ImGuiFileDialog_INCLUDE_DIRS})
 
 target_link_libraries(example ${engine_LIBRARIES} ${glad_LIBRARIES} ${glfw_LIBRARIES} ${stb_image_LIBRARIES} ${assimp_LIBRARIES} ${imgui_LIBRARIES} ${ImGuiFileDialog_LIBRARIES})
+
+add_custom_command(TARGET example POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    ${CMAKE_SOURCE_DIR}/src/3rdparty/assimp/lib/dll/assimp-vc142-mt.dll
+    $<TARGET_FILE_DIR:example>)
