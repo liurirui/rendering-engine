@@ -1,2 +1,2 @@
-cmake -G "Visual Studio 16 2019" -A x64 -S . -B ./build
+cmake -G "Visual Studio 17 2022" -A x64 -S . -B ./build
 pause
