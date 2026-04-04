@@ -172,9 +172,13 @@ public:
 
     virtual void bindVertexBuffer(unsigned int bufferID) = 0;
 
+    virtual void bindVertexArray(unsigned int vaoID) = 0;
+
     virtual unsigned int createVertexBuffer(const void * data, int sizeInByte) = 0;
 
-    virtual unsigned int createVertexBufferLayoutInfo(unsigned int vertexBufferID) = 0;
+    virtual unsigned int createVertexArray(unsigned int vertexBufferID) = 0;
+
+    virtual unsigned int createVertexArray(unsigned int vertexBufferID, unsigned int indexBufferID) = 0;
 
     virtual void bindIndexBuffer(unsigned int bufferID) = 0;
 

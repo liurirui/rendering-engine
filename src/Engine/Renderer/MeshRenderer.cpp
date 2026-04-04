@@ -4,7 +4,7 @@
 #include "Base/Camera.h"
 #include "Base/Light.h"
 #include "RenderGraph/RenderGraph.h"
-
+#include "Base/Material.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -31,21 +31,19 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
         
         //plane(shadow)
         depthMapShader.getPtr()->setMat4("model", model);
-        renderContext->bindVertexBuffer(planeVAO);
+        renderContext->bindVertexArray(planeVAO);
         renderContext->drawArrays(0, 6);
 
         for (Renderable* renderable : opaqueMeshes) {
             depthMapShader.getPtr()->setMat4("model", renderable->transform->modelMatrix);
-            renderContext->bindVertexBuffer(renderable->mesh->vertexAttributeBufferID);
-            renderContext->bindIndexBuffer(renderable->mesh->indexBufferID);
-            renderContext->drawElements(renderable->mesh->numTriangle * 3, 0);
+            renderContext->bindVertexArray(renderable->mesh->vao);
+            renderContext->drawElements(renderable->mesh->indexCount, 0);
         }
 
         for (Renderable* renderable : translucentMeshes) {
             depthMapShader.getPtr()->setMat4("model", renderable->transform->modelMatrix);
-            renderContext->bindVertexBuffer(renderable->mesh->vertexAttributeBufferID);
-            renderContext->bindIndexBuffer(renderable->mesh->indexBufferID);
-            renderContext->drawElements(renderable->mesh->numTriangle * 3, 0);
+            renderContext->bindVertexArray(renderable->mesh->vao);
+            renderContext->drawElements(renderable->mesh->indexCount, 0);
         }
         renderContext->endRendering();
         
@@ -66,7 +64,7 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
         light_model = glm::scale(light_model, glm::vec3(3.0f, 3.0f, 3.0f));
         lightingShader_cube.getPtr()->setMat4("model", light_model);
         lightingShader_cube.getPtr()->setVec3("lightColor", directionLight->getColor());
-        renderContext->bindVertexBuffer(cubeVAO);
+        renderContext->bindVertexArray(cubeVAO);
         renderContext->drawArrays(0, 36);
 
         //render light cube
@@ -76,7 +74,7 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
             light_model = glm::scale(light_model, glm::vec3(0.25f, 0.25f, 0.25f));
             lightingShader_cube.getPtr()->setMat4("model", light_model); 
             lightingShader_cube.getPtr()->setVec3("lightColor", pointLights[i]->getColor());
-            renderContext->bindVertexBuffer(cubeVAO);
+            renderContext->bindVertexArray(cubeVAO);
             renderContext->drawArrays(0, 36);
         }
 
@@ -112,7 +110,7 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
         
         //render plane
         lightingShader.getPtr()->setMat4("model", model);
-        renderContext->bindVertexBuffer(planeVAO);
+        renderContext->bindVertexArray(planeVAO);
         renderContext->bindTexture(floor->id, 0);
         renderContext->drawArrays(0, 6);
 
@@ -133,9 +131,8 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
             if (baseTexture) {
                 lightingShader.getPtr()->setMat4("model", renderable->transform->modelMatrix);
                 renderContext->bindTexture(baseTexture->id, 0);
-                renderContext->bindVertexBuffer(renderable->mesh->vertexAttributeBufferID);
-                renderContext->bindIndexBuffer(renderable->mesh->indexBufferID);
-                renderContext->drawElements(renderable->mesh->numTriangle * 3, 0);
+                renderContext->bindVertexArray(renderable->mesh->vao);
+                renderContext->drawElements(renderable->mesh->indexCount, 0);
             }
             baseTexture = nullptr;
         }
@@ -161,14 +158,12 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
             if (baseTexture) {
                 lightingShader.getPtr()->setMat4("model", renderable->transform->modelMatrix);
                 renderContext->bindTexture(baseTexture->id, 0);
-                renderContext->bindVertexBuffer(renderable->mesh->vertexAttributeBufferID);
-                renderContext->bindIndexBuffer(renderable->mesh->indexBufferID);
-                renderContext->drawElements(renderable->mesh->numTriangle * 3, 0);
+                renderContext->bindVertexArray(renderable->mesh->vao);
+                renderContext->drawElements(renderable->mesh->indexCount, 0);
             }
             baseTexture = nullptr;
         }
-        renderContext->bindVertexBuffer(0);
-        renderContext->bindIndexBuffer(0);
+        renderContext->bindVertexArray(0);
         renderContext->endRendering();
         });
 }

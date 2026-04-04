@@ -167,7 +167,7 @@ void Scene::Start() {
 		meshRenderer->cubeVBO = RenderContext::getInstance()->createVertexBuffer(meshRenderer->cubeVertices, sizeof(meshRenderer->cubeVertices));
 	}
 	if (!meshRenderer->cubeVAO) {
-		meshRenderer->cubeVAO = RenderContext::getInstance()->createVertexBufferLayoutInfo(meshRenderer->cubeVBO);
+		meshRenderer->cubeVAO = RenderContext::getInstance()->createVertexArray(meshRenderer->cubeVBO);
 		RenderContext::getInstance()->setUpVertexBufferLayoutInfo(meshRenderer->cubeVBO, meshRenderer->cubeVAO, 3, 8 * sizeof(float), 0, 0);
 		RenderContext::getInstance()->setUpVertexBufferLayoutInfo(meshRenderer->cubeVBO, meshRenderer->cubeVAO, 3, 8 * sizeof(float), 1, 3);
 		RenderContext::getInstance()->setUpVertexBufferLayoutInfo(meshRenderer->cubeVBO, meshRenderer->cubeVAO, 2, 8 * sizeof(float), 2, 6);
@@ -176,7 +176,7 @@ void Scene::Start() {
 		meshRenderer->planeVBO = RenderContext::getInstance()->createVertexBuffer(meshRenderer->planeVertices, sizeof(meshRenderer->planeVertices));
 	}
 	if (!meshRenderer->planeVAO) {
-		meshRenderer->planeVAO = RenderContext::getInstance()->createVertexBufferLayoutInfo(meshRenderer->planeVBO);
+		meshRenderer->planeVAO = RenderContext::getInstance()->createVertexArray(meshRenderer->planeVBO);
 		RenderContext::getInstance()->setUpVertexBufferLayoutInfo(meshRenderer->planeVBO, meshRenderer->planeVAO, 3, 8 * sizeof(float), 0, 0);
 		RenderContext::getInstance()->setUpVertexBufferLayoutInfo(meshRenderer->planeVBO, meshRenderer->planeVAO, 3, 8 * sizeof(float), 1, 3);
 		RenderContext::getInstance()->setUpVertexBufferLayoutInfo(meshRenderer->planeVBO, meshRenderer->planeVAO, 2, 8 * sizeof(float), 2, 6);

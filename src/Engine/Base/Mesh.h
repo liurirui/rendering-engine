@@ -16,9 +16,9 @@ NAMESPACE_START
         Mesh();
         virtual ~Mesh();
 
-        void createVertextBuffer(unsigned int numVertex, glm::vec3* position, glm::vec3* normal, glm::vec2* uv);
+        void createVertexBuffer(unsigned int numVertex, glm::vec3* position, glm::vec3* normal, glm::vec2* uv);
 
-        void createTriangleIndexBuffer(unsigned int numTriangle, unsigned int* indices);
+        void createIndexBuffer(unsigned int numIndex, unsigned int* indices);
 
         struct Vertex {
             // position
@@ -34,13 +34,13 @@ NAMESPACE_START
         std::string nowName;
 
         unsigned int numVertex = 0;
-        Vertex * vertices = nullptr;
-        unsigned int vertexBufferID = 0;
-        unsigned int vertexAttributeBufferID = 0;
+        Vertex* vertices = nullptr;
+        unsigned int vao = 0;   // 顶点数组对象
+        unsigned int vbo = 0;   // 顶点缓冲
+        unsigned int ibo = 0;   // 索引缓冲
 
-        unsigned int numTriangle = 0;
+        unsigned int indexCount = 0;
         unsigned int* indices = nullptr;
-        unsigned int indexBufferID = 0;
 
     };
 

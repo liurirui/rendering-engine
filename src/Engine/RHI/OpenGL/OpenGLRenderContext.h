@@ -35,7 +35,9 @@ public:
 
     virtual unsigned int createVertexBuffer(const void* data, int sizeInByte) override;
 
-    virtual unsigned int createVertexBufferLayoutInfo(unsigned int vertexBufferID) override;
+    virtual unsigned int createVertexArray(unsigned int vertexBufferID) override;
+
+    virtual unsigned int createVertexArray(unsigned int vertexBufferID, unsigned int indexBufferID) override;
 
     virtual void bindIndexBuffer(unsigned int bufferID) override;
 
@@ -45,7 +47,9 @@ public:
 
    // virtual void setClearAction(unsigned int action) override;
 
-    virtual void bindVertexBuffer(unsigned int bufferID) override;
+    virtual void bindVertexBuffer(unsigned int bufferID) override; 
+
+    virtual void bindVertexArray(unsigned int vaoID) override;
 
     virtual ~OpenGLRenderContext();
 

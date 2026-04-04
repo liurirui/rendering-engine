@@ -6,7 +6,7 @@ Mesh::Mesh() {
 
 }
 
-void Mesh::createVertextBuffer(unsigned int numVertex, glm::vec3* position, glm::vec3* normal, glm::vec2* uv) {
+void Mesh::createVertexBuffer(unsigned int numVertex, glm::vec3* position, glm::vec3* normal, glm::vec2* uv) {
 
 	RenderContext* renderContext = RenderContext::getInstance();
 	if (!renderContext) {
@@ -20,20 +20,26 @@ void Mesh::createVertextBuffer(unsigned int numVertex, glm::vec3* position, glm:
 		this->vertices[i].uv = uv[i];
 	}
 
-	if (!vertexBufferID) {
-		vertexBufferID = renderContext->createVertexBuffer(vertices, numVertex * sizeof(Vertex));
+	if (!vbo) {
+		vbo = renderContext->createVertexBuffer(vertices, numVertex * sizeof(Vertex));
 	}
 
-	if (!vertexAttributeBufferID) {
-		vertexAttributeBufferID = renderContext->createVertexBufferLayoutInfo(vertexBufferID);
+
+	if (!vao) {
+		if (ibo != 0) {
+			vao = renderContext->createVertexArray(vbo, ibo);
+		}
+		else {
+			vao = renderContext->createVertexArray(vbo);
+		}
 		//position
-		renderContext->setUpVertexBufferLayoutInfo(vertexBufferID, vertexAttributeBufferID, 3, sizeof(Vertex), 0, 0);
+		renderContext->setUpVertexBufferLayoutInfo(vbo, vao, 3, sizeof(Vertex), 0, 0);
 
 		//normal
-		renderContext->setUpVertexBufferLayoutInfo(vertexBufferID, vertexAttributeBufferID, 3, sizeof(Vertex), 1, 3);
+		renderContext->setUpVertexBufferLayoutInfo(vbo, vao, 3, sizeof(Vertex), 1, 3);
 
 		//uv
-		renderContext->setUpVertexBufferLayoutInfo(vertexBufferID, vertexAttributeBufferID, 2, sizeof(Vertex), 2, 6);
+		renderContext->setUpVertexBufferLayoutInfo(vbo, vao, 2, sizeof(Vertex), 2, 6);
 	}
 
 	//// create buffers/arrays
@@ -76,17 +82,16 @@ void Mesh::createVertextBuffer(unsigned int numVertex, glm::vec3* position, glm:
 
 }
 
-void Mesh::createTriangleIndexBuffer(unsigned int numTriangle, unsigned int* indices) {
+void Mesh::createIndexBuffer(unsigned int numIndex, unsigned int* indices) {
 
 	RenderContext* renderContext = RenderContext::getInstance();
-	if (!renderContext) {
+	if (!renderContext || !indices) {
 		return;
 	}
-
-	this->numTriangle = numTriangle;
 	this->indices = indices;
-	if (!indexBufferID) {
-		indexBufferID = renderContext->createIndexBuffer(indices, numTriangle * 3 * sizeof(unsigned int));
+	indexCount = numIndex;
+	if (!ibo) {
+		ibo = renderContext->createIndexBuffer(indices, indexCount * sizeof(unsigned int));
 	}
 }
 

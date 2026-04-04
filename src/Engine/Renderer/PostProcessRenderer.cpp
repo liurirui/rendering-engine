@@ -101,7 +101,7 @@ PostProcessRenderer::PostProcessRenderer() {
         VBO = RenderContext::getInstance()->createVertexBuffer(quadVertices, sizeof(quadVertices));
     }
     if (!quadVAO) {
-        quadVAO = RenderContext::getInstance()->createVertexBufferLayoutInfo(VBO);
+        quadVAO = RenderContext::getInstance()->createVertexArray(VBO);
         RenderContext::getInstance()->setUpVertexBufferLayoutInfo(VBO, quadVAO, 2, 4 * sizeof(float), 0, 0);
         RenderContext::getInstance()->setUpVertexBufferLayoutInfo(VBO, quadVAO, 2, 4 * sizeof(float), 1, 2);
     }
@@ -120,7 +120,7 @@ void PostProcessRenderer::render(RenderGraph& rg, FrameBufferInfo* sceneFBO) {
         HightLightShader.getPtr()->use();
         HightLightShader.getPtr()->setInt("scene", 0);
         renderContext->bindTexture(sceneFBO->colorAttachments[0].texture->id, 0);
-        renderContext->bindVertexBuffer(quadVAO);
+        renderContext->bindVertexArray(quadVAO);
         renderContext->drawArrays(0, 6);
         renderContext->endRendering();
 
@@ -133,7 +133,7 @@ void PostProcessRenderer::render(RenderGraph& rg, FrameBufferInfo* sceneFBO) {
         BlurShader.getPtr()->setInt("horizontal", horizontal);
         BlurShader.getPtr()->setInt("image", 0);
         renderContext->bindTexture(HighLightFramebuffer.colorAttachments[0].texture->id, 0);
-        renderContext->bindVertexBuffer(quadVAO);
+        renderContext->bindVertexArray(quadVAO);
         renderContext->drawArrays(0, 6);
     
         //vertical blur
@@ -146,7 +146,7 @@ void PostProcessRenderer::render(RenderGraph& rg, FrameBufferInfo* sceneFBO) {
         BlurShader.getPtr()->setInt("horizontal", !horizontal);
         BlurShader.getPtr()->setInt("image", 0);
         renderContext->bindTexture(PingpongFramebuffer[0].colorAttachments[0].texture->id, 0);
-        renderContext->bindVertexBuffer(quadVAO);
+        renderContext->bindVertexArray(quadVAO);
         renderContext->drawArrays(0, 6);
         renderContext->endRendering();
 
@@ -160,7 +160,7 @@ void PostProcessRenderer::render(RenderGraph& rg, FrameBufferInfo* sceneFBO) {
         BloomShader.getPtr()->setInt("bloomBlur", 1);
         renderContext->bindTexture(sceneFBO->colorAttachments[0].texture->id, 0);
         renderContext->bindTexture(PingpongFramebuffer[1].colorAttachments[0].texture->id, 1);
-        renderContext->bindVertexBuffer(quadVAO);
+        renderContext->bindVertexArray(quadVAO);
         renderContext->drawArrays(0, 6);
         bloomTexture = BloomFramebuffer.colorAttachments[0].texture;
         renderContext->endRendering();
@@ -180,7 +180,7 @@ void PostProcessRenderer::render(RenderGraph& rg, FrameBufferInfo* sceneFBO) {
         RadialBlurShader.getPtr()->setVec2("center", 0.5, 0.5);
         RadialBlurShader.getPtr()->setFloat("strength", 0.3);
         renderContext->bindTexture(bloomTexture->id, 0);
-        renderContext->bindVertexBuffer(quadVAO);
+        renderContext->bindVertexArray(quadVAO);
         renderContext->drawArrays(0, 6);
         renderContext->endRendering();
     });
@@ -200,7 +200,7 @@ void PostProcessRenderer::render(RenderGraph& rg, FrameBufferInfo* sceneFBO) {
         renderContext->bindPipeline(PostProcessRenderer_graphicsPipeline);
         MotionBlurShader.getPtr()->use();
         int errorCode = glGetError();
-        renderContext->bindVertexBuffer(quadVAO);
+        renderContext->bindVertexArray(quadVAO);
         MotionBlurShader.getPtr()->setInt("sceneTexture", 0);
         MotionBlurShader.getPtr()->setInt("lastTexture", 1);
         renderContext->bindTexture(bloomTexture->id, 0);
@@ -217,7 +217,7 @@ void PostProcessRenderer::render(RenderGraph& rg, FrameBufferInfo* sceneFBO) {
         renderContext->beginRendering(CartoonFramebuffer);
         CartoonShader.getPtr()->use();
        int errorCode = glGetError(); 
-        renderContext->bindVertexBuffer(quadVAO);
+        renderContext->bindVertexArray(quadVAO);
         CartoonShader.getPtr()->setInt("sceneTexture", 0);
         renderContext->bindTexture(bloomTexture->id, 0);
         renderContext->drawArrays(0, 6);
@@ -232,7 +232,7 @@ void PostProcessRenderer::render(RenderGraph& rg, FrameBufferInfo* sceneFBO) {
         int errorCode = glGetError();
         RippleShader.getPtr()->use();
         errorCode = glGetError();
-        renderContext->bindVertexBuffer(quadVAO);
+        renderContext->bindVertexArray(quadVAO);
         RippleShader.getPtr()->setVec2("rippleCenter", glm::vec2(0.5f, 0.5f));
         RippleShader.getPtr()->setFloat("time", time);
         RippleShader.getPtr()->setFloat("waveAmplitude", 0.02f);

@@ -4,6 +4,7 @@
 #include "Mesh.h"
 #include"Model.h"
 #include "Transform.h"
+#include <Base/Material.h>
 NAMESPACE_START
 class Renderable {
 public:

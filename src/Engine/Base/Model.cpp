@@ -114,19 +114,20 @@ Mesh* Model::processMesh(aiMesh* mesh, const aiScene* scene)
     newMesh->nowName=mesh->mName.C_Str();
 
     unsigned int numVertices = (unsigned int)(vertices.size());
-    // get  ¡®position¡¯  pointer 
+    // get position pointer 
     glm::vec3* positionPtr = vertices.data();
 
-    // get  ¡®normal¡¯  pointer
+    // get normal pointer
     glm::vec3* normalPtr = normals.data();
 
-    // get  ¡®uv¡¯  pointer
+    // get uv pointer
     glm::vec2* uvPtr = uvs.data();
  
 
     // µ÷ÓÃ createVertextBuffer
-    newMesh->createVertextBuffer(numVertices, positionPtr, normalPtr, uvPtr);
-    newMesh->createTriangleIndexBuffer((unsigned int)(indices.size() / 3), indices.data());
+    newMesh->createIndexBuffer((unsigned int)indices.size(), indices.data());
+    newMesh->createVertexBuffer(numVertices, positionPtr, normalPtr, uvPtr);
+   
     return newMesh;
 }
 

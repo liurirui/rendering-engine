@@ -35,10 +35,9 @@ BasePassRenderer::BasePassRenderer() {
     glm::vec3* normal = new glm::vec3[3]{ glm::vec3(0.0f,  0.0f, 1.0f), glm::vec3(0.0f,  0.0f, 1.0f) , glm::vec3(0.0f,  0.0f, 1.0f) };
     glm::vec2* uv = new glm::vec2[3]{ glm::vec2(0.0f,  0.0f), glm::vec2(1.0f,  0.0f) , glm::vec2(1.0f,  1.0f) };
 
-    mesh->createVertextBuffer(3, vertex, normal, uv);
-
-    unsigned int* indices = new unsigned int[3]{ 0,1,2 };//只有一个三角形
-    mesh->createTriangleIndexBuffer(1, indices);
+    unsigned int* indices = new unsigned int[3] { 0, 1, 2 };//只有一个三角形
+    mesh->createIndexBuffer(1, indices);
+    mesh->createVertexBuffer(3, vertex, normal, uv);
 
     lightingShader = TRefCountPtr<Shader>(new Shader(Vertbasic_lighting, Fragbasic_lighting));
 
@@ -115,11 +114,9 @@ void BasePassRenderer::render(Camera* camera, RenderGraph & rg){
         errorCode = glGetError();
         // render the cube
 
-        renderContext->bindVertexBuffer(mesh->vertexAttributeBufferID);
+        renderContext->bindVertexArray(mesh->vao);
 
-        renderContext->bindIndexBuffer(mesh->indexBufferID);
-
-        renderContext->drawElements(mesh->numTriangle * 3, 0);
+        renderContext->drawElements(mesh->indexCount * 3, 0);
 
         renderContext->endRendering();
         

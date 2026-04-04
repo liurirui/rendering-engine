@@ -222,7 +222,7 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
     if (!glfwInit())
         return 1;
 
-    Scene::rootPath = "E:/";
+    Scene::rootPath = "D:/ProgrammingTools/VS2022/Project/rendering-engine";
 
     // Decide GL+GLSL versions
 #if defined(IMGUI_IMPL_OPENGL_ES2)

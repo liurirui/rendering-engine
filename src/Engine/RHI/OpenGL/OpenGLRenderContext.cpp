@@ -229,7 +229,7 @@ unsigned int OpenGLRenderContext::createVertexBuffer(const void* data, int sizeI
     return bufferID;
 }
 
-unsigned int OpenGLRenderContext::createVertexBufferLayoutInfo(unsigned int vertexBufferID) {
+unsigned int OpenGLRenderContext::createVertexArray(unsigned int vertexBufferID) {
 
     glBindBuffer(GL_ARRAY_BUFFER, vertexBufferID);
 
@@ -238,6 +238,21 @@ unsigned int OpenGLRenderContext::createVertexBufferLayoutInfo(unsigned int vert
     glBindVertexArray(vertextBufferAtributeID);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     return vertextBufferAtributeID;
+}
+
+unsigned int OpenGLRenderContext::createVertexArray(unsigned int vertexBufferID, unsigned int indexBufferID) {
+    unsigned int vaoID;
+    glGenVertexArrays(1, &vaoID);
+    glBindVertexArray(vaoID);
+
+    glBindBuffer(GL_ARRAY_BUFFER, vertexBufferID);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBufferID);
+
+    glBindVertexArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+    return vaoID;
 }
 
 void OpenGLRenderContext::setUpVertexBufferLayoutInfo(unsigned int vertexBufferID, unsigned int vertexBufferLayoutID, int size, int stride, int location, int offset) {
@@ -282,8 +297,11 @@ void OpenGLRenderContext::setDepthStencilState(const DepthStencilState& depthSte
 //}
 
 void OpenGLRenderContext::bindVertexBuffer(unsigned int bufferID) {
+    glBindBuffer(GL_ARRAY_BUFFER, bufferID);
+}
 
-    glBindVertexArray(bufferID);
+void OpenGLRenderContext::bindVertexArray(unsigned int vaoID) {
+    glBindVertexArray(vaoID);
 }
 
 OpenGLRenderContext::~OpenGLRenderContext() {
