@@ -1,32 +1,335 @@
 const char* general_pbr_vert = R"(
-layout (location = 0) in vec2 aPos;
-layout (location = 1) in vec2 aTexCoords;
+layout (location = 0) in vec3 aPos;
+layout (location = 1) in vec3 aNormal;
+layout (location = 2) in vec2 aTexCoords;
+#ifdef HAS_NORMAL_MAP
+layout (location = 3) in vec3 aTangent;
+layout (location = 4) in vec3 aBitangent;
+#endif
 
+out vec3 FragPos;
+out vec3 Normal;
 out vec2 TexCoords;
+#ifdef HAS_NORMAL_MAP
+out mat3 TBN;
+#endif
 
-void main()
-{
+layout (std140, binding = 0) uniform CameraData {
+    mat4 viewMatrix;
+    mat4 projectionMatrix;
+    vec4 cameraPosition;
+};
+
+uniform mat4 model;
+
+void main() {
+    FragPos = vec3(model * vec4(aPos, 1.0));
+    Normal = mat3(transpose(inverse(model))) * aNormal;
     TexCoords = aTexCoords;
-    gl_Position = vec4(aPos.x, aPos.y, 0.0, 1.0); 
-}  
+    
+    #ifdef HAS_NORMAL_MAP
+    vec3 T = normalize(mat3(model) * aTangent);
+    vec3 B = normalize(mat3(model) * aBitangent);
+    vec3 N = normalize(mat3(model) * aNormal);
+    TBN = mat3(T, B, N);
+    #endif
+
+    gl_Position = projectionMatrix * viewMatrix * vec4(FragPos, 1.0);
+}
 )";
 
-const char* general_pbr_frag = R"( 
-
-
+const char* general_pbr_frag = R"(
 out vec4 FragColor;
+
+in vec3 FragPos;
+in vec3 Normal;
 in vec2 TexCoords;
+#ifdef HAS_NORMAL_MAP
+in mat3 TBN;
+#endif
 
-uniform sampler2D screenTexture;
+layout (std140, binding = 0) uniform CameraData {
+    mat4 viewMatrix;
+    mat4 projectionMatrix;
+    vec4 cameraPosition;
+};
 
-void main()
-{
-    vec3 col = texture(screenTexture, TexCoords).rgb;
-    vec3 gammaCorrectedColor = pow(col, vec3(1.0 / 2.2));
+struct PointLightData {
+    vec4 position;
+    vec4 color;
+    float intensity;
+    float constant;
+    float linear;
+    float quadratic;
+    vec2 padding;
+};
 
-    FragColor = vec4(gammaCorrectedColor, 1.0);
-} 
+const int MAX_LIGHTS = 4;
+layout (std140, binding = 1) uniform LightData {
+    // Direction light
+    vec4 directionLightDirection;
+    vec4 directionLightColor;
+    float directionLightIntensity;
+    vec3 padding1;
+    // Point lights
+    int numPointLights;
+    vec3 padding2;
+    PointLightData pointLights[MAX_LIGHTS];
+};
+
+#ifdef HAS_DIFFUSE_MAP
+uniform sampler2D diffuseMap;
+#endif
+#ifdef HAS_NORMAL_MAP
+uniform sampler2D normalMap;
+#endif
+#ifdef HAS_SPECULAR_MAP
+uniform sampler2D specularMap;
+#endif
+#ifdef HAS_METALLIC_MAP
+uniform sampler2D metallicMap;
+#endif
+#ifdef HAS_ROUGHNESS_MAP
+uniform sampler2D roughnessMap;
+#endif
+#ifdef HAS_AO_MAP
+uniform sampler2D aoMap;
+#endif
+#ifdef HAS_EMISSIVE_MAP
+uniform sampler2D emissiveMap;
+#endif
+
+// ï¿½ï¿½ï¿½Ê»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+uniform vec3 ambientColor;
+uniform vec3 diffuseColor;
+uniform vec3 specularColor;
+uniform vec3 emissiveColor;
+uniform float metallic;
+uniform float roughness;
+
+// ï¿½ï¿½Ó°
+#ifdef RECEIVE_SHADOWS
+uniform sampler2D shadowMap;
+uniform mat4 lightSpaceMatrix;
+#endif
+
+#define PI 3.14159265359
+
+// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+vec3 getDiffuseColor();
+vec3 getNormal();
+float getMetallic();
+float getRoughness();
+float getAmbientOcclusion();
+vec3 getEmissiveColor();
+
+#ifdef USE_PBR
+vec3 calculatePBR();
+#elif defined(USE_BLINN_PHONG)
+vec3 calculateBlinnPhong();
+#endif
+
+// PBR ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È«
+float DistributionGGX(vec3 N, vec3 H, float roughness);
+float GeometrySchlickGGX(float NdotV, float roughness);
+float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness);
+vec3 FresnelSchlick(float cosTheta, vec3 F0, float metalness);
+
+void main() {
+    vec3 albedo = getDiffuseColor();
+    vec3 normal = getNormal();
+    float metalness = getMetallic();
+    float roughnessVal = getRoughness();
+    float ao = getAmbientOcclusion();
+    vec3 emissive = getEmissiveColor();
+    
+    #ifdef USE_PBR
+    vec3 color = calculatePBR();
+    #elif defined(USE_BLINN_PHONG)
+    vec3 color = calculateBlinnPhong();
+    #endif
+    
+    color += emissive;
+    FragColor = vec4(color, 1.0);
+}
+ 
+vec3 getDiffuseColor() {
+    #ifdef HAS_DIFFUSE_MAP
+    return texture(diffuseMap, TexCoords).rgb * diffuseColor;
+    #else
+    return diffuseColor;
+    #endif
+}
+
+vec3 getNormal() {
+    #ifdef HAS_NORMAL_MAP
+    vec3 tangentNormal = texture(normalMap, TexCoords).rgb * 2.0 - 1.0;
+    return normalize(TBN * tangentNormal);
+    #else
+    return normalize(Normal);
+    #endif
+}
+
+float getMetallic() {
+    #ifdef HAS_METALLIC_MAP
+    return texture(metallicMap, TexCoords).r * metallic;
+    #else
+    return metallic;
+    #endif
+}
+
+float getRoughness() {
+    #ifdef HAS_ROUGHNESS_MAP
+    return texture(roughnessMap, TexCoords).r * roughness;
+    #else
+    return roughness;
+    #endif
+}
+
+float getAmbientOcclusion() {
+    #ifdef HAS_AO_MAP
+    return texture(aoMap, TexCoords).r;
+    #else
+    return 1.0;
+    #endif
+}
+
+vec3 getEmissiveColor() {
+    #ifdef HAS_EMISSIVE_MAP
+    return texture(emissiveMap, TexCoords).rgb * emissiveColor;
+    #else
+    return emissiveColor;
+    #endif
+}
+
+// ==============================
+// PBR ï¿½ï¿½ï¿½ï¿½Êµï¿½Ö£ï¿½ï¿½ï¿½È«ï¿½ï¿½ï¿½ï¿½
+// ==============================
+#ifdef USE_PBR
+vec3 calculatePBR() {
+    vec3 N = getNormal();
+    vec3 V = normalize(cameraPosition.xyz - FragPos);
+    vec3 albedo = getDiffuseColor();
+    float metalness = getMetallic();
+    float roughnessVal = getRoughness();
+    float ao = getAmbientOcclusion();
+
+    vec3 F0 = vec3(0.04);
+    F0 = mix(F0, albedo, metalness);
+    vec3 Lo = vec3(0.0);
+
+    // Directional light contribution (if directionLightIntensity > 0)
+    if (directionLightIntensity > 0.0) {
+        vec3 L = normalize(-directionLightDirection.xyz);
+        vec3 H = normalize(V + L);
+
+        // No distance attenuation for directional light
+        vec3 radiance = directionLightColor.rgb * directionLightIntensity;
+
+        float NDF = DistributionGGX(N, H, roughnessVal);
+        float G = GeometrySmith(N, V, L, roughnessVal);
+        vec3 F = FresnelSchlick(max(dot(H, V), 0.0), F0, metalness);
+
+        vec3 kS = F;
+        vec3 kD = vec3(1.0) - kS;
+        kD *= 1.0 - metalness;
+
+        float NdotL = max(dot(N, L), 0.0);
+        Lo += (kD * albedo / PI + NDF * G * F / max(4 * max(dot(N, V), 0.0) * NdotL, 0.001)) * radiance * NdotL;
+    }
+
+    // Point lights contribution
+    for (int i = 0; i < numPointLights; ++i) {
+        vec3 L = normalize(pointLights[i].position.xyz - FragPos);
+        vec3 H = normalize(V + L);
+
+        float distance = length(pointLights[i].position.xyz - FragPos);
+        float attenuation = 1.0 / (pointLights[i].constant + pointLights[i].linear * distance + pointLights[i].quadratic * distance * distance);
+        vec3 radiance = pointLights[i].color.rgb * attenuation * pointLights[i].intensity;
+
+        float NDF = DistributionGGX(N, H, roughnessVal);
+        float G = GeometrySmith(N, V, L, roughnessVal);
+        vec3 F = FresnelSchlick(max(dot(H, V), 0.0), F0, metalness);
+
+        vec3 kS = F;
+        vec3 kD = vec3(1.0) - kS;
+        kD *= 1.0 - metalness;
+
+        float NdotL = max(dot(N, L), 0.0);
+        Lo += (kD * albedo / PI + NDF * G * F / max(4 * max(dot(N, V), 0.0) * NdotL, 0.001)) * radiance * NdotL;
+    }
+
+    vec3 ambient = vec3(0.03) * albedo * ao;
+    return ambient + Lo;
+}
+
+float DistributionGGX(vec3 N, vec3 H, float roughness) {
+    float a = roughness * roughness;
+    float a2 = a * a;
+    float NdotH = max(dot(N, H), 0.0);
+    float NdotH2 = NdotH * NdotH;
+    float denom = (NdotH2 * (a2 - 1.0) + 1.0);
+    return a2 / (PI * denom * denom);
+}
+
+float GeometrySchlickGGX(float NdotV, float roughness) {
+    float r = (roughness + 1.0);
+    float k = (r*r) / 8.0;
+    return NdotV / (NdotV * (1.0 - k) + k);
+}
+
+float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness) {
+    float NdotV = max(dot(N, V), 0.0);
+    float NdotL = max(dot(N, L), 0.0);
+    float ggx1 = GeometrySchlickGGX(NdotV, roughness);
+    float ggx2 = GeometrySchlickGGX(NdotL, roughness);
+    return ggx1 * ggx2;
+}
+
+vec3 FresnelSchlick(float cosTheta, vec3 F0, float metalness) {
+    return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(1.0 - cosTheta, 5.0);
+}
+#endif
+
+// ==============================
+// Blinn-Phong ï¿½Þ¸ï¿½ï¿½ï¿½
+// ==============================
+#ifdef USE_BLINN_PHONG
+vec3 calculateBlinnPhong() {
+    vec3 N = getNormal();
+    vec3 V = normalize(cameraPosition.xyz - FragPos);
+    vec3 albedo = getDiffuseColor();
+    vec3 result = ambientColor * albedo;
+
+    // Directional light contribution (if directionLightIntensity > 0)
+    if (directionLightIntensity > 0.0) {
+        vec3 L = normalize(-directionLightDirection.xyz);
+        vec3 H = normalize(L + V);
+        float diff = max(dot(N, L), 0.0);
+        vec3 diffuse = directionLightColor.rgb * diff * albedo;
+        float spec = pow(max(dot(N, H), 0.0), 64.0);
+        vec3 specular = directionLightColor.rgb * spec * specularColor;
+        // No distance attenuation for directional light
+        result += (diffuse + specular) * directionLightIntensity;
+    }
+
+    // Point lights contribution
+    for (int i = 0; i < numPointLights; ++i) {
+        vec3 L = normalize(pointLights[i].position.xyz - FragPos);
+        vec3 H = normalize(L + V);
+        float diff = max(dot(N, L), 0.0);
+        vec3 diffuse = pointLights[i].color.rgb * diff * albedo;
+        float spec = pow(max(dot(N, H), 0.0), 64.0);
+        vec3 specular = pointLights[i].color.rgb * spec * specularColor;
+        float distance = length(pointLights[i].position.xyz - FragPos);
+        float attenuation = 1.0 / (pointLights[i].constant + pointLights[i].linear * distance + pointLights[i].quadratic * distance * distance);
+        result += (diffuse + specular) * pointLights[i].intensity * attenuation;
+    }
+    return result;
+}
+#endif
 )";
+
 const char* Vert_quad = R"(
 #version 330 core
 layout (location = 0) in vec2 aPos;
@@ -534,29 +837,29 @@ layout (location = 0) out vec4 FragColor;
 
 in vec2 TexCoords;
 
-uniform sampler2D sceneTexture; // ³õÊ¼³¡¾°ÎÆÀí
-uniform vec2 rippleCenter;      // ²¨ÎÆÖÐÐÄ£¨Í¨³£ÊÇÆÁÄ»×ø±ê£©
-uniform float time;             // Ê±¼ä±äÁ¿£¬¿ØÖÆ²¨ÎÆÀ©Õ¹
-uniform float waveAmplitude;    // ²¨ÎÆÕñ·ù
-uniform float waveFrequency;    // ²¨ÎÆÆµÂÊ
-uniform float waveSpeed;        // ²¨ÎÆÀ©Õ¹ËÙ¶È
+uniform sampler2D sceneTexture; // ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+uniform vec2 rippleCenter;      // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä£ï¿½Í¨ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä»ï¿½ï¿½ï¿½ê£©
+uniform float time;             // Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ²ï¿½ï¿½ï¿½ï¿½ï¿½Õ¹
+uniform float waveAmplitude;    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+uniform float waveFrequency;    // ï¿½ï¿½ï¿½ï¿½Æµï¿½ï¿½
+uniform float waveSpeed;        // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Õ¹ï¿½Ù¶ï¿½
 
 void main() {
-    // ¼ÆËãµ±Ç°Æ¬¶Î¾àÀë²¨ÎÆÖÐÐÄµÄ¾àÀë
+    // ï¿½ï¿½ï¿½ãµ±Ç°Æ¬ï¿½Î¾ï¿½ï¿½ë²¨ï¿½ï¿½ï¿½ï¿½ï¿½ÄµÄ¾ï¿½ï¿½ï¿½
     vec2 uv = TexCoords - rippleCenter;
     float dist = length(uv);
 
-    // »ùÓÚ¾àÀë¼ÆËã²¨ÎÆÐÎ×´£¬Ê¹ÓÃÕýÏÒ²¨Ä£Äâ
+    // ï¿½ï¿½ï¿½Ú¾ï¿½ï¿½ï¿½ï¿½ï¿½ã²¨ï¿½ï¿½ï¿½ï¿½×´ï¿½ï¿½Ê¹ï¿½ï¿½ï¿½ï¿½ï¿½Ò²ï¿½Ä£ï¿½ï¿½
     float ripple = sin(dist * waveFrequency - time * waveSpeed) * waveAmplitude / (dist + 1.0); 
 
-    // µ÷Õû UV ÎÆÀí×ø±ê£¬¸ù¾Ý²¨ÎÆÐ§¹û¶¯Ì¬±äÐÎ
+    // ï¿½ï¿½ï¿½ï¿½ UV ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ê£¬ï¿½ï¿½ï¿½Ý²ï¿½ï¿½ï¿½Ð§ï¿½ï¿½ï¿½ï¿½Ì¬ï¿½ï¿½ï¿½ï¿½
     vec2 rippleTexCoords = TexCoords + uv * ripple;
-    rippleTexCoords = clamp(rippleTexCoords, vec2(0.0), vec2(1.0));  // ·ÀÖ¹ÎÆÀí×ø±ê³¬³ö·¶Î§
+    rippleTexCoords = clamp(rippleTexCoords, vec2(0.0), vec2(1.0));  // ï¿½ï¿½Ö¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ê³¬ï¿½ï¿½ï¿½ï¿½Î§
 
-    // ²ÉÑù³¡¾°ÎÆÀí
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     vec4 sceneColor = texture(sceneTexture, rippleTexCoords);
 
-    // Êä³ö×îÖÕµÄÑÕÉ«
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Õµï¿½ï¿½ï¿½É«
     FragColor = sceneColor;
 }
 )";

@@ -13,19 +13,16 @@ class Camera;
 class Shader;
 class DirectionLight;
 class PointLight;
-
+class Scene;
 class MeshRenderer {
 public:
     friend class Scene;
+    MeshRenderer();
     MeshRenderer(const std::vector<Renderable*>& translucentMeshes, const std::vector<Renderable*>& opaqueMeshes);
     ~MeshRenderer();
     virtual void render(Camera* camera, RenderGraph& rg);
     unsigned int getTargetColorTextureID(int  attachment);
     FrameBufferInfo* getTargetFrameBuffer();
-
-    //light
-    DirectionLight* directionLight;
-    std::vector<PointLight*> pointLights;
 
     //Model mesh textures that need to be stored in advance
     std::unordered_map<std::string, Texture2D*> ColorTextureMap;
@@ -37,6 +34,7 @@ private:
     TRefCountPtr<Shader> lightingShader_cube;
     TRefCountPtr<Shader> depthMapShader;
 
+    Scene* scene;
     //FBO
     FrameBufferInfo OriginFramebuffer;
     FrameBufferInfo DepthMapFramebuffer;
@@ -53,8 +51,8 @@ private:
     DepthStencilState depthStencilState;
 
     //Accept  Scene's RenderableContainer reference
-    const std::vector<Renderable*>& translucentMeshes;  
-    const std::vector<Renderable*>& opaqueMeshes;       
+    const std::vector<Renderable*> translucentMeshes;  
+    const std::vector<Renderable*> opaqueMeshes;       
     
     const unsigned int SCR_WIDTH = 800;
     const unsigned int SCR_HEIGHT = 600;

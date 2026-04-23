@@ -116,7 +116,7 @@ void BasePassRenderer::render(Camera* camera, RenderGraph & rg){
 
         renderContext->bindVertexArray(mesh->vao);
 
-        renderContext->drawElements(mesh->indexCount * 3, 0);
+        renderContext->drawElements(mesh->indices.size() * 3, 0);
 
         renderContext->endRendering();
         

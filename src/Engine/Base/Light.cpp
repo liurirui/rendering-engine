@@ -1,5 +1,8 @@
 #include"Light.h"
 NAMESPACE_START
+
+// Static member definition
+unsigned int Light::uboID = 0;
 Shadow::Shadow(LightType type) {
     switch (type) {
     case LightType::Direction:   initDirection(); break;
@@ -88,9 +91,9 @@ void DirectionLight::setDirection(const glm::vec3& direction) {
 void DirectionLight::calculateLightSpaceMatrix() {
     glm::mat4 lightProjection = glm::ortho(-25.0f, 25.0f, -25.0f, 25.0f, shadow->near_plane, shadow->far_plane);
 
-    glm::vec3 lightPos = -glm::normalize(direction) * 40.0f;         // ¹âÔ´µÄÎ»ÖÃ¿ÉÒÔ¸ù¾Ý·½ÏòÀ­Ô¶Ò»¶¨µÄ¾àÀë
-    glm::vec3 target = glm::vec3(0.0f, 0.0f, 0.0f);  // ¿´Ïò³¡¾°ÖÐÐÄ
-    glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);      // ÉÏ·½Ïò£¨YÖáÏòÉÏ£©
+    glm::vec3 lightPos = -glm::normalize(direction) * 40.0f;     
+    glm::vec3 target = glm::vec3(0.0f, 0.0f, 0.0f); 
+    glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);     
 
     glm::mat4 lightViewMatrix = glm::lookAt(lightPos, target, up);
     LightSpaceMatrix = lightProjection * lightViewMatrix;
@@ -137,7 +140,7 @@ glm::mat4 PointLight::calculateShadowViewMatrix(int faceIndex) {
     glm::mat4 lightProjection = glm::perspective(glm::radians(90.0f), aspect, shadow->near_plane, shadow->far_plane);
     glm::vec3 up;
     glm::vec3 target;
-    // µã¹âÔ´µÄÁù¸ö·½Ïò£º+X, -X, +Y, -Y, +Z, -Z
+    // ï¿½ï¿½ï¿½Ô´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½+X, -X, +Y, -Y, +Z, -Z
     switch (faceIndex) {
     case 0: target = position + glm::vec3(1.0f, 0.0f, 0.0f); up = glm::vec3(0.0f, -1.0f, 0.0f); break; // +X
     case 1: target = position + glm::vec3(-1.0f, 0.0f, 0.0f); up = glm::vec3(0.0f, -1.0f, 0.0f); break; // -X
@@ -148,5 +151,113 @@ glm::mat4 PointLight::calculateShadowViewMatrix(int faceIndex) {
     }
     glm::mat4 lightViewMatrix = glm::lookAt(position, target, up);
     return lightProjection * lightViewMatrix;
+}
+
+// Light UBO methods implementation
+void Light::createUBO() {
+    RenderContext* renderContext = RenderContext::getInstance();
+    if (!renderContext) return;
+
+    // Create UBO with initial zero data
+    struct LightUBOData {
+        // Direction light
+        glm::vec4 directionLightDirection;
+        glm::vec4 directionLightColor;
+        float directionLightIntensity;
+        glm::vec3 padding1;
+        // Point lights
+        int numPointLights;
+        glm::vec3 padding2;
+        struct PointLightData {
+            glm::vec4 position;
+            glm::vec4 color;
+            float intensity;
+            float constant;
+            float linear;
+            float quadratic;
+            glm::vec2 padding;
+        } pointLights[MAX_POINT_LIGHTS];
+    };
+
+    LightUBOData data = {};
+    data.numPointLights = 0;
+    // Initialize point lights with zero
+    for (int i = 0; i < MAX_POINT_LIGHTS; i++) {
+        data.pointLights[i].position = glm::vec4(0.0f);
+        data.pointLights[i].color = glm::vec4(0.0f);
+        data.pointLights[i].intensity = 0.0f;
+        data.pointLights[i].constant = 1.0f;
+        data.pointLights[i].linear = 0.0f;
+        data.pointLights[i].quadratic = 0.0f;
+    }
+
+    uboID = renderContext->createUniformBuffer(&data, sizeof(LightUBOData));
+}
+
+void Light::updateUBO(const std::vector<Light*>& lights) {
+    RenderContext* renderContext = RenderContext::getInstance();
+    if (!renderContext || uboID == 0) return;
+
+    struct PointLightData {
+        glm::vec4 position;
+        glm::vec4 color;
+        float intensity;
+        float constant;
+        float linear;
+        float quadratic;
+        glm::vec2 padding;
+    };
+
+    struct LightUBOData {
+        // Direction light
+        glm::vec4 directionLightDirection;
+        glm::vec4 directionLightColor;
+        float directionLightIntensity;
+        glm::vec3 padding1;
+        // Point lights
+        int numPointLights;
+        glm::vec3 padding2;
+        PointLightData pointLights[MAX_POINT_LIGHTS];
+    };
+
+    LightUBOData data = {};
+    data.numPointLights = 0;
+
+    // Fill direction light and point lights
+    for (Light* light : lights) {
+        if (light->getType() == LightType::Direction) {
+            DirectionLight* dirLight = static_cast<DirectionLight*>(light);
+            data.directionLightDirection = glm::vec4(dirLight->getDirection(), 0.0f);
+            data.directionLightColor = glm::vec4(dirLight->getColor(), 1.0f);
+            data.directionLightIntensity = dirLight->getIntensity();
+        }
+        else if (light->getType() == LightType::Point && data.numPointLights < MAX_POINT_LIGHTS) {
+            PointLight* pointLight = static_cast<PointLight*>(light);
+            data.pointLights[data.numPointLights].position = glm::vec4(pointLight->getPosition(), 1.0f);
+            data.pointLights[data.numPointLights].color = glm::vec4(pointLight->getColor(), 1.0f);
+            data.pointLights[data.numPointLights].intensity = pointLight->getIntensity();
+            data.pointLights[data.numPointLights].constant = pointLight->getConstantAttenuation();
+            data.pointLights[data.numPointLights].linear = pointLight->getLinearAttenuation();
+            data.pointLights[data.numPointLights].quadratic = pointLight->getQuadraticAttenuation();
+            data.numPointLights++;
+        }
+    }
+
+    renderContext->updateUniformBuffer(uboID, &data, sizeof(LightUBOData));
+}
+
+void Light::bindUBO() {
+    RenderContext* renderContext = RenderContext::getInstance();
+    if (!renderContext || uboID == 0) return;
+
+    renderContext->bindUniformBuffer(uboID, UBO_BINDING_POINT);
+}
+
+void Light::deleteUBO() {
+    RenderContext* renderContext = RenderContext::getInstance();
+    if (!renderContext || uboID == 0) return;
+
+    renderContext->deleteUniformBuffer(uboID);
+    uboID = 0;
 }
 NAMESPACE_END

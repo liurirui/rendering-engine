@@ -2,19 +2,8 @@
 #include<iostream>
 #include <algorithm>
 NAMESPACE_START
-
-std::string Scene::rootPath = "";
-Scene:: Scene() {}
-
 void Scene::addRenderable(Renderable* newRenderable) {
-	if (newRenderable == nullptr) {
-		std::cout << "Cannot add a null Renderable to the scene." << std::endl;
-		return; 
-	}
-	if (newRenderable->isTranslucent) {
-		Translucent.push_back(newRenderable);
-	}
-	else if(!newRenderable->isTranslucent)Opaque.push_back(newRenderable);
+	
 }
 
 float Scene::calculateDistance(glm::vec3 cameraPosition,glm::vec3 meshPosition) {
@@ -23,64 +12,20 @@ float Scene::calculateDistance(glm::vec3 cameraPosition,glm::vec3 meshPosition) 
 
 // sort translucent meshes by their distance to the camera (far to near)
 void Scene::sortTranslucentMeshes(glm::vec3 cameraPosition) {
-	std::sort(Translucent.begin(), Translucent.end(),
-		[cameraPosition, this](Renderable* a, Renderable* b) {
-			return calculateDistance(cameraPosition, a->getWorldCenter()) > calculateDistance(cameraPosition, b->getWorldCenter());
-		}
-	);
+	
 }
 
-void Scene::storeMeshes(Model* newModel) {
-	for(Mesh* mesh:newModel->meshes){
-		//Storing the model's mesh
-		Renderable* renderable = nullptr;
-		string meshName = mesh->nowName;
-		if (mesh->nowName == "frame" || mesh->nowName == "glass_2") {
-			newModel->modelNumber = 1;
-			if (mesh->nowName == "frame")  renderable = new Renderable(mesh, false);
-			else  renderable = new Renderable(mesh, true);
-		}
-		else if (mesh->nowName == "mask") {
-			newModel->modelNumber = 2;
-			renderable = new Renderable(mesh, true);
-		}
-		else if (mesh->nowName == "hands" || mesh->nowName == "Visor" || mesh->nowName == "Body" ||
-			mesh->nowName == "Helmet" || mesh->nowName == "Legs" || mesh->nowName == "Arms"|| mesh->nowName == "Lights") {
-			newModel->modelNumber = 3;
-			renderable = new Renderable(mesh, false);
-		}
-		else if (mesh->nowName=="Mars_Cube.002") {
-			newModel->modelNumber = 4;
-			renderable = new Renderable(mesh, false);
-		}
-		else if (mesh->nowName == "Cube") {
-			newModel->modelNumber = 5;
-			renderable = new Renderable(mesh, false);
-		}
-		else if (mesh->nowName == "Cyborg") {
-			newModel->modelNumber = 6;
-			renderable = new Renderable(mesh, false);
-		}
-		else if (mesh->nowName == "VampireMesh") {
-			newModel->modelNumber = 7;
-			renderable = new Renderable(mesh, false);
-		}
-		else {
-			newModel->modelNumber = 8;
-			renderable = new Renderable(mesh, false);
-		}
-		if (renderable) {
-			renderable->setTransformFromModel(newModel);
-			renderable->modelNumber = newModel->modelNumber;
-			addRenderable(renderable);
-		}
+void Scene::storeObjectMeshes(GameObject* go) {
+	if (!go->meshes.empty()) renderableObjects.emplace_back(go);
+	for (auto children : go->child) {
+		storeObjectMeshes(children);
 	}
-	model.push_back(newModel);
 }
 
 void Scene::createModel(const std::string& modelPath){
 	Model* nowModel= new Model(modelPath);
-	storeMeshes(nowModel);
+	addRootChild(nowModel->model_go);
+	storeObjectMeshes(nowModel->model_go);
 }
 
 void Scene::loadFloorTexture(const std::string& TexturePath) {
@@ -92,39 +37,47 @@ void Scene::loadFloorTexture(const std::string& TexturePath) {
 }
 
 void Scene::updateMeshTransform() {
-	for (Model* singleModel : model) {
-		if (singleModel->isTransformDirty) {
-			singleModel->transform->calculateMatrix();
-			for (Renderable* renderable : Translucent) {
-				if (renderable->modelNumber == singleModel->modelNumber) renderable->setTransformFromModel(singleModel);
+	
+}
+
+DirectionLight* Scene::GetMainDirectionalLight()const {
+	return mainDirectionalLight;
+}
+
+Light* Scene::AddLight(LightType type, const glm::vec3& param, const glm::vec3& color, float intensity) {
+	Light* newLight = nullptr;
+
+	switch (type) {
+		case LightType::Direction: {
+			DirectionLight* dirLight = new DirectionLight(param, color, intensity);
+			newLight = dirLight;
+
+			if (!mainDirectionalLight) {
+				mainDirectionalLight = static_cast<DirectionLight*>(newLight);
 			}
-			for (Renderable* renderable : Opaque) {
-				if (renderable->modelNumber == singleModel->modelNumber) renderable->setTransformFromModel(singleModel);
-			}
-			singleModel->isTransformDirty = false;
+			break;
+		}
+		case LightType::Point: {
+			PointLight* pointLight = new PointLight(param, color, intensity);
+			newLight = pointLight;
+			break;
+		}
+		case LightType::Spot: {
+			// ´ýÌí¼Ó
+			break;
 		}
 	}
+	if (newLight) {
+		lights.push_back(newLight);
+	}
+	return newLight;
 }
 
 void Scene::Start() {
-	meshRenderer = new MeshRenderer(Translucent, Opaque);
+	meshRenderer = new MeshRenderer();
+	meshRenderer->scene = this;
 
-	//loadTexture
-	meshRenderer->ColorTextureMap["hands"] = RenderContext::getInstance()->loadTexture2D((rootPath + "/resources/objects/nanosuit/hand_dif.png").c_str());
-	meshRenderer->ColorTextureMap["Visor"] = RenderContext::getInstance()->loadTexture2D((rootPath + "/resources/objects/nanosuit/glass_dif.png").c_str());
-	meshRenderer->ColorTextureMap["Body"] = RenderContext::getInstance()->loadTexture2D((rootPath + "/resources/objects/nanosuit/body_dif.png").c_str());
-	meshRenderer->ColorTextureMap["Helmet"] = RenderContext::getInstance()->loadTexture2D((rootPath + "/resources/objects/nanosuit/helmet_diff.png").c_str());
-	meshRenderer->ColorTextureMap["Legs"] = RenderContext::getInstance()->loadTexture2D((rootPath + "/resources/objects/nanosuit/leg_dif.png").c_str());
-	meshRenderer->ColorTextureMap["Arms"] = RenderContext::getInstance()->loadTexture2D((rootPath + "/resources/objects/nanosuit/arm_dif.png").c_str());
-	meshRenderer->ColorTextureMap["glass"] = RenderContext::getInstance()->loadTexture2D((rootPath + "/resources/textures/skybox/back.jpg").c_str());
-	meshRenderer->ColorTextureMap["app"] = RenderContext::getInstance()->loadTexture2D((rootPath + "/resources/textures/background.jpg").c_str());
-	meshRenderer->ColorTextureMap["plane"] = RenderContext::getInstance()->loadTexture2D((Scene::rootPath + "/resources/textures/wood.png").c_str());
-	meshRenderer->ColorTextureMap["Mars_Cube.002"] = RenderContext::getInstance()->loadTexture2D((Scene::rootPath + "/resources/objects/planet/mars.png").c_str());
-	meshRenderer->ColorTextureMap["Cube"] = RenderContext::getInstance()->loadTexture2D((Scene::rootPath + "/resources/objects/rock/rock.png").c_str());
-	meshRenderer->ColorTextureMap["Backpack"] = RenderContext::getInstance()->loadTexture2D((Scene::rootPath + "/resources/objects/backpack/diffuse.jpg").c_str());
-	meshRenderer->ColorTextureMap["Cyborg"] = RenderContext::getInstance()->loadTexture2D((Scene::rootPath + "/resources/objects/cyborg/cyborg_diffuse.png").c_str());
-	meshRenderer->ColorTextureMap["VampireMesh"] = RenderContext::getInstance()->loadTexture2D((Scene::rootPath + "/resources/objects/vampire/textures/Vampire_diffuse.png").c_str());
-	meshRenderer->floor = RenderContext::getInstance()->loadTexture2D((Scene::rootPath + "/resources/textures/wood.png").c_str());       //Initialize the texture of the floor
+	meshRenderer->floor = RenderContext::getInstance()->loadTexture2D (((std::string("D:/ProgrammingTools/VS2022/Project/rendering-engine") + std::string("/resources/textures/wood.png")).c_str()));       //Initialize the texture of the floor
 
 	meshRenderer->depthStencilState.depthTest = true;
 	meshRenderer->depthStencilState.depthWrite = true;
@@ -157,11 +110,11 @@ void Scene::Start() {
 	meshRenderer->graphicsPipeline_DepthMap.rasterizationState.blendState.attachmentsBlendState.push_back(pipelineColorBlendAttachment);
 	meshRenderer->graphicsPipeline_DepthMap.rasterizationState.cullMode = CullMode::Back;
 
-	meshRenderer->directionLight = new DirectionLight(glm::vec3(-0.5f, -0.8f, -0.5f), glm::vec3(2.0f, 2.0f, 2.0f), 1.0f);
-	meshRenderer->pointLights.push_back(new PointLight(glm::vec3(0.0f, 6.0f, 5.0f), glm::vec3(15.0f, 0.0f, 0.0f), 0.4f));
-	meshRenderer->pointLights.push_back(new PointLight(glm::vec3(-2.0f, 1.0f, -3.0f), glm::vec3(0.0f, 15.0f, 0.0f), 0.4f));
-	meshRenderer->pointLights.push_back(new PointLight(glm::vec3(3.0f, 8.5f, 0.0f), glm::vec3(0.0f, 0.0f, 25.0f), 0.4f));
-	meshRenderer->pointLights.push_back(new PointLight(glm::vec3(-8.0f, 3.0f, -1.0f), glm::vec3(6.0f, 6.0f, 6.0f), 0.3f));
+	AddLight(LightType::Direction, glm::vec3(-0.5f, -0.8f, -0.5f), glm::vec3(2.0f, 2.0f, 2.0f), 1.0f);
+	AddLight(LightType::Point, glm::vec3(0.0f, 6.0f, 5.0f), glm::vec3(15.0f, 0.0f, 0.0f), 0.4f);
+	AddLight(LightType::Point, glm::vec3(-2.0f, 1.0f, -3.0f), glm::vec3(0.0f, 15.0f, 0.0f), 0.4f);
+	AddLight(LightType::Point, glm::vec3(3.0f, 8.5f, 0.0f), glm::vec3(0.0f, 0.0f, 25.0f), 0.4f);
+	AddLight(LightType::Point, glm::vec3(-8.0f, 3.0f, -1.0f), glm::vec3(6.0f, 6.0f, 6.0f), 0.3f);
 
 	if (!meshRenderer->cubeVBO) {
 		meshRenderer->cubeVBO = RenderContext::getInstance()->createVertexBuffer(meshRenderer->cubeVertices, sizeof(meshRenderer->cubeVertices));
@@ -184,26 +137,34 @@ void Scene::Start() {
 }
 
 void Scene::Update() {
-	updateMeshTransform();
+	UpdateTransform(root);
+	//updateMeshTransform();
+}
+
+void Scene::UpdateTransform(GameObject* go) {
+	if (!go->GetTransform()) return;
+	glm::mat4 parentWorldMaterix = glm::mat4(1.0);
+	if (go->parent) parentWorldMaterix = go->parent->GetTransform()->worldMaterix;
+	go->GetTransform()->worldMaterix = parentWorldMaterix * go->GetTransform()->getLocalMatrix();
+	for (auto children : go->child) {
+		UpdateTransform(children);
+	}
+	//updateMeshTransform();
+}
+
+void Scene::RenderObject() {
+	for (auto go : renderableObjects) {
+		for (auto mesh : go->meshes) {
+			mesh->material->setUniform();
+			mesh->material->shader.setMat4("model", go->GetTransform()->worldMaterix);
+			mesh->draw();
+		}
+	}
 }
 
 void Scene::Render(Camera* camera, RenderGraph& rg) {
 	meshRenderer->render(camera, rg);
-}
-
-Scene::~Scene() {
-	if(meshRenderer) delete meshRenderer;
-	for (Renderable* renderable : Translucent) {
-		delete renderable;
-		renderable = nullptr;
-	}
-	for (Renderable* renderable : Opaque) {
-		delete renderable;
-		renderable = nullptr;
-	}
-	for (Model* singleModel : model) {
-		delete singleModel;
-	}
+	
 }
 
 NAMESPACE_END

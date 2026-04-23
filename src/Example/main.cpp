@@ -90,12 +90,12 @@ int asdasdasdsa(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_
     //puts(path);
     //delete path;
 
-    Scene::rootPath = "E:/";
+    std::string rootPath = "E:/";
     // glfw: initialize and configure
     // ------------------------------
     glfwInit();
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
 #ifdef __APPLE__
@@ -148,13 +148,13 @@ int asdasdasdsa(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_
     openGLRenderContext->windowsHeight = SRC_HEIGHT;
 
     BasePassRenderer* basePassRenderer = new BasePassRenderer;
-    std::string texturepath = Scene::rootPath + "/resources/textures/background.jpg";
+    std::string texturepath = rootPath + "/resources/textures/background.jpg";
     Texture2D* texture = new Texture2D(texturepath.c_str());
 
-    Scene* scene = new Scene;
+    Scene* scene = new Scene("scene");
     scene->Start();
     PostProcessRenderer* postprocessRenderer = new PostProcessRenderer;
-     scene->createModel(scene->rootPath + "/resources/objects/nanosuit/nanosuit.obj");
+     scene->createModel(rootPath + "/resources/objects/nanosuit/nanosuit.obj");
     // render loop
     // -----------
     while (!glfwWindowShouldClose(window))
@@ -222,7 +222,7 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
     if (!glfwInit())
         return 1;
 
-    Scene::rootPath = "D:/ProgrammingTools/VS2022/Project/rendering-engine";
+    std::string rootPath = "D:/ProgrammingTools/VS2022/Project/rendering-engine";
 
     // Decide GL+GLSL versions
 #if defined(IMGUI_IMPL_OPENGL_ES2)
@@ -246,8 +246,8 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
     
      // GL 3.3 + GLSL 330
       const char* glsl_version = "#version 330";
-     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
      glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);  // 3.2+ only
     //glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);            // 3.0+ only
 #endif
@@ -336,9 +336,9 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
     openGLRenderContext->windowsHeight = SRC_HEIGHT;
 
     BasePassRenderer* basePassRenderer = new BasePassRenderer;
-    std::string texturepath = Scene::rootPath + "/resources/textures/background.jpg";
+    std::string texturepath = rootPath + "/resources/textures/background.jpg";
     
-    Scene* scene = new Scene;
+    Scene* scene = new Scene("scene");
 
     PostProcessRenderer* postprocessRenderer = new PostProcessRenderer;
 
@@ -452,28 +452,26 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
                 ImGuiFileDialog::Instance()->Close();
             }
 
-            if (!scene->model.empty()) {
+            if (!scene->root->child.empty()) {
                 if (ImGui::CollapsingHeader("Model Control")) {
                     ImGui::Indent(ImGui::GetFontSize() * 2);
-                    for (int i = 0; i < scene->model.size(); i++) {
+                    for (int i = 0; i < scene->root->child.size(); i++) {
                         if (ImGui::CollapsingHeader(("Model " + to_string(i + 1) + " Control").c_str())) {
                             ImGui::Indent(ImGui::GetFontSize() * 2);
                             if (ImGui::CollapsingHeader(("Model " + to_string(i + 1) + " Position").c_str())) {
-                                if (ImGui::SliderFloat(("Position X##" + to_string(i)).c_str(), &((scene->model[i]->transform->Position).x), -10.0f, 10.0f))  scene->model[i]->isTransformDirty = true;
-                                if (ImGui::SliderFloat(("Position Y##" + to_string(i)).c_str(), &((scene->model[i]->transform->Position).y), 0.0f, 10.0f))  scene->model[i]->isTransformDirty = true;
-                                if (ImGui::SliderFloat(("Position Z##" + to_string(i)).c_str(), &((scene->model[i]->transform->Position).z), -10.0f, 10.0f))  scene->model[i]->isTransformDirty = true;
+                                if (ImGui::SliderFloat(("Position X##" + to_string(i)).c_str(), &((scene->root->child[i]->GetTransform()->localPosition).x), -10.0f, 10.0f))  scene->root->child[i]->GetTransform()->SetDirty();
+                                if (ImGui::SliderFloat(("Position Y##" + to_string(i)).c_str(), &((scene->root->child[i]->GetTransform()->localPosition).y), 0.0f, 10.0f))  scene->root->child[i]->GetTransform()->SetDirty();
+                                if (ImGui::SliderFloat(("Position Z##" + to_string(i)).c_str(), &((scene->root->child[i]->GetTransform()->localPosition).z), -10.0f, 10.0f))  scene->root->child[i]->GetTransform()->SetDirty();
                             }
                             if (ImGui::CollapsingHeader(("Model " + to_string(i + 1) + " Rotation").c_str())) {
-                                if (ImGui::SliderFloat(("Rotation X##" + to_string(i)).c_str(), &((scene->model[i]->transform->Rotation).x), -90.0f, 90.0f))  scene->model[i]->isTransformDirty = true;
-                                if (ImGui::SliderFloat(("Rotation Y##" + to_string(i)).c_str(), &((scene->model[i]->transform->Rotation).y), -90.0f, 90.0f))  scene->model[i]->isTransformDirty = true;
-                                if (ImGui::SliderFloat(("Rotation Z##" + to_string(i)).c_str(), &((scene->model[i]->transform->Rotation).z), -90.0f, 90.0f))  scene->model[i]->isTransformDirty = true;
+                                if (ImGui::SliderFloat(("Rotation X##" + to_string(i)).c_str(), &((scene->root->child[i]->GetTransform()->localRotation).x), -90.0f, 90.0f))  scene->root->child[i]->GetTransform()->SetDirty();
+                                if (ImGui::SliderFloat(("Rotation Y##" + to_string(i)).c_str(), &((scene->root->child[i]->GetTransform()->localRotation).y), -90.0f, 90.0f))  scene->root->child[i]->GetTransform()->SetDirty();
+                                if (ImGui::SliderFloat(("Rotation Z##" + to_string(i)).c_str(), &((scene->root->child[i]->GetTransform()->localRotation).z), -90.0f, 90.0f))  scene->root->child[i]->GetTransform()->SetDirty();
                             }
                             if (ImGui::CollapsingHeader(("Model " + to_string(i + 1) + " Scale").c_str())) {
-                                float uniformScale = scene->model[i]->transform->Scale.x;
-                                if (ImGui::SliderFloat(("Model Scale##" + to_string(i)).c_str(), &uniformScale, 0.05f, 5.0f)) {
-                                    scene->model[i]->transform->Scale = glm::vec3(uniformScale);
-                                    scene->model[i]->isTransformDirty = true;
-                                }
+                                if (ImGui::SliderFloat(("Scale X##" + to_string(i)).c_str(), &((scene->root->child[i]->GetTransform()->localScale).x), 0.0f, 5.0f))  scene->root->child[i]->GetTransform()->SetDirty();
+                                if (ImGui::SliderFloat(("Scale Y##" + to_string(i)).c_str(), &((scene->root->child[i]->GetTransform()->localScale).y), 0.0f, 5.0f))  scene->root->child[i]->GetTransform()->SetDirty();
+                                if (ImGui::SliderFloat(("Scale Z##" + to_string(i)).c_str(), &((scene->root->child[i]->GetTransform()->localScale).z), 0.0f, 5.0f))  scene->root->child[i]->GetTransform()->SetDirty();
                             }
                             ImGui::Unindent();
                         }
@@ -496,7 +494,7 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
 
             ImGui::RadioButton("Ripple", &useEffect, 5);
             
-            if (ImGui::CollapsingHeader("Lights Control")) {
+            /*if (ImGui::CollapsingHeader("Lights Control")) {
                 //directionLight 
                 ImGui::Text("Directional Light:");
                 ImGui::Indent(ImGui::GetFontSize() * 2);
@@ -526,7 +524,7 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
                     }
                 }
                 ImGui::Unindent();
-            }
+            }*/
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
             ImGui::End();
         }

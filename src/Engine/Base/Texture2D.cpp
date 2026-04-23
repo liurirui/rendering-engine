@@ -102,7 +102,6 @@ Texture2D::Texture2D(const char* path) {
         if (nrChannels == 3) {
             this->initTexture(TextureUsage::ShaderRead, TextureFormat::RGB, width, height, data);
         }
-        
         delete[] data;
     }
     

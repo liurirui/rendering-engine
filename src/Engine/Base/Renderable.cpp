@@ -28,10 +28,6 @@ void Renderable::calculateCenter() {
 }
 
 glm::vec3  Renderable::getWorldCenter(){
-    if (needCaculateWorldCenter) {
-        worldBoundingBoxCenter = transform->modelMatrix * glm::vec4(boundingBoxCenter, 1.0);
-        needCaculateWorldCenter = false;
-    }
     return worldBoundingBoxCenter;
 }
 NAMESPACE_END

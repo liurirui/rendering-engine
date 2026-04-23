@@ -8,7 +8,7 @@
 
 NAMESPACE_START
 
-class Shader : public Object
+class Shader
 {
 public:
    
@@ -16,6 +16,8 @@ public:
     // constructor generates the shader on the fly
     // ------------------------------------------------------------------------
     Shader(const char* vertexCode, const char* fragmentCode,const char* geometryPath = nullptr);
+
+    Shader(){}
 
     // activate the shader
     // ------------------------------------------------------------------------

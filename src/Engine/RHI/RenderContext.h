@@ -192,6 +192,23 @@ public:
 
     virtual void drawElements(unsigned int count, const void* indices) = 0;
 
+    virtual void deleteVertexBuffer(unsigned int bufferID) = 0;
+
+    virtual void deleteIndexBuffer(unsigned int bufferID) = 0;
+
+    virtual void deleteVertexArray(unsigned int vaoID) = 0;
+
+    // UBO
+    virtual unsigned int createUniformBuffer(const void* data, size_t size) = 0;
+
+    virtual void updateUniformBuffer(unsigned int uboID, const void* data, size_t size, size_t offset = 0) = 0;
+
+    virtual void bindUniformBuffer(unsigned int uboID, unsigned int bindingPoint) = 0;
+
+    virtual void deleteUniformBuffer(unsigned int uboID) = 0;
+
+    virtual void bindUniformBlock(unsigned int programID, const char* blockName, unsigned int bindingPoint) = 0;
+
     virtual ~RenderContext() {};
 
     int windowsWidth = 0;

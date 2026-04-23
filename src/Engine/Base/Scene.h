@@ -15,10 +15,13 @@
 NAMESPACE_START
 class Scene {
 public:
-	Scene();
-	~Scene() ;
+	Scene(const std::string& sceneName) {
+		name = sceneName;
+		root = new GameObject(name);
+	};
+	~Scene() = default;
 	void addRenderable(Renderable* newMesh);
-	void storeMeshes(Model* newModel);
+	void storeObjectMeshes(GameObject* go);
 	void createModel(const std::string& modelPath);
 	void loadFloorTexture(const std::string& TexturePath);
 	void updateMeshTransform();
@@ -26,26 +29,44 @@ public:
 	float calculateDistance(glm::vec3 cameraPosition, glm::vec3 meshPosition);
 	void sortTranslucentMeshes(glm::vec3 cameraPosition);
 
-
 	//Interface function
 	void Start();
 	void Update();
+	void UpdateTransform(GameObject* go);
 	void Render(Camera* camera, RenderGraph& rg);
+	void RenderObject();
 
-	//mesh
-	std::vector<Renderable*> Translucent;
-	std::vector<Renderable*> Opaque;
+	void clear(); 
 
-	//model
-	std::vector<Model*> model;
+	// 添加/删除物体
+	void addRootChild(GameObject* go) {
+		root->addChildren(go);
+	}
+	void removeRootChild(const std::string name) {
+		root->removeChildren(name);
+	};
+	Light* AddLight(LightType type, const glm::vec3& param,
+		const glm::vec3& color, float intensity);
+	void RemoveLight(Light* light);
 
-	//Renderer
+	const std::vector<Light*>& GetAllLights() const { return lights; }
+	DirectionLight* GetMainDirectionalLight() const;
+	std::vector<PointLight*> GetPointLights() const;
+
+	// 光源统一缓冲区管理
+	void UpdateLightUBO();
+	void addLight(Light* light) {
+		lights.emplace_back(light);
+	}
+	GameObject* root = nullptr;
 	MeshRenderer* meshRenderer = nullptr;
-	
-	static std::string rootPath;
-
+	Camera* mainCamera = nullptr;
+	std::vector<Light*> lights;
+	DirectionLight* mainDirectionalLight = nullptr;
+	std::vector<GameObject*> renderableObjects;
+	std::string name = "scene";
 private:
-
+	
 };
 
 NAMESPACE_END

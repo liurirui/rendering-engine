@@ -47,13 +47,30 @@ public:
 
    // virtual void setClearAction(unsigned int action) override;
 
-    virtual void bindVertexBuffer(unsigned int bufferID) override; 
+    virtual void bindVertexBuffer(unsigned int bufferID) override;
 
     virtual void bindVertexArray(unsigned int vaoID) override;
+     
+    virtual void deleteVertexBuffer(unsigned int bufferID) override;
+
+    virtual void deleteIndexBuffer(unsigned int bufferID) override;
+
+    virtual void deleteVertexArray(unsigned int vaoID) override;
+
+    // UBO
+    virtual unsigned int createUniformBuffer(const void* data, size_t size) override;
+
+    virtual void updateUniformBuffer(unsigned int uboID, const void* data, size_t size, size_t offset = 0) override;
+
+    virtual void bindUniformBuffer(unsigned int uboID, unsigned int bindingPoint) override;
+
+    virtual void deleteUniformBuffer(unsigned int uboID) override;
+
+    virtual void bindUniformBlock(unsigned int programID, const char* blockName, unsigned int bindingPoint) override;
 
     virtual ~OpenGLRenderContext();
 
-    
+
 
 };
 

@@ -98,7 +98,7 @@ struct SamplerInfo {
 
 static SamplerInfo defaultSampler;
 
-class Texture2D : public Object
+class Texture2D
 {
 public:
 

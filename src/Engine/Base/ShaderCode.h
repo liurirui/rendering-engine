@@ -33,3 +33,7 @@ extern const char* Frag_ripple;
 extern const char* Vert_quad;
 
 extern const char* Frag_quad;
+
+extern const char* general_pbr_vert;
+
+extern const char* general_pbr_frag;

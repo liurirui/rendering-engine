@@ -2,6 +2,8 @@
 
 #include"Constants.h"
 #include<vector>
+#include"Texture2D.h"
+#include"Material.h"
 
 #include<glm/vec3.hpp>
 #include<glm/vec2.hpp>
@@ -12,36 +14,36 @@ NAMESPACE_START
     class Mesh
     {
     public:
+        struct Vertex {
+            glm::vec3 position;
+            glm::vec3 normal;
+            glm::vec2 texCoords;
+            glm::vec3 tangent;
+        };
 
         Mesh();
         virtual ~Mesh();
+
+        void setupMesh();
+
+        void draw();
 
         void createVertexBuffer(unsigned int numVertex, glm::vec3* position, glm::vec3* normal, glm::vec2* uv);
 
         void createIndexBuffer(unsigned int numIndex, unsigned int* indices);
 
-        struct Vertex {
-            // position
-            glm::vec3 position;
-            // normal
-            glm::vec3 normal;
-            // texCoords
-            glm::vec2 uv;
-            // tangent
-            glm::vec3 tangent;
-        };
-
-        std::string nowName;
-
+        std::vector<Vertex> vertices;
+        std::vector<unsigned int> indices;
+        bool hasNormals = false;
+        bool hasTexCoords = false;
+        bool hasTangents = false;
         unsigned int numVertex = 0;
-        Vertex* vertices = nullptr;
         unsigned int vao = 0;   // 顶点数组对象
         unsigned int vbo = 0;   // 顶点缓冲
         unsigned int ibo = 0;   // 索引缓冲
-
-        unsigned int indexCount = 0;
-        unsigned int* indices = nullptr;
-
+        std::string name;
+        Material* material = nullptr;
+         
     };
 
 

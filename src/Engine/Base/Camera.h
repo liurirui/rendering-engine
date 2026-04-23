@@ -2,6 +2,7 @@
 #define CAMERA_H
 
 #include"Object.h"
+#include <RHI/RenderContext.h>
 
 #include <glm/glm.hpp>
 #include"Constants.h"
@@ -28,7 +29,7 @@ const float ZOOM        =  45.0f;
 
 
 // An abstract camera class that processes input and calculates the corresponding Euler Angles, Vectors and Matrices for use in OpenGL
-class Camera : public Object
+class Camera 
 {
 public:
     // camera Attributes
@@ -45,13 +46,24 @@ public:
     float MouseSensitivity;
     float Zoom;
 
+    // UBO for camera data
+    unsigned int uboID;
+    glm::mat4 projectionMatrix;
+
     // constructor with vectors
     Camera(glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f),
         float yaw = YAW, float pitch = PITCH);
 
     // constructor with scalar values
     //Camera(float posX, float posY, float posZ, float upX, float upY, float upZ, float yaw, float pitch);
- 
+
+    // UBO methods
+    void createUBO();
+    void updateUBO();
+    void bindUBO(unsigned int bindingPoint = 0);
+    void setProjectionMatrix(const glm::mat4& projection);
+    unsigned int getUBOID() const { return uboID; }
+    static const unsigned int UBO_BINDING_POINT = 0;
 
     // returns the view matrix calculated using Euler Angles and the LookAt Matrix
     glm::mat4 GetViewMatrix();

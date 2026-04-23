@@ -1,14 +1,16 @@
 #include"Camera.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <RHI/RenderContext.h>
 
 #include <vector>
 
 NAMESPACE_START
 
     // constructor with vectors
-Camera::Camera(glm::vec3 position, glm::vec3 up, float yaw, float pitch) 
-    : Front(glm::vec3(0.0f, 0.0f, -1.0f)), MovementSpeed(SPEED), MouseSensitivity(SENSITIVITY), Zoom(ZOOM)
+Camera::Camera(glm::vec3 position, glm::vec3 up, float yaw, float pitch)
+    : Front(glm::vec3(0.0f, 0.0f, -1.0f)), MovementSpeed(SPEED), MouseSensitivity(SENSITIVITY), Zoom(ZOOM),
+      uboID(0), projectionMatrix(glm::mat4(1.0f))
 {
     Position = position;
     WorldUp = up;
@@ -92,6 +94,59 @@ Camera::Camera(glm::vec3 position, glm::vec3 up, float yaw, float pitch)
         // also re-calculate the Right and Up vector
         Right = glm::normalize(glm::cross(Front, WorldUp));  // normalize the vectors, because their length gets closer to 0 the more you look up or down which results in slower movement.
         Up    = glm::normalize(glm::cross(Right, Front));
+    }
+
+    // UBO methods implementation
+    void Camera::createUBO() {
+        RenderContext* renderContext = RenderContext::getInstance();
+        if (!renderContext) return;
+
+        // Initialize projection matrix with identity (will be set later)
+        projectionMatrix = glm::mat4(1.0f);
+
+        // Create UBO data structure
+        struct CameraUBOData {
+            glm::mat4 viewMatrix;
+            glm::mat4 projectionMatrix;
+            glm::vec4 cameraPosition;
+            // Add padding to meet std140 alignment (mat4 is 4 vec4, vec4 is aligned)
+        };
+
+        CameraUBOData data;
+        data.viewMatrix = GetViewMatrix();
+        data.projectionMatrix = projectionMatrix;
+        data.cameraPosition = glm::vec4(Position, 1.0f);
+
+        uboID = renderContext->createUniformBuffer(&data, sizeof(CameraUBOData));
+    }
+
+    void Camera::updateUBO() {
+        RenderContext* renderContext = RenderContext::getInstance();
+        if (!renderContext || uboID == 0) return;
+
+        struct CameraUBOData {
+            glm::mat4 viewMatrix;
+            glm::mat4 projectionMatrix;
+            glm::vec4 cameraPosition;
+        };
+
+        CameraUBOData data;
+        data.viewMatrix = GetViewMatrix();
+        data.projectionMatrix = projectionMatrix;
+        data.cameraPosition = glm::vec4(Position, 1.0f);
+
+        renderContext->updateUniformBuffer(uboID, &data, sizeof(CameraUBOData));
+    }
+
+    void Camera::bindUBO(unsigned int bindingPoint) {
+        RenderContext* renderContext = RenderContext::getInstance();
+        if (!renderContext || uboID == 0) return;
+
+        renderContext->bindUniformBuffer(uboID, bindingPoint);
+    }
+
+    void Camera::setProjectionMatrix(const glm::mat4& projection) {
+        projectionMatrix = projection;
     }
 
 NAMESPACE_END

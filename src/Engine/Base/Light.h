@@ -4,6 +4,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <RHI/RenderContext.h>
+#include <vector>
 NAMESPACE_START
 enum class LightType {
     Direction,
@@ -34,7 +35,7 @@ public:
     //initialization
     Light(LightType type, const glm::vec3& color, float intensity);
 
-    ~Light();
+    virtual ~Light();
 
     LightType getType() const;    //get light type
 
@@ -54,14 +55,24 @@ public:
 
     bool Switch = true;         // light status
 
+    // UBO for light data (shared by all lights)
+    static unsigned int uboID;
+    static const unsigned int UBO_BINDING_POINT = 1;
+    static const unsigned int MAX_POINT_LIGHTS = 4;
+
+    static void createUBO();
+    static void updateUBO(const std::vector<Light*>& lights);
+    static void bindUBO();
+    static void deleteUBO();
+
 protected:
-    LightType type;            
-    glm::vec3 color;            
-    glm::vec3 colorOn;           // The color when the light source is on
+    LightType type;
+    glm::vec3 color;
+    glm::vec3 colorOn;           // The color when the light source is on 
     glm::vec3 colorOff;          // The color when the light source is off
-    float intensity;           
+    float intensity;
     float intensityOrigin;      // the intensity of the light when it is turned on
-    Shadow* shadow = nullptr;   
+    Shadow* shadow = nullptr;
 };
 
 

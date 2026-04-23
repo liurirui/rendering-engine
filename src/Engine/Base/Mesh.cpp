@@ -7,7 +7,7 @@ Mesh::Mesh() {
 }
 
 void Mesh::createVertexBuffer(unsigned int numVertex, glm::vec3* position, glm::vec3* normal, glm::vec2* uv) {
-
+	/*
 	RenderContext* renderContext = RenderContext::getInstance();
 	if (!renderContext) {
 		return;
@@ -32,6 +32,7 @@ void Mesh::createVertexBuffer(unsigned int numVertex, glm::vec3* position, glm::
 		else {
 			vao = renderContext->createVertexArray(vbo);
 		}
+		glBindVertexArray(6);
 		//position
 		renderContext->setUpVertexBufferLayoutInfo(vbo, vao, 3, sizeof(Vertex), 0, 0);
 
@@ -40,7 +41,8 @@ void Mesh::createVertexBuffer(unsigned int numVertex, glm::vec3* position, glm::
 
 		//uv
 		renderContext->setUpVertexBufferLayoutInfo(vbo, vao, 2, sizeof(Vertex), 2, 6);
-	}
+		glBindVertexArray(6);
+	}*/
 
 	//// create buffers/arrays
 	//glGenVertexArrays(1, &VAO);
@@ -83,35 +85,54 @@ void Mesh::createVertexBuffer(unsigned int numVertex, glm::vec3* position, glm::
 }
 
 void Mesh::createIndexBuffer(unsigned int numIndex, unsigned int* indices) {
-
+	/*
 	RenderContext* renderContext = RenderContext::getInstance();
 	if (!renderContext || !indices) {
 		return;
 	}
+	glBindVertexArray(6);
+	GLint currentIBO;
+	glGetIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING, &currentIBO);
 	this->indices = indices;
 	indexCount = numIndex;
 	if (!ibo) {
 		ibo = renderContext->createIndexBuffer(indices, indexCount * sizeof(unsigned int));
 	}
+	glBindVertexArray(6);
+	glGetIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING, &currentIBO);*/
 }
 
 Mesh::~Mesh() {
-
-	if (vertices) {
-		delete[] vertices;
-		vertices = nullptr;
-	}
-
-	if (indices) {
-		delete[] indices;
-		indices = nullptr;
-	}
-
-	//glDeleteVertexArrays(1, &cubeVAO);
-	//glDeleteVertexArrays(1, &lightCubeVAO);
-	//glDeleteBuffers(1, &VBO);
-
+	if (vao) RenderContext::getInstance()->deleteVertexBuffer(vao);
+	if (vbo) RenderContext::getInstance()->deleteVertexBuffer(vbo);
+	if (ibo) RenderContext::getInstance()->deleteVertexBuffer(ibo); 
 }
+
+void Mesh::setupMesh() {
+	RenderContext* renderContext = RenderContext::getInstance();
+	vbo = renderContext->createVertexBuffer(vertices.data(), vertices.size() * sizeof(Vertex));
+	ibo = renderContext->createIndexBuffer(indices.data(), indices.size() * sizeof(unsigned int));
+	vao = renderContext->createVertexArray(vbo, ibo);
+
+	// position
+	renderContext->setUpVertexBufferLayoutInfo(vbo, vao, 3, sizeof(Vertex), 0, offsetof(Vertex, position) / sizeof(float));
+
+	// normal
+	if (hasNormals) renderContext->setUpVertexBufferLayoutInfo(vbo, vao, 3, sizeof(Vertex), 1, offsetof(Vertex, normal) / sizeof(float));
+
+	// uv
+	if (hasTexCoords) renderContext->setUpVertexBufferLayoutInfo(vbo, vao, 2, sizeof(Vertex), 2, offsetof(Vertex, texCoords) / sizeof(float));
+	
+	// tangent
+	if (hasTangents) renderContext->setUpVertexBufferLayoutInfo(vbo, vao, 3, sizeof(Vertex), 3, offsetof(Vertex, tangent) / sizeof(float));
+}
+
+void Mesh::draw() {
+	glBindVertexArray(vao);
+	glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
+	glBindVertexArray(0);
+}
+
 
 NAMESPACE_END
 
