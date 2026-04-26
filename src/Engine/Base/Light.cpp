@@ -13,7 +13,10 @@ Shadow::Shadow(LightType type) {
 Shadow::~Shadow() { delete depthMap; }
 
 void Shadow::initDirection() {
-    depthMap = RenderContext::getInstance()->createTexture2D(TextureUsage::DepthStencil, TextureFormat::Depth, SHADOW_WIDTH, SHADOW_HEIGHT);
+    SamplerInfo depthSampler;
+    depthSampler.mipmapMode = MipmapMode::None;
+    depthSampler.addressMode = SamplerAddressMode::ClampToBorder;
+    depthMap = RenderContext::getInstance()->createTexture2D(TextureUsage::DepthStencil, TextureFormat::Depth, SHADOW_WIDTH, SHADOW_HEIGHT, depthSampler);
     DepthMapFramebuffer.depthStencilAttachment.texture = depthMap;
     DepthMapFramebuffer.depthStencilAttachment.useStencil = false;
 }

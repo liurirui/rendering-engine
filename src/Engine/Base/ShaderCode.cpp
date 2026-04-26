@@ -129,7 +129,7 @@ vec3 calculatePBR();
 vec3 calculateBlinnPhong();
 #endif
 
-// PBR ������ȫ
+// PBR
 float DistributionGGX(vec3 N, vec3 H, float roughness);
 float GeometrySchlickGGX(float NdotV, float roughness);
 float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness);
@@ -202,9 +202,7 @@ vec3 getEmissiveColor() {
     #endif
 }
 
-// ==============================
-// PBR ����ʵ�֣���ȫ����
-// ==============================
+// PBR 
 #ifdef USE_PBR
 vec3 calculatePBR() {
     vec3 N = getNormal();
@@ -228,7 +226,7 @@ vec3 calculatePBR() {
 
         float NDF = DistributionGGX(N, H, roughnessVal);
         float G = GeometrySmith(N, V, L, roughnessVal);
-        vec3 F = FresnelSchlick(max(dot(H, V), 0.0), F0, metalness);
+        vec3 F = FresnelSchlick(max(dot(H, V), 0.0), F0);
 
         vec3 kS = F;
         vec3 kD = vec3(1.0) - kS;
@@ -249,7 +247,7 @@ vec3 calculatePBR() {
 
         float NDF = DistributionGGX(N, H, roughnessVal);
         float G = GeometrySmith(N, V, L, roughnessVal);
-        vec3 F = FresnelSchlick(max(dot(H, V), 0.0), F0, metalness);
+        vec3 F = FresnelSchlick(max(dot(H, V), 0.0), F0);
 
         vec3 kS = F;
         vec3 kD = vec3(1.0) - kS;
@@ -286,14 +284,12 @@ float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness) {
     return ggx1 * ggx2;
 }
 
-vec3 FresnelSchlick(float cosTheta, vec3 F0, float metalness) {
-    return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(1.0 - cosTheta, 5.0);
+vec3 FresnelSchlick(float cosTheta, vec3 F0) {
+    return F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0);
 }
 #endif
 
-// ==============================
-// Blinn-Phong �޸���
-// ==============================
+// Blinn-Phong 
 #ifdef USE_BLINN_PHONG
 vec3 calculateBlinnPhong() {
     vec3 N = getNormal();
@@ -861,5 +857,48 @@ void main() {
 
     // ������յ���ɫ
     FragColor = sceneColor;
+}
+)";
+
+const char* Frag_DownSample = R"(
+#version 330 core
+layout (location = 0) out vec4 FragColor;
+in vec2 TexCoords;
+uniform sampler2D u_texture;
+uniform vec2 textureSize;
+void main()
+{
+    vec3 result = vec3(0.0);
+    //result +=  texture(u_texture, TexCoords).rgb;
+    result += texture(u_texture, TexCoords + vec2(textureSize.x, 0.0)).rgb;
+    result += texture(u_texture, TexCoords + vec2(-textureSize.x, 0.0)).rgb;
+    result += texture(u_texture, TexCoords + vec2(0.0, textureSize.y)).rgb;
+    result += texture(u_texture, TexCoords + vec2(0.0, -textureSize.y)).rgb;
+    result /= 4.0;
+    
+    FragColor = vec4(result, 1.0);
+}
+)";
+
+const char* Frag_UpSample = R"(
+#version 330 core
+layout (location = 0) out vec4 FragColor;
+
+in vec2 TexCoords;
+
+uniform sampler2D curMipDownSampletexture; 
+uniform sampler2D lastMipUpSampletexture; 
+uniform vec2 textureSize;
+
+void main() {
+   vec3 result = vec3(0.0);
+    result += texture(lastMipUpSampletexture, TexCoords + vec2(textureSize.x, textureSize.y)).rgb;
+    result += texture(lastMipUpSampletexture, TexCoords + vec2(textureSize.x, -textureSize.y)).rgb;
+    result += texture(lastMipUpSampletexture, TexCoords + vec2(-textureSize.x, textureSize.y)).rgb;
+    result += texture(lastMipUpSampletexture, TexCoords + vec2(-textureSize.x, -textureSize.y)).rgb;
+    result += texture(curMipDownSampletexture, TexCoords).rgb ;
+    result /= 5.0;
+    
+    FragColor = vec4(result, 1.0);
 }
 )";

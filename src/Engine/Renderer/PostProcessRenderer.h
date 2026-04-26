@@ -16,6 +16,8 @@ private:
     //shader
     TRefCountPtr<Shader> HightLightShader;
     TRefCountPtr<Shader> BlurShader;
+    TRefCountPtr<Shader> DownSampleShader;
+    TRefCountPtr<Shader> UpSampleShader;
     TRefCountPtr<Shader> RadialBlurShader;
     TRefCountPtr<Shader> MotionBlurShader;
     TRefCountPtr<Shader> BloomShader;
@@ -23,8 +25,10 @@ private:
     TRefCountPtr<Shader> RippleShader;
 
     //fbo
+    const int bloomLevel = 5;
     FrameBufferInfo HighLightFramebuffer;
-    FrameBufferInfo PingpongFramebuffer[2];
+    FrameBufferInfo UpSampleFramebuffer[5];
+    FrameBufferInfo DownSampleFramebuffer[5];
     FrameBufferInfo BloomFramebuffer;
     FrameBufferInfo RadialFramebuffer;
     FrameBufferInfo MotionFramebufferA;
@@ -39,14 +43,15 @@ private:
 
     //Texture
     Texture2D* fboBrightTexture = nullptr;
-    Texture2D* fbopingpongColorTexture[2];
+    Texture2D* fboUpSampleColorTexture[5];
+    Texture2D* fboDownSampleColorTexture[5];
+    Texture2D* bloomTexture = nullptr;
     Texture2D* fboRadialTexture = nullptr;
     Texture2D* fboMotionTextureA = nullptr;
     Texture2D* fboMotionTextureB = nullptr;
     Texture2D* fboBloomTexture = nullptr;
     Texture2D* fboCartoonTexture = nullptr;
     Texture2D* fboRippleTexture = nullptr;
-    Texture2D* bloomTexture = nullptr;
     Texture2D* lastTexture=nullptr;
 
     bool firstRender = true;

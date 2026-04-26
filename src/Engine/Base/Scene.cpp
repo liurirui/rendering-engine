@@ -88,10 +88,12 @@ void Scene::Start() {
 	meshRenderer->lightingShader_cube = TRefCountPtr<Shader>(new Shader(Vertmodel_lighting, Fragmodel_cube));
 
 	//set  Originframebuffer's Texture Attachments
+	SamplerInfo depthSampler;
+	depthSampler.mipmapMode = MipmapMode::None;
 	meshRenderer->fboColorTexture = RenderContext::getInstance()->createTexture2D(TextureUsage::RenderTarget, TextureFormat::RGBA32F, RenderContext::getInstance()->windowsWidth,
 		RenderContext::getInstance()->windowsHeight);
 	meshRenderer->fboDepthTexture = RenderContext::getInstance()->createTexture2D(TextureUsage::DepthStencil, TextureFormat::Depth24_Stencil8, RenderContext::getInstance()->windowsWidth,
-		RenderContext::getInstance()->windowsHeight);
+		RenderContext::getInstance()->windowsHeight, depthSampler);
 	ColorAttachment colorAttachment;
 	colorAttachment.attachment = 0;
 	colorAttachment.texture = meshRenderer->fboColorTexture;
@@ -111,9 +113,9 @@ void Scene::Start() {
 	meshRenderer->graphicsPipeline_DepthMap.rasterizationState.cullMode = CullMode::Back;
 
 	AddLight(LightType::Direction, glm::vec3(-0.5f, -0.8f, -0.5f), glm::vec3(2.0f, 2.0f, 2.0f), 1.0f);
-	AddLight(LightType::Point, glm::vec3(0.0f, 6.0f, 5.0f), glm::vec3(15.0f, 0.0f, 0.0f), 0.4f);
-	AddLight(LightType::Point, glm::vec3(-2.0f, 1.0f, -3.0f), glm::vec3(0.0f, 15.0f, 0.0f), 0.4f);
-	AddLight(LightType::Point, glm::vec3(3.0f, 8.5f, 0.0f), glm::vec3(0.0f, 0.0f, 25.0f), 0.4f);
+	AddLight(LightType::Point, glm::vec3(0.0f, 6.0f, 5.0f), glm::vec3(6.0f, 0.0f, 0.0f), 0.4f);
+	AddLight(LightType::Point, glm::vec3(-2.0f, 1.0f, -3.0f), glm::vec3(0.0f, 9.0f, 0.0f), 0.4f);
+	AddLight(LightType::Point, glm::vec3(3.0f, 8.5f, 0.0f), glm::vec3(0.0f, 0.0f, 25.0f), 0.2f);
 	AddLight(LightType::Point, glm::vec3(-8.0f, 3.0f, -1.0f), glm::vec3(6.0f, 6.0f, 6.0f), 0.3f);
 
 	if (!meshRenderer->cubeVBO) {

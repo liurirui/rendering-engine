@@ -37,3 +37,7 @@ extern const char* Frag_quad;
 extern const char* general_pbr_vert;
 
 extern const char* general_pbr_frag;
+
+extern const char* Frag_DownSample;
+
+extern const char* Frag_UpSample;

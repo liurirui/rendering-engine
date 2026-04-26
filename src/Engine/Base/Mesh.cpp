@@ -124,13 +124,16 @@ void Mesh::setupMesh() {
 	if (hasTexCoords) renderContext->setUpVertexBufferLayoutInfo(vbo, vao, 2, sizeof(Vertex), 2, offsetof(Vertex, texCoords) / sizeof(float));
 	
 	// tangent
-	if (hasTangents) renderContext->setUpVertexBufferLayoutInfo(vbo, vao, 3, sizeof(Vertex), 3, offsetof(Vertex, tangent) / sizeof(float));
+	if (hasTangents) {
+		renderContext->setUpVertexBufferLayoutInfo(vbo, vao, 3, sizeof(Vertex), 3, offsetof(Vertex, tangent) / sizeof(float));
+		renderContext->setUpVertexBufferLayoutInfo(vbo, vao, 3, sizeof(Vertex), 3, offsetof(Vertex, bitangent) / sizeof(float));
+	}
 }
 
 void Mesh::draw() {
-	glBindVertexArray(vao);
-	glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
-	glBindVertexArray(0);
+	RenderContext::getInstance()->bindVertexArray(vao);
+	RenderContext::getInstance()->drawElements(indices.size(), 0);
+	RenderContext::getInstance()->bindVertexArray(0);
 }
 
 

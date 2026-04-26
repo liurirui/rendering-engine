@@ -335,7 +335,7 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
     openGLRenderContext->windowsWidth = SRC_WIDTH;
     openGLRenderContext->windowsHeight = SRC_HEIGHT;
 
-    BasePassRenderer* basePassRenderer = new BasePassRenderer;
+    //BasePassRenderer* basePassRenderer = new BasePassRenderer;
     std::string texturepath = rootPath + "/resources/textures/background.jpg";
     
     Scene* scene = new Scene("scene");
@@ -591,7 +591,7 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
     EMSCRIPTEN_MAINLOOP_END;
 #endif
     delete scene;
-    delete basePassRenderer;
+    //delete basePassRenderer;
     delete postprocessRenderer;
     delete openGLRenderContext;
 

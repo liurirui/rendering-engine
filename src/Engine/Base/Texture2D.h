@@ -69,8 +69,10 @@ enum class CompareOp : uint32_t {
 struct SamplerInfo {
 
     TexelFilter minFilter = TexelFilter::Linear;
-    MipmapMode mipmapMode = MipmapMode::None;
     TexelFilter magFilter = TexelFilter::Linear;
+    MipmapMode mipmapMode = MipmapMode::Linear;
+
+    SamplerAddressMode addressMode = SamplerAddressMode::Repeat;
 
     SamplerAddressMode addressModeS = SamplerAddressMode::ClampToEdge;
     SamplerAddressMode addressModeT = SamplerAddressMode::ClampToEdge;
@@ -113,11 +115,13 @@ public:
 
     TextureUsage textureUsage = TextureUsage::ShaderRead;
 
+    SamplerInfo sampler;
+
     // constructor generates the shader on the fly
     // ------------------------------------------------------------------------
     Texture2D(const char* path);
 
-    Texture2D(const TextureUsage & usage, const TextureFormat & textureFormat, const int width, const int height, const unsigned char* data = nullptr, bool useCubeMao=false);
+    Texture2D(const TextureUsage & usage, const TextureFormat & textureFormat, SamplerInfo sampler, const int width, const int height, const unsigned char* data = nullptr);
 
     void initTexture(const TextureUsage& usage, const TextureFormat& textureFormat, const int width, const int height, const unsigned char* data = nullptr);
 

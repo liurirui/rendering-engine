@@ -10,9 +10,9 @@ OpenGLRenderContext::OpenGLRenderContext(){
     this->setCurrentRenderContext(this);
 }
 
-Texture2D* OpenGLRenderContext::createTexture2D(const TextureUsage& usage, const TextureFormat& textureFormat, const int width, const int height, bool useCubeMap) {
+Texture2D* OpenGLRenderContext::createTexture2D(const TextureUsage& usage, const TextureFormat& textureFormat, const int width, const int height, const SamplerInfo& samplerInfo) {
 
-    Texture2D* texture2D = new Texture2D(usage, textureFormat, width, height ,nullptr,useCubeMap);
+    Texture2D* texture2D = new Texture2D(usage, textureFormat, samplerInfo, width, height, nullptr);
     
     return texture2D;
 }

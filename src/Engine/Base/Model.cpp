@@ -81,6 +81,10 @@ Mesh* Model::processMesh(aiMesh* mesh, const aiScene* scene)
         if (mesh->mTangents) {
             vertex.tangent = glm::vec3(mesh->mTangents[i].x, mesh->mTangents[i].y, mesh->mTangents[i].z);
         }
+        if (mesh->mBitangents) {
+            vertex.bitangent = glm::vec3(mesh->mBitangents[i].x, mesh->mBitangents[i].y, mesh->mBitangents[i].z
+            );
+        }
         new_Mesh->vertices.emplace_back(vertex);
     }
     for (unsigned int i = 0; i < mesh->mNumFaces; i++) {

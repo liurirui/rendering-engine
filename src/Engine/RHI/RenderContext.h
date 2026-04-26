@@ -152,7 +152,7 @@ public:
         return instance;
     }
 
-    virtual Texture2D * createTexture2D(const TextureUsage& usage, const TextureFormat& textureFormat, const int width, const int height,bool useCubeMap=false) = 0;
+    virtual Texture2D * createTexture2D(const TextureUsage& usage, const TextureFormat& textureFormat, const int width, const int height,const SamplerInfo& samplerInfo = defaultSampler) = 0;
 
     virtual Texture2D * loadTexture2D(const char* path) = 0;
 

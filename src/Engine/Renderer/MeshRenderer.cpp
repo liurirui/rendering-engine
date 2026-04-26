@@ -16,45 +16,28 @@ MeshRenderer::MeshRenderer(const std::vector<Renderable*>& translucentMeshes, co
     : translucentMeshes(translucentMeshes), opaqueMeshes(opaqueMeshes){}
 
 void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
-    const char* passName = "modelPass";
-    rg.addPass(passName, camera, [this, camera](RenderContext* renderContext) {
-        glm::mat4 model = glm::mat4(1.0f);
-        //Rendering shadow maps
+
+    rg.addPass("shadowPass", &camera, [this, camera](RenderContext* renderContext) {
         depthStencilState.depthTest = true;
         depthStencilState.depthWrite = true;
-        int errorCode = glGetError();
         renderContext->beginRendering(scene->GetMainDirectionalLight()->getShadow()->DepthMapFramebuffer);
         renderContext->setDepthStencilState(depthStencilState);
         renderContext->bindPipeline(graphicsPipeline_DepthMap);
-        errorCode = glGetError();
-        depthMapShader.getPtr()->use();
-        errorCode = glGetError();
         depthMapShader.getPtr()->setMat4("lightSpaceMatrix", scene->GetMainDirectionalLight()->LightSpaceMatrix);
         //plane(shadow)
-        depthMapShader.getPtr()->setMat4("model", model);
+        depthMapShader.getPtr()->setMat4("model", glm::mat4(1.0f));
         renderContext->bindVertexArray(planeVAO);
         renderContext->drawArrays(0, 6);
-
+        //gameObject(shadow)
         scene->RenderObject();
-        
-
-        /*for (Renderable* renderable : opaqueMeshes) {
-            depthMapShader.getPtr()->setMat4("model", renderable->transform->modelMatrix);
-            renderContext->bindVertexArray(renderable->mesh->vao);
-            renderContext->drawElements(renderable->mesh->indexCount, nullptr);
-        }
-
-        for (Renderable* renderable : translucentMeshes) {
-            depthMapShader.getPtr()->setMat4("model", renderable->transform->modelMatrix);
-            renderContext->bindVertexArray(renderable->mesh->vao);
-            renderContext->drawElements(renderable->mesh->indexCount, nullptr);
-        }*/
         renderContext->endRendering();
+    });
 
-        // Start render scene
-        // Calculate projection and view matrices for UBO
-        glm::mat4 projection = glm::perspective(glm::radians(camera->Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 1000.0f);
+    rg.addPass("scenePass", &camera, [this, camera](RenderContext* renderContext) {
+        depthStencilState.depthTest = true;
+        depthStencilState.depthWrite = true;
         // Update Camera UBO
+        glm::mat4 projection = glm::perspective(glm::radians(camera->Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 1000.0f);
         if (camera->getUBOID() == 0) {
             camera->createUBO();
         }
@@ -72,7 +55,7 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
         renderContext->beginRendering(OriginFramebuffer);
         renderContext->setDepthStencilState(depthStencilState);
         renderContext->bindPipeline(graphicsPipeline);
-        glm::mat4 light_model=glm::mat4(1.0f);
+        glm::mat4 light_model = glm::mat4(1.0f);
         lightingShader_cube.getPtr()->use();
         lightingShader_cube.getPtr()->setMat4("projection", projection);
         lightingShader_cube.getPtr()->setMat4("view", camera->GetViewMatrix());
@@ -91,9 +74,9 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
             auto light = all_lights[i];
             if (light->getType() == LightType::Point) {
                 auto pointLight = dynamic_cast<PointLight*>(light);
-                light_model = glm::mat4(1.0f);
+                light_model = glm::mat4(1.0f); 
                 light_model = glm::translate(light_model, glm::vec3(pointLight->getPosition()));
-                light_model = glm::scale(light_model, glm::vec3(0.25f, 0.25f, 0.25f));
+                light_model = glm::scale(light_model, glm::vec3(0.1f, 0.1f, 0.1f));
                 lightingShader_cube.getPtr()->setMat4("model", light_model); 
                 lightingShader_cube.getPtr()->setVec3("lightColor", pointLight->getColor());
                 renderContext->bindVertexArray(cubeVAO);
@@ -132,7 +115,7 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
         }
         
         //render plane
-        lightingShader.getPtr()->setMat4("model", model);
+        lightingShader.getPtr()->setMat4("model", glm::mat4(1.0));
         renderContext->bindVertexArray(planeVAO);
         renderContext->bindTexture(floor->id, 0);
         renderContext->drawArrays(0, 6);

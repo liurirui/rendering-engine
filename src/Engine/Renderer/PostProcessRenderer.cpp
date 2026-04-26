@@ -10,18 +10,23 @@ PostProcessRenderer::PostProcessRenderer() {
     //PostProcessRenderer_depthStencilState.depthWrite = false;
     HightLightShader = TRefCountPtr<Shader>(new Shader(Vert_quad, Frag_highlight));
     BlurShader = TRefCountPtr<Shader>(new Shader(Vert_quad, Frag_blur));
+    DownSampleShader = TRefCountPtr<Shader>(new Shader(Vert_quad, Frag_DownSample));
+    UpSampleShader = TRefCountPtr<Shader>(new Shader(Vert_quad, Frag_UpSample));
     BloomShader = TRefCountPtr<Shader>(new Shader(Vert_quad, Frag_bloom));
     RadialBlurShader = TRefCountPtr<Shader>(new Shader(Vert_quad, Frag_Radialblur));
     MotionBlurShader = TRefCountPtr<Shader>(new Shader(Vert_quad, Frag_Motionblur));
     CartoonShader = TRefCountPtr<Shader>(new Shader(Vert_quad, Frag_cartoon));
     RippleShader = TRefCountPtr<Shader>(new Shader(Vert_quad, Frag_ripple));
 
-    lastTexture=RenderContext::getInstance()->createTexture2D(TextureUsage::RenderTarget, TextureFormat::RGBA32F, RenderContext::getInstance()->windowsWidth,
+    lastTexture = RenderContext::getInstance()->createTexture2D(TextureUsage::RenderTarget, TextureFormat::RGBA32F, RenderContext::getInstance()->windowsWidth,
         RenderContext::getInstance()->windowsHeight);
 
     //set HightLightFramebuffer's Texture Attachments
+    SamplerInfo bloomSampler;
+    bloomSampler.mipmapMode = MipmapMode::None;
+    bloomSampler.addressMode = SamplerAddressMode::ClampToEdge;
     fboBrightTexture = RenderContext::getInstance()->createTexture2D(TextureUsage::RenderTarget, TextureFormat::RGBA32F, RenderContext::getInstance()->windowsWidth,
-        RenderContext::getInstance()->windowsHeight);
+        RenderContext::getInstance()->windowsHeight, bloomSampler);
     ColorAttachment brightAttachment;
     brightAttachment.attachment = 0;
     brightAttachment.texture = fboBrightTexture;
@@ -34,19 +39,33 @@ PostProcessRenderer::PostProcessRenderer() {
     PostProcessRenderer_graphicsPipeline.rasterizationState.blendState.attachmentsBlendState.push_back(pipelineColorBlendAttachment);
 
     //set pingpongFramebuffer's Texture Attachments
-    ColorAttachment pingpongColorAttachment[2];
-    for (int i = 0; i < 2; i++) {
-        fbopingpongColorTexture[i] = RenderContext::getInstance()->createTexture2D(TextureUsage::RenderTarget, TextureFormat::RGBA32F, RenderContext::getInstance()->windowsWidth,
-            RenderContext::getInstance()->windowsHeight);
-        pingpongColorAttachment[i].attachment = 0;
-        pingpongColorAttachment[i].texture = fbopingpongColorTexture[i];
-        pingpongColorAttachment[i].clearColor = glm::vec4(1, 0, 0, 1);
-        PingpongFramebuffer[i].colorAttachments.emplace_back(std::move(pingpongColorAttachment[i]));
+    
+    
+    for (int i = 0; i < bloomLevel; i++) {
+        fboDownSampleColorTexture[i] = RenderContext::getInstance()->createTexture2D(TextureUsage::RenderTarget, TextureFormat::RGBA32F, RenderContext::getInstance()->windowsWidth / (1 << (i + 1)),
+            RenderContext::getInstance()->windowsHeight / (1 << (i + 1)), bloomSampler);
+        ColorAttachment downSampleColorAttachment;
+        downSampleColorAttachment.attachment = 0;
+        downSampleColorAttachment.texture = fboDownSampleColorTexture[i];
+        downSampleColorAttachment.clearColor = glm::vec4(1, 0, 0, 1);
+        DownSampleFramebuffer[i].colorAttachments.emplace_back(std::move(downSampleColorAttachment));
     }
+
+
+    for (int i = 0; i < bloomLevel; i++) {
+        fboUpSampleColorTexture[i] = RenderContext::getInstance()->createTexture2D(TextureUsage::RenderTarget, TextureFormat::RGBA32F, RenderContext::getInstance()->windowsWidth / (1 << (i + 1)),
+            RenderContext::getInstance()->windowsHeight / (1 << (i + 1)), bloomSampler);
+        ColorAttachment upSampleColorAttachment;
+        upSampleColorAttachment.attachment = 0;
+        upSampleColorAttachment.texture = fboUpSampleColorTexture[i];
+        upSampleColorAttachment.clearColor = glm::vec4(1, 0, 0, 1);
+        UpSampleFramebuffer[i].colorAttachments.emplace_back(std::move(upSampleColorAttachment));
+    }
+   
 
     //set BloomFramebuffer's Texture Attachments
     fboBloomTexture = RenderContext::getInstance()->createTexture2D(TextureUsage::RenderTarget, TextureFormat::RGBA32F, RenderContext::getInstance()->windowsWidth,
-        RenderContext::getInstance()->windowsHeight);
+        RenderContext::getInstance()->windowsHeight, bloomSampler);
     ColorAttachment bloomColorAttachment;
     bloomColorAttachment.attachment = 0;
     bloomColorAttachment.texture = fboBloomTexture;
@@ -124,42 +143,48 @@ void PostProcessRenderer::render(RenderGraph& rg, FrameBufferInfo* sceneFBO) {
         renderContext->drawArrays(0, 6);
         renderContext->endRendering();
 
-        //horizontal blur
-        PostProcessRenderer_graphicsPipeline.shader = BlurShader.getPtr();
-        bool horizontal = true;
-        renderContext->beginRendering(PingpongFramebuffer[0]);
-        renderContext->bindPipeline(PostProcessRenderer_graphicsPipeline);
-        BlurShader.getPtr()->use();
-        BlurShader.getPtr()->setInt("horizontal", horizontal);
-        BlurShader.getPtr()->setInt("image", 0);
-        renderContext->bindTexture(HighLightFramebuffer.colorAttachments[0].texture->id, 0);
-        renderContext->bindVertexArray(quadVAO);
-        renderContext->drawArrays(0, 6);
-    
-        //vertical blur
-        PostProcessRenderer_graphicsPipeline.shader = BlurShader.getPtr();
-        renderContext->beginRendering(PingpongFramebuffer[1]);
-        renderContext->bindPipeline(PostProcessRenderer_graphicsPipeline);
-        int errorCode = glGetError();
-        BlurShader.getPtr()->use();
-        errorCode = glGetError();
-        BlurShader.getPtr()->setInt("horizontal", !horizontal);
-        BlurShader.getPtr()->setInt("image", 0);
-        renderContext->bindTexture(PingpongFramebuffer[0].colorAttachments[0].texture->id, 0);
-        renderContext->bindVertexArray(quadVAO);
-        renderContext->drawArrays(0, 6);
-        renderContext->endRendering();
+        for (int i = 0; i < bloomLevel; i++) {
+            renderContext->beginRendering(DownSampleFramebuffer[i]);
+            PostProcessRenderer_graphicsPipeline.shader = DownSampleShader.getPtr();
+            glViewport(0, 0, RenderContext::getInstance()->windowsWidth / (1 << (i + 1)), RenderContext::getInstance()->windowsHeight / (1 << (i + 1)));
+            renderContext->bindPipeline(PostProcessRenderer_graphicsPipeline);
+            DownSampleShader.getPtr()->use();
+            glm::vec2 textureSize = glm::vec2((float)(1 << (i + 1)) / (float)RenderContext::getInstance()->windowsWidth, (float)(1 << (i + 1)) / (float)RenderContext::getInstance()->windowsHeight);
+            DownSampleShader.getPtr()->setVec2("textureSize", textureSize);
+            DownSampleShader.getPtr()->setInt("u_texture", 0);
+            if (i == 0) renderContext->bindTexture(HighLightFramebuffer.colorAttachments[0].texture->id, 0);
+            else renderContext->bindTexture(DownSampleFramebuffer[i - 1].colorAttachments[0].texture->id, 0);
+            renderContext->bindVertexArray(quadVAO);
+            renderContext->drawArrays(0, 6);
+        }
+
+        for (int i = bloomLevel - 2; i >= 0; i--) {
+            renderContext->beginRendering(UpSampleFramebuffer[i]);
+            PostProcessRenderer_graphicsPipeline.shader = UpSampleShader.getPtr();
+            glViewport(0, 0, RenderContext::getInstance()->windowsWidth / (1 << (i + 1)), RenderContext::getInstance()->windowsHeight / (1 << (i + 1)));
+            renderContext->bindPipeline(PostProcessRenderer_graphicsPipeline);
+            UpSampleShader.getPtr()->use();
+            glm::vec2 textureSize = glm::vec2((float)(1 << (i + 1)) / (float)RenderContext::getInstance()->windowsWidth, (float)(1 << (i + 1)) / (float)RenderContext::getInstance()->windowsHeight);
+            UpSampleShader.getPtr()->setVec2("textureSize", textureSize);
+            UpSampleShader.getPtr()->setInt("curMipDownSampletexture", 0);
+            renderContext->bindTexture(DownSampleFramebuffer[i].colorAttachments[0].texture->id, 0);
+            UpSampleShader.getPtr()->setInt("lastMipUpSampletexture", 1);
+            if(i == bloomLevel - 2) renderContext->bindTexture(DownSampleFramebuffer[i + 1].colorAttachments[0].texture->id, 1);
+            else renderContext->bindTexture(UpSampleFramebuffer[i + 1].colorAttachments[0].texture->id, 1);
+            renderContext->bindVertexArray(quadVAO);
+            renderContext->drawArrays(0, 6);
+        }
 
         //Calculate the final color
         PostProcessRenderer_graphicsPipeline.shader = BloomShader.getPtr();
         renderContext->beginRendering(BloomFramebuffer);
+        glViewport(0, 0, RenderContext::getInstance()->windowsWidth , RenderContext::getInstance()->windowsHeight);
         renderContext->bindPipeline(PostProcessRenderer_graphicsPipeline);
         BloomShader.getPtr()->use();
-        errorCode = glGetError();
         BloomShader.getPtr()->setInt("scene", 0);
         BloomShader.getPtr()->setInt("bloomBlur", 1);
         renderContext->bindTexture(sceneFBO->colorAttachments[0].texture->id, 0);
-        renderContext->bindTexture(PingpongFramebuffer[1].colorAttachments[0].texture->id, 1);
+        renderContext->bindTexture(UpSampleFramebuffer[0].colorAttachments[0].texture->id, 1);
         renderContext->bindVertexArray(quadVAO);
         renderContext->drawArrays(0, 6);
         bloomTexture = BloomFramebuffer.colorAttachments[0].texture;
