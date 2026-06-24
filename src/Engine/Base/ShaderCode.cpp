@@ -133,7 +133,7 @@ vec3 calculateBlinnPhong();
 float DistributionGGX(vec3 N, vec3 H, float roughness);
 float GeometrySchlickGGX(float NdotV, float roughness);
 float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness);
-vec3 FresnelSchlick(float cosTheta, vec3 F0, float metalness);
+vec3 FresnelSchlick(float cosTheta, vec3 F0);
 
 void main() {
     vec3 albedo = getDiffuseColor();

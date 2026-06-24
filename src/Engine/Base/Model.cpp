@@ -111,8 +111,15 @@ Material* Model::loadMaterial(aiMaterial* mat) {
         string filename = directory.empty() ? string(str.C_Str()) : directory + "/" + string(str.C_Str());
         // Normalize path separators to forward slashes
         std::replace(filename.begin(), filename.end(), '\\', '/');
-        auto texture = std::make_shared<Texture2D>(filename.c_str());
-        material->setDiffuseMap(texture);
+        auto it = s_TextureCache.find(filename);
+        if (it != s_TextureCache.end()) {
+            material->setDiffuseMap((it->second).lock());  // 命中缓存
+        }
+        else {
+            auto texture = std::make_shared<Texture2D>(filename.c_str());
+            material->setDiffuseMap(texture);
+            s_TextureCache[filename] = texture;
+        }
     }
 
     // Load specular maps
@@ -122,8 +129,15 @@ Material* Model::loadMaterial(aiMaterial* mat) {
         string filename = directory.empty() ? string(str.C_Str()) : directory + "/" + string(str.C_Str());
         // Normalize path separators to forward slashes
         std::replace(filename.begin(), filename.end(), '\\', '/');
-        auto texture = std::make_shared<Texture2D>(filename.c_str());
-        material->setSpecularMap(texture);
+        auto it = s_TextureCache.find(filename);
+        if (it != s_TextureCache.end()) {
+            material->setSpecularMap((it->second).lock());  // 命中缓存
+        }
+        else {
+            auto texture = std::make_shared<Texture2D>(filename.c_str());
+            material->setSpecularMap(texture);
+            s_TextureCache[filename] = texture;
+        }
     }
 
     // Load normal maps
@@ -133,8 +147,68 @@ Material* Model::loadMaterial(aiMaterial* mat) {
         string filename = directory.empty() ? string(str.C_Str()) : directory + "/" + string(str.C_Str());
         // Normalize path separators to forward slashes
         std::replace(filename.begin(), filename.end(), '\\', '/');
-        auto texture = std::make_shared<Texture2D>(filename.c_str());
-        material->setNormalMap(texture);
+        auto it = s_TextureCache.find(filename);
+        if (it != s_TextureCache.end()) {
+            material->setNormalMap((it->second).lock());  // 命中缓存
+        }
+        else {
+            auto texture = std::make_shared<Texture2D>(filename.c_str());
+            material->setNormalMap(texture);
+            s_TextureCache[filename] = texture;
+        }
+    }
+
+    // 金属度贴图
+    for (unsigned int i = 0; i < mat->GetTextureCount(aiTextureType_METALNESS); i++) {
+        aiString str;
+        mat->GetTexture(aiTextureType_METALNESS, i, &str);
+        string filename = directory.empty() ? string(str.C_Str()) : directory + "/" + string(str.C_Str());
+        // Normalize path separators to forward slashes
+        std::replace(filename.begin(), filename.end(), '\\', '/');
+        auto it = s_TextureCache.find(filename);
+        if (it != s_TextureCache.end()) {
+            material->setMetallicMap((it->second).lock());  // 命中缓存
+        }
+        else {
+            auto texture = std::make_shared<Texture2D>(filename.c_str());
+            material->setMetallicMap(texture);
+            s_TextureCache[filename] = texture;
+        }
+    }
+
+    // 金属度贴图
+    for (unsigned int i = 0; i < mat->GetTextureCount(aiTextureType_DIFFUSE_ROUGHNESS); i++) {
+        aiString str;
+        mat->GetTexture(aiTextureType_DIFFUSE_ROUGHNESS, i, &str);
+        string filename = directory.empty() ? string(str.C_Str()) : directory + "/" + string(str.C_Str());
+        // Normalize path separators to forward slashes
+        std::replace(filename.begin(), filename.end(), '\\', '/');
+        auto it = s_TextureCache.find(filename);
+        if (it != s_TextureCache.end()) {
+            material->setRoughnessMap((it->second).lock());  // 命中缓存
+        }
+        else {
+            auto texture = std::make_shared<Texture2D>(filename.c_str());
+            material->setRoughnessMap(texture);
+            s_TextureCache[filename] = texture;
+        }
+    }
+
+    // 金属度贴图
+    for (unsigned int i = 0; i < mat->GetTextureCount(aiTextureType_AMBIENT_OCCLUSION); i++) {
+        aiString str;
+        mat->GetTexture(aiTextureType_AMBIENT_OCCLUSION, i, &str);
+        string filename = directory.empty() ? string(str.C_Str()) : directory + "/" + string(str.C_Str());
+        std::replace(filename.begin(), filename.end(), '\\', '/');
+        auto it = s_TextureCache.find(filename);
+        if (it != s_TextureCache.end()) {
+            material->setAoMap((it->second).lock());  // 命中缓存
+        }
+        else {
+            auto texture = std::make_shared<Texture2D>(filename.c_str());
+            material->setAoMap(texture);
+            s_TextureCache[filename] = texture;
+        }
     }
 
     // Load other properties if needed

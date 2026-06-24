@@ -28,7 +28,7 @@ public:
     Transform* transform = new Transform();
     int modelNumber;
     bool isTransformDirty = false;
-
+    std::unordered_map<std::string, std::weak_ptr<Texture2D>> s_TextureCache;
     Model(string const& path, bool gamma = false);
     ~Model();
 

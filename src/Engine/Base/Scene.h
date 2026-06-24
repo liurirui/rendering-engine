@@ -23,7 +23,6 @@ public:
 	void addRenderable(Renderable* newMesh);
 	void storeObjectMeshes(GameObject* go);
 	void createModel(const std::string& modelPath);
-	void loadFloorTexture(const std::string& TexturePath);
 	void updateMeshTransform();
 
 	float calculateDistance(glm::vec3 cameraPosition, glm::vec3 meshPosition);
@@ -59,7 +58,6 @@ public:
 		lights.emplace_back(light);
 	}
 	GameObject* root = nullptr;
-	MeshRenderer* meshRenderer = nullptr;
 	Camera* mainCamera = nullptr;
 	std::vector<Light*> lights;
 	DirectionLight* mainDirectionalLight = nullptr;

@@ -21,12 +21,14 @@ public:
     MeshRenderer(const std::vector<Renderable*>& translucentMeshes, const std::vector<Renderable*>& opaqueMeshes);
     ~MeshRenderer();
     virtual void render(Camera* camera, RenderGraph& rg);
+    void addShadowPass(Camera* camera, RenderGraph& rg);
     unsigned int getTargetColorTextureID(int  attachment);
     FrameBufferInfo* getTargetFrameBuffer();
 
     //Model mesh textures that need to be stored in advance
     std::unordered_map<std::string, Texture2D*> ColorTextureMap;
     Texture2D* floor = nullptr;
+    Scene* scene_ = nullptr;
 
 private:
     //shader
@@ -34,7 +36,6 @@ private:
     TRefCountPtr<Shader> lightingShader_cube;
     TRefCountPtr<Shader> depthMapShader;
 
-    Scene* scene;
     //FBO
     FrameBufferInfo OriginFramebuffer;
     FrameBufferInfo DepthMapFramebuffer;

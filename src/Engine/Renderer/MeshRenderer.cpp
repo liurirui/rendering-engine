@@ -11,27 +11,86 @@
 #include <glm/gtc/type_ptr.hpp>
 
 NAMESPACE_START
-MeshRenderer::MeshRenderer() {}
+MeshRenderer::MeshRenderer() {
+   floor = RenderContext::getInstance()->loadTexture2D(((std::string("D:/ProgrammingTools/VS2022/Project/rendering-engine") + std::string("/resources/textures/wood.png")).c_str()));       //Initialize the texture of the floor
+
+    depthStencilState.depthTest = true;
+    depthStencilState.depthWrite = true;
+
+    //Shader
+    depthMapShader = TRefCountPtr<Shader>(new Shader(Vert_depth_map, Frag_depth_map));
+    lightingShader = TRefCountPtr<Shader>(new Shader(Vertmodel_lighting, Fragmodel_lighting));
+    lightingShader_cube = TRefCountPtr<Shader>(new Shader(Vertmodel_lighting, Fragmodel_cube));
+
+    //set  Originframebuffer's Texture Attachments
+    SamplerInfo depthSampler;
+    depthSampler.mipmapMode = MipmapMode::None;
+    fboColorTexture = RenderContext::getInstance()->createTexture2D(TextureUsage::RenderTarget, TextureFormat::RGBA32F, RenderContext::getInstance()->windowsWidth,
+        RenderContext::getInstance()->windowsHeight);
+    fboDepthTexture = RenderContext::getInstance()->createTexture2D(TextureUsage::DepthStencil, TextureFormat::Depth24_Stencil8, RenderContext::getInstance()->windowsWidth,
+        RenderContext::getInstance()->windowsHeight, depthSampler);
+    ColorAttachment colorAttachment;
+    colorAttachment.attachment = 0;
+    colorAttachment.texture = fboColorTexture;
+    colorAttachment.clearColor = glm::vec4(0.1, 0.05, 0.15, 1);
+    OriginFramebuffer.colorAttachments.emplace_back(std::move(colorAttachment));
+    OriginFramebuffer.depthStencilAttachment.texture = fboDepthTexture;
+    graphicsPipeline.shader = lightingShader.getPtr();
+    PipelineColorBlendAttachment pipelineColorBlendAttachment;
+    pipelineColorBlendAttachment.blendState.enabled = true;
+    graphicsPipeline.rasterizationState.blendState.attachmentsBlendState.push_back(pipelineColorBlendAttachment);
+
+
+    graphicsPipeline_DepthMap.shader = depthMapShader.getPtr();
+    PipelineColorBlendAttachment pipelineColorBlendAttachment_DepthMap;
+    pipelineColorBlendAttachment_DepthMap.blendState.enabled = true;
+    graphicsPipeline_DepthMap.rasterizationState.blendState.attachmentsBlendState.push_back(pipelineColorBlendAttachment);
+    graphicsPipeline_DepthMap.rasterizationState.cullMode = CullMode::Back;
+
+    
+
+    if (!cubeVBO) {
+        cubeVBO = RenderContext::getInstance()->createVertexBuffer(cubeVertices, sizeof(cubeVertices));
+    }
+    if (!cubeVAO) {
+       cubeVAO = RenderContext::getInstance()->createVertexArray(cubeVBO);
+        RenderContext::getInstance()->setUpVertexBufferLayoutInfo(cubeVBO, cubeVAO, 3, 8 * sizeof(float), 0, 0);
+        RenderContext::getInstance()->setUpVertexBufferLayoutInfo(cubeVBO, cubeVAO, 3, 8 * sizeof(float), 1, 3);
+        RenderContext::getInstance()->setUpVertexBufferLayoutInfo(cubeVBO, cubeVAO, 2, 8 * sizeof(float), 2, 6);
+    }
+    if (!planeVBO) {
+        planeVBO = RenderContext::getInstance()->createVertexBuffer(planeVertices, sizeof(planeVertices));
+    }
+    if (!planeVAO) {
+        planeVAO = RenderContext::getInstance()->createVertexArray(planeVBO);
+        RenderContext::getInstance()->setUpVertexBufferLayoutInfo(planeVBO, planeVAO, 3, 8 * sizeof(float), 0, 0);
+        RenderContext::getInstance()->setUpVertexBufferLayoutInfo(planeVBO, planeVAO, 3, 8 * sizeof(float), 1, 3);
+        RenderContext::getInstance()->setUpVertexBufferLayoutInfo(planeVBO, planeVAO, 2, 8 * sizeof(float), 2, 6);
+    }
+}
 MeshRenderer::MeshRenderer(const std::vector<Renderable*>& translucentMeshes, const std::vector<Renderable*>& opaqueMeshes)
     : translucentMeshes(translucentMeshes), opaqueMeshes(opaqueMeshes){}
 
-void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
-
+void MeshRenderer::addShadowPass(Camera* camera, RenderGraph& rg) {
     rg.addPass("shadowPass", &camera, [this, camera](RenderContext* renderContext) {
         depthStencilState.depthTest = true;
         depthStencilState.depthWrite = true;
-        renderContext->beginRendering(scene->GetMainDirectionalLight()->getShadow()->DepthMapFramebuffer);
+        renderContext->beginRendering(scene_->GetMainDirectionalLight()->getShadow()->DepthMapFramebuffer);
         renderContext->setDepthStencilState(depthStencilState);
         renderContext->bindPipeline(graphicsPipeline_DepthMap);
-        depthMapShader.getPtr()->setMat4("lightSpaceMatrix", scene->GetMainDirectionalLight()->LightSpaceMatrix);
+        depthMapShader.getPtr()->setMat4("lightSpaceMatrix", scene_->GetMainDirectionalLight()->LightSpaceMatrix);
         //plane(shadow)
         depthMapShader.getPtr()->setMat4("model", glm::mat4(1.0f));
         renderContext->bindVertexArray(planeVAO);
         renderContext->drawArrays(0, 6);
         //gameObject(shadow)
-        scene->RenderObject();
+        scene_->RenderObject();
         renderContext->endRendering();
-    });
+        });
+}
+
+void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
+    addShadowPass(camera, rg);
 
     rg.addPass("scenePass", &camera, [this, camera](RenderContext* renderContext) {
         depthStencilState.depthTest = true;
@@ -49,7 +108,7 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
         if (Light::uboID == 0) {
             Light::createUBO();
         }
-        Light::updateUBO(scene->lights);
+        Light::updateUBO(scene_->lights);
         Light::bindUBO();
 
         renderContext->beginRendering(OriginFramebuffer);
@@ -60,16 +119,16 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
         lightingShader_cube.getPtr()->setMat4("projection", projection);
         lightingShader_cube.getPtr()->setMat4("view", camera->GetViewMatrix());
         //Render a large point light source to act as a unidirectional light source
-        static glm::vec3 directionPos = scene->GetMainDirectionalLight()->getDirection() * (-80.0f);
+        static glm::vec3 directionPos = scene_->GetMainDirectionalLight()->getDirection() * (-80.0f);
         light_model = glm::translate(light_model, directionPos);
         light_model = glm::scale(light_model, glm::vec3(3.0f, 3.0f, 3.0f));
         lightingShader_cube.getPtr()->setMat4("model", light_model);
-        lightingShader_cube.getPtr()->setVec3("lightColor", scene->GetMainDirectionalLight()->getColor());
+        lightingShader_cube.getPtr()->setVec3("lightColor", scene_->GetMainDirectionalLight()->getColor());
         renderContext->bindVertexArray(cubeVAO);
         renderContext->drawArrays(0, 36);
 
         //render light cube
-        std::vector<Light*> all_lights = scene->GetAllLights();
+        std::vector<Light*> all_lights = scene_->GetAllLights();
         for (int i = 0; i < all_lights.size(); i++) {
             auto light = all_lights[i];
             if (light->getType() == LightType::Point) {
@@ -89,11 +148,11 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
         lightingShader.getPtr()->setMat4("view", camera->GetViewMatrix());
         // light properties
         lightingShader.getPtr()->setVec3("viewPos", camera->Position);
-        lightingShader.getPtr()->setVec3("lightPos", scene->GetMainDirectionalLight()->getDirection()*(-10.0f));
-        lightingShader.getPtr()->setMat4("lightSpaceMatrix", scene->GetMainDirectionalLight()->LightSpaceMatrix);
-        lightingShader.getPtr()->setVec3("light.direction", scene->GetMainDirectionalLight()->getDirection());
-        lightingShader.getPtr()->setVec3("light.color", scene->GetMainDirectionalLight()->getColor());
-        lightingShader.getPtr()->setFloat("light.intensity", scene->GetMainDirectionalLight()->getIntensity());
+        lightingShader.getPtr()->setVec3("lightPos", scene_->GetMainDirectionalLight()->getDirection()*(-10.0f));
+        lightingShader.getPtr()->setMat4("lightSpaceMatrix", scene_->GetMainDirectionalLight()->LightSpaceMatrix);
+        lightingShader.getPtr()->setVec3("light.direction", scene_->GetMainDirectionalLight()->getDirection());
+        lightingShader.getPtr()->setVec3("light.color", scene_->GetMainDirectionalLight()->getColor());
+        lightingShader.getPtr()->setFloat("light.intensity", scene_->GetMainDirectionalLight()->getIntensity());
         lightingShader.getPtr()->setVec3("ambient", 0.3f, 0.3f, 0.3f);
         lightingShader.getPtr()->setVec3("diffuse", 0.6f, 0.6f, 0.6f);
         lightingShader.getPtr()->setVec3("specular", 1.0f, 1.0f, 1.0f);
@@ -103,9 +162,9 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
         lightingShader.getPtr()->setBool("isGlass", false);
         lightingShader.getPtr()->setInt("baseTexture", 0);
         lightingShader.getPtr()->setInt("shadowMap", 1);
-        renderContext->bindTexture(scene->GetMainDirectionalLight()->getShadow()->depthMap->id, 1);
-        for (int i = 1; i<scene->lights.size(); i++) {
-            PointLight* light = dynamic_cast<PointLight*>(scene->lights[i]);
+        renderContext->bindTexture(scene_->GetMainDirectionalLight()->getShadow()->depthMap->id, 1);
+        for (int i = 1; i<scene_->lights.size(); i++) {
+            PointLight* light = dynamic_cast<PointLight*>(scene_->lights[i]);
             lightingShader.getPtr()->setVec3(("point[" + std::to_string(i-1) + "].position").c_str(), light->getPosition());
             lightingShader.getPtr()->setVec3(("point[" + std::to_string(i - 1) + "].color").c_str(), light->getColor());
             lightingShader.getPtr()->setFloat(("point[" + std::to_string(i - 1) + "].intensity").c_str(), light->getIntensity());
@@ -120,7 +179,7 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
         renderContext->bindTexture(floor->id, 0);
         renderContext->drawArrays(0, 6);
 
-        scene->RenderObject();
+        scene_->RenderObject();
 
         renderContext->bindVertexArray(0);
         renderContext->endRendering();

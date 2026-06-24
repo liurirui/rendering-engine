@@ -175,7 +175,7 @@ int asdasdasdsa(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_
         scene->Update();
         scene->Render(&camera, renderGraph);
 
-        postprocessRenderer->render(renderGraph, scene->meshRenderer->getTargetFrameBuffer());
+        //postprocessRenderer->render(renderGraph, scene->meshRenderer->getTargetFrameBuffer());
         renderGraph.execute(openGLRenderContext);
 
         glDisable(GL_DEPTH_TEST); // disable depth test so screen-space quad isn't discarded due to depth test.
@@ -186,7 +186,7 @@ int asdasdasdsa(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_
 
         glActiveTexture(GL_TEXTURE0);
         //glBindTexture(GL_TEXTURE_2D, basePassRenderer->getTargetColorTexture(0));	// use the color attachment texture as the texture of the quad plane
-        glBindTexture(GL_TEXTURE_2D, scene->meshRenderer->getTargetColorTextureID(0));
+        //glBindTexture(GL_TEXTURE_2D, scene->meshRenderer->getTargetColorTextureID(0));
         //glBindTexture(GL_TEXTURE_2D, postprocessRenderer->getTargetColorTextureID(0));
         glDrawArrays(GL_TRIANGLES, 0, 6);
 
@@ -340,9 +340,16 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
     
     Scene* scene = new Scene("scene");
 
+    MeshRenderer* meshRenderer = new MeshRenderer;
     PostProcessRenderer* postprocessRenderer = new PostProcessRenderer;
 
+    meshRenderer->scene_ = scene;
     scene->Start();
+    scene->AddLight(LightType::Direction, glm::vec3(-0.5f, -0.8f, -0.5f), glm::vec3(2.0f, 2.0f, 2.0f), 1.0f);
+    scene->AddLight(LightType::Point, glm::vec3(0.0f, 6.0f, 5.0f), glm::vec3(6.0f, 0.0f, 0.0f), 0.4f);
+    scene->AddLight(LightType::Point, glm::vec3(-2.0f, 1.0f, -3.0f), glm::vec3(0.0f, 9.0f, 0.0f), 0.4f);
+    scene->AddLight(LightType::Point, glm::vec3(3.0f, 8.5f, 0.0f), glm::vec3(0.0f, 0.0f, 25.0f), 0.2f);
+    scene->AddLight(LightType::Point, glm::vec3(-8.0f, 3.0f, -1.0f), glm::vec3(6.0f, 6.0f, 6.0f), 0.3f);
 
     // Main loop
 #ifdef __EMSCRIPTEN__
@@ -391,7 +398,7 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
             ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
             ImGui::Checkbox("Another Window", &show_another_window);
 
-            ImGui::ColorEdit3("Background Color", (float*)&(scene->meshRenderer->getTargetFrameBuffer()->colorAttachments[0].clearColor)); // Edit 3 floats representing a color
+            ImGui::ColorEdit3("Background Color", (float*)&(meshRenderer->getTargetFrameBuffer()->colorAttachments[0].clearColor)); // Edit 3 floats representing a color
 
             ImVec4 buttonColor = ImVec4(1.0f, 0.4f, 0.f, 1.0f);      // Color of button
             ImVec4 hoveredColor = ImVec4(0.4f, 0.15f, 0.15f, 1.0f);  // Color on hover
@@ -447,7 +454,7 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
             if (ImGuiFileDialog::Instance()->Display("ChooseTextureDlgKey")) {
                 if (ImGuiFileDialog::Instance()->IsOk()) {
                     selectedFilePath = ImGuiFileDialog::Instance()->GetFilePathName();
-                    scene->loadFloorTexture(selectedFilePath);  // Load texture to the scene
+                    //meshRenderer->floor = loadTexture2D(selectedFilePath);  // Load texture to the scene
                 }
                 ImGuiFileDialog::Instance()->Close();
             }
@@ -564,9 +571,10 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
         //basePassRenderer->render(&camera, renderGraph);
         scene->Update();
         scene->Render(&camera, renderGraph);
+        meshRenderer->render(&camera, renderGraph);
 
         if(useEffect!=0)
-        postprocessRenderer->render(renderGraph, scene->meshRenderer->getTargetFrameBuffer());
+        postprocessRenderer->render(renderGraph, meshRenderer->getTargetFrameBuffer());
         renderGraph.execute(openGLRenderContext);
 
         glDisable(GL_DEPTH_TEST); // disable depth test so screen-space quad isn't discarded due to depth test.
@@ -578,7 +586,7 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
         glActiveTexture(GL_TEXTURE0);
         //glBindTexture(GL_TEXTURE_2D, basePassRenderer->getTargetColorTexture(0));	// use the color attachment texture as the texture of the quad plane
         if(useEffect==0)
-        glBindTexture(GL_TEXTURE_2D, scene->meshRenderer->getTargetColorTextureID(0));
+        glBindTexture(GL_TEXTURE_2D, meshRenderer->getTargetColorTextureID(0));
         else 
         glBindTexture(GL_TEXTURE_2D, postprocessRenderer->getTargetColorTextureID(0,useEffect));
         glDrawArrays(GL_TRIANGLES, 0, 6);
