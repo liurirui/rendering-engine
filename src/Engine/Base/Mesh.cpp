@@ -103,9 +103,10 @@ void Mesh::createIndexBuffer(unsigned int numIndex, unsigned int* indices) {
 }
 
 Mesh::~Mesh() {
-	if (vao) RenderContext::getInstance()->deleteVertexBuffer(vao);
+	if (vao) RenderContext::getInstance()->deleteVertexArray(vao);
 	if (vbo) RenderContext::getInstance()->deleteVertexBuffer(vbo);
 	if (ibo) RenderContext::getInstance()->deleteVertexBuffer(ibo); 
+	delete material;
 }
 
 void Mesh::setupMesh() {
@@ -126,7 +127,7 @@ void Mesh::setupMesh() {
 	// tangent
 	if (hasTangents) {
 		renderContext->setUpVertexBufferLayoutInfo(vbo, vao, 3, sizeof(Vertex), 3, offsetof(Vertex, tangent) / sizeof(float));
-		renderContext->setUpVertexBufferLayoutInfo(vbo, vao, 3, sizeof(Vertex), 3, offsetof(Vertex, bitangent) / sizeof(float));
+		renderContext->setUpVertexBufferLayoutInfo(vbo, vao, 3, sizeof(Vertex), 4, offsetof(Vertex, bitangent) / sizeof(float));
 	}
 }
 

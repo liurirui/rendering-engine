@@ -2,6 +2,22 @@
 #include<iostream>
 #include <algorithm>
 NAMESPACE_START
+Scene::~Scene() {
+	for (auto light : lights) {
+		delete light;
+	}
+	lights.clear();
+	mainDirectionalLight = nullptr;
+
+	for (auto model : models) {
+		delete model;
+	}
+	models.clear();
+
+	delete root;
+	root = nullptr;
+	renderableObjects.clear();
+}
 void Scene::addRenderable(Renderable* newRenderable) {
 	
 }
@@ -24,6 +40,11 @@ void Scene::storeObjectMeshes(GameObject* go) {
 
 void Scene::createModel(const std::string& modelPath){
 	Model* nowModel= new Model(modelPath);
+	if (!nowModel->model_go) {
+		delete nowModel;
+		return;
+	}
+	models.emplace_back(nowModel);
 	addRootChild(nowModel->model_go);
 	storeObjectMeshes(nowModel->model_go);
 }

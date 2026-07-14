@@ -16,9 +16,12 @@
 #include<Engine/Renderer/BasePassRenderer.h>
 #include<Engine/Renderer/MeshRenderer.h>
 #include<Engine/Renderer/PostProcessRenderer.h>
+#include<Engine/Renderer/Renderer.h>
+#include<Engine/Base/AssetManager.h>
 
 #include <iostream>
 #include<array>
+#include<algorithm>
 
 #include<Engine/Base/Constants.h>
 
@@ -80,6 +83,33 @@ float quadVertices[] = { // vertex attributes for a quad that fills the entire s
 
 Shader* screenShader = nullptr;
 
+static bool directoryExists(const std::string& path)
+{
+    DWORD attributes = GetFileAttributesA(path.c_str());
+    return attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY);
+}
+
+static std::string findProjectRoot()
+{
+    char currentDir[MAX_PATH] = {};
+    GetCurrentDirectoryA(MAX_PATH, currentDir);
+    std::string path = currentDir;
+    std::replace(path.begin(), path.end(), '\\', '/');
+
+    for (int i = 0; i < 8; ++i) {
+        if (directoryExists(path + "/resources")) {
+            return path;
+        }
+        size_t slash = path.find_last_of('/');
+        if (slash == std::string::npos) {
+            break;
+        }
+        path = path.substr(0, slash);
+    }
+
+    return ".";
+}
+
 //#include <direct.h>
 //int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR lpCmdLine, _In_ int nShowCmd)
 int asdasdasdsa(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR lpCmdLine, _In_ int nShowCmd)
@@ -90,7 +120,7 @@ int asdasdasdsa(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_
     //puts(path);
     //delete path;
 
-    std::string rootPath = "E:/";
+    std::string rootPath = findProjectRoot();
     // glfw: initialize and configure
     // ------------------------------
     glfwInit();
@@ -222,7 +252,7 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
     if (!glfwInit())
         return 1;
 
-    std::string rootPath = "D:/ProgrammingTools/VS2022/Project/rendering-engine";
+    std::string rootPath = findProjectRoot();
 
     // Decide GL+GLSL versions
 #if defined(IMGUI_IMPL_OPENGL_ES2)
@@ -334,16 +364,13 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
     OpenGLRenderContext* openGLRenderContext = new OpenGLRenderContext();
     openGLRenderContext->windowsWidth = SRC_WIDTH;
     openGLRenderContext->windowsHeight = SRC_HEIGHT;
+    AssetManager* assetManager = new AssetManager(*openGLRenderContext, rootPath);
+    Renderer* renderer = new Renderer(*openGLRenderContext, *assetManager);
 
     //BasePassRenderer* basePassRenderer = new BasePassRenderer;
     std::string texturepath = rootPath + "/resources/textures/background.jpg";
     
     Scene* scene = new Scene("scene");
-
-    MeshRenderer* meshRenderer = new MeshRenderer;
-    PostProcessRenderer* postprocessRenderer = new PostProcessRenderer;
-
-    meshRenderer->scene_ = scene;
     scene->Start();
     scene->AddLight(LightType::Direction, glm::vec3(-0.5f, -0.8f, -0.5f), glm::vec3(2.0f, 2.0f, 2.0f), 1.0f);
     scene->AddLight(LightType::Point, glm::vec3(0.0f, 6.0f, 5.0f), glm::vec3(6.0f, 0.0f, 0.0f), 0.4f);
@@ -398,7 +425,7 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
             ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
             ImGui::Checkbox("Another Window", &show_another_window);
 
-            ImGui::ColorEdit3("Background Color", (float*)&(meshRenderer->getTargetFrameBuffer()->colorAttachments[0].clearColor)); // Edit 3 floats representing a color
+            ImGui::ColorEdit3("Background Color", (float*)&(renderer->getMeshRenderer().getTargetFrameBuffer()->colorAttachments[0].clearColor)); // Edit 3 floats representing a color
 
             ImVec4 buttonColor = ImVec4(1.0f, 0.4f, 0.f, 1.0f);      // Color of button
             ImVec4 hoveredColor = ImVec4(0.4f, 0.15f, 0.15f, 1.0f);  // Color on hover
@@ -417,7 +444,7 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
 
             if (openModelDialog) {
                 IGFD::FileDialogConfig config;
-                config.path = "/resources/objects/";                // Default folder path for model selection
+                config.path = assetManager->resolvePath("resources/objects");                // Default folder path for model selection
                 config.countSelectionMax = 1;                       // Allow only one file to be selected
                 config.flags = ImGuiFileDialogFlags_None;           // No special flags
 
@@ -441,7 +468,7 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
 
             if (openTextureDialog) {
                 IGFD::FileDialogConfig config;
-                config.path = "/resources/textures/";               // Default folder path for texture selection
+                config.path = assetManager->resolvePath("resources/textures");               // Default folder path for texture selection
                 config.countSelectionMax = 1;                       // Allow only one file to be selected
                 config.flags = ImGuiFileDialogFlags_None;           // No special flags
 
@@ -454,7 +481,7 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
             if (ImGuiFileDialog::Instance()->Display("ChooseTextureDlgKey")) {
                 if (ImGuiFileDialog::Instance()->IsOk()) {
                     selectedFilePath = ImGuiFileDialog::Instance()->GetFilePathName();
-                    //meshRenderer->floor = loadTexture2D(selectedFilePath);  // Load texture to the scene
+                    renderer->getMeshRenderer().setFloorTexture(assetManager->loadTexture2D(selectedFilePath));
                 }
                 ImGuiFileDialog::Instance()->Close();
             }
@@ -562,20 +589,11 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
         float currentFrame = static_cast<float>(glfwGetTime());
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
-        postprocessRenderer->time = lastFrame;
+        renderer->getPostProcessRenderer().time = lastFrame;
         // input
         // -----
         processInput(window);
-        RenderGraph renderGraph;
-
-        //basePassRenderer->render(&camera, renderGraph);
-        scene->Update();
-        scene->Render(&camera, renderGraph);
-        meshRenderer->render(&camera, renderGraph);
-
-        if(useEffect!=0)
-        postprocessRenderer->render(renderGraph, meshRenderer->getTargetFrameBuffer());
-        renderGraph.execute(openGLRenderContext);
+        renderer->render(*scene, camera, useEffect);
 
         glDisable(GL_DEPTH_TEST); // disable depth test so screen-space quad isn't discarded due to depth test.
         glDepthMask(GL_FALSE);
@@ -586,9 +604,9 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
         glActiveTexture(GL_TEXTURE0);
         //glBindTexture(GL_TEXTURE_2D, basePassRenderer->getTargetColorTexture(0));	// use the color attachment texture as the texture of the quad plane
         if(useEffect==0)
-        glBindTexture(GL_TEXTURE_2D, meshRenderer->getTargetColorTextureID(0));
+        glBindTexture(GL_TEXTURE_2D, renderer->getMeshRenderer().getTargetColorTextureID(0));
         else 
-        glBindTexture(GL_TEXTURE_2D, postprocessRenderer->getTargetColorTextureID(0,useEffect));
+        glBindTexture(GL_TEXTURE_2D, renderer->getPostProcessRenderer().getTargetColorTextureID(0,useEffect));
         glDrawArrays(GL_TRIANGLES, 0, 6);
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -600,7 +618,8 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
 #endif
     delete scene;
     //delete basePassRenderer;
-    delete postprocessRenderer;
+    delete renderer;
+    delete assetManager;
     delete openGLRenderContext;
 
     glDeleteVertexArrays(1, &quadVAO);

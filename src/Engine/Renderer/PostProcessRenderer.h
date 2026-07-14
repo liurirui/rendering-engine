@@ -9,7 +9,7 @@ class PostProcessRenderer {
 public:
     PostProcessRenderer();
     ~PostProcessRenderer();
-    virtual void render(RenderGraph& rg, FrameBufferInfo* sceneFBO);
+    virtual void render(RenderGraph& rg, FrameBufferInfo* sceneFBO, int effectNo);
     unsigned int getTargetColorTextureID(int  attachment,int effectNo );
     float time=0;
 private:
@@ -35,8 +35,8 @@ private:
     FrameBufferInfo MotionFramebufferB;
     FrameBufferInfo CartoonFramebuffer;
     FrameBufferInfo RippleFramebuffer;
-    FrameBufferInfo* NowFramebuffer;
-    FrameBufferInfo* useFrameBufferInfo;
+    FrameBufferInfo* NowFramebuffer = nullptr;
+    FrameBufferInfo* useFrameBufferInfo = nullptr;
 
     GraphicsPipeline PostProcessRenderer_graphicsPipeline;
     DepthStencilState PostProcessRenderer_depthStencilState;
@@ -52,6 +52,7 @@ private:
     Texture2D* fboBloomTexture = nullptr;
     Texture2D* fboCartoonTexture = nullptr;
     Texture2D* fboRippleTexture = nullptr;
+    Texture2D* historySeedTexture = nullptr;
     Texture2D* lastTexture=nullptr;
 
     bool firstRender = true;

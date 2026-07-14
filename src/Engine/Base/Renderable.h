@@ -24,6 +24,14 @@ public:
         {
             delete comp;
         }
+        for (auto mesh : meshes)
+        {
+            delete mesh;
+        }
+        for (auto children : child)
+        {
+            delete children;
+        }
     }
 
     void setParent(GameObject* p) { parent = p; }

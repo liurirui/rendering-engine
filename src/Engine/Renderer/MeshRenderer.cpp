@@ -12,8 +12,6 @@
 
 NAMESPACE_START
 MeshRenderer::MeshRenderer() {
-   floor = RenderContext::getInstance()->loadTexture2D(((std::string("D:/ProgrammingTools/VS2022/Project/rendering-engine") + std::string("/resources/textures/wood.png")).c_str()));       //Initialize the texture of the floor
-
     depthStencilState.depthTest = true;
     depthStencilState.depthWrite = true;
 
@@ -71,28 +69,41 @@ MeshRenderer::MeshRenderer() {
 MeshRenderer::MeshRenderer(const std::vector<Renderable*>& translucentMeshes, const std::vector<Renderable*>& opaqueMeshes)
     : translucentMeshes(translucentMeshes), opaqueMeshes(opaqueMeshes){}
 
-void MeshRenderer::addShadowPass(Camera* camera, RenderGraph& rg) {
-    rg.addPass("shadowPass", &camera, [this, camera](RenderContext* renderContext) {
+void MeshRenderer::setFloorTexture(Texture2D* texture) {
+    floor = texture;
+}
+
+void MeshRenderer::addShadowPass(Scene& scene, Camera* camera, RenderGraph& rg) {
+    if (!scene.GetMainDirectionalLight()) {
+        return;
+    }
+
+    rg.addPass("shadowPass", &camera, [this, &scene, camera](RenderContext* renderContext) {
         depthStencilState.depthTest = true;
         depthStencilState.depthWrite = true;
-        renderContext->beginRendering(scene_->GetMainDirectionalLight()->getShadow()->DepthMapFramebuffer);
+        renderContext->beginRendering(scene.GetMainDirectionalLight()->getShadow()->DepthMapFramebuffer);
         renderContext->setDepthStencilState(depthStencilState);
         renderContext->bindPipeline(graphicsPipeline_DepthMap);
-        depthMapShader.getPtr()->setMat4("lightSpaceMatrix", scene_->GetMainDirectionalLight()->LightSpaceMatrix);
+        depthMapShader.getPtr()->setMat4("lightSpaceMatrix", scene.GetMainDirectionalLight()->LightSpaceMatrix);
         //plane(shadow)
         depthMapShader.getPtr()->setMat4("model", glm::mat4(1.0f));
         renderContext->bindVertexArray(planeVAO);
         renderContext->drawArrays(0, 6);
         //gameObject(shadow)
-        scene_->RenderObject();
+        scene.RenderObject();
         renderContext->endRendering();
         });
 }
 
-void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
-    addShadowPass(camera, rg);
+void MeshRenderer::render(Scene& scene, Camera* camera, RenderGraph& rg) {
+    addShadowPass(scene, camera, rg);
 
-    rg.addPass("scenePass", &camera, [this, camera](RenderContext* renderContext) {
+    rg.addPass("scenePass", &camera, [this, &scene, camera](RenderContext* renderContext) {
+        DirectionLight* mainLight = scene.GetMainDirectionalLight();
+        if (!mainLight) {
+            return;
+        }
+
         depthStencilState.depthTest = true;
         depthStencilState.depthWrite = true;
         // Update Camera UBO
@@ -108,7 +119,7 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
         if (Light::uboID == 0) {
             Light::createUBO();
         }
-        Light::updateUBO(scene_->lights);
+        Light::updateUBO(scene.lights);
         Light::bindUBO();
 
         renderContext->beginRendering(OriginFramebuffer);
@@ -119,16 +130,16 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
         lightingShader_cube.getPtr()->setMat4("projection", projection);
         lightingShader_cube.getPtr()->setMat4("view", camera->GetViewMatrix());
         //Render a large point light source to act as a unidirectional light source
-        static glm::vec3 directionPos = scene_->GetMainDirectionalLight()->getDirection() * (-80.0f);
+        glm::vec3 directionPos = mainLight->getDirection() * (-80.0f);
         light_model = glm::translate(light_model, directionPos);
         light_model = glm::scale(light_model, glm::vec3(3.0f, 3.0f, 3.0f));
         lightingShader_cube.getPtr()->setMat4("model", light_model);
-        lightingShader_cube.getPtr()->setVec3("lightColor", scene_->GetMainDirectionalLight()->getColor());
+        lightingShader_cube.getPtr()->setVec3("lightColor", mainLight->getColor());
         renderContext->bindVertexArray(cubeVAO);
         renderContext->drawArrays(0, 36);
 
         //render light cube
-        std::vector<Light*> all_lights = scene_->GetAllLights();
+        std::vector<Light*> all_lights = scene.GetAllLights();
         for (int i = 0; i < all_lights.size(); i++) {
             auto light = all_lights[i];
             if (light->getType() == LightType::Point) {
@@ -148,11 +159,11 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
         lightingShader.getPtr()->setMat4("view", camera->GetViewMatrix());
         // light properties
         lightingShader.getPtr()->setVec3("viewPos", camera->Position);
-        lightingShader.getPtr()->setVec3("lightPos", scene_->GetMainDirectionalLight()->getDirection()*(-10.0f));
-        lightingShader.getPtr()->setMat4("lightSpaceMatrix", scene_->GetMainDirectionalLight()->LightSpaceMatrix);
-        lightingShader.getPtr()->setVec3("light.direction", scene_->GetMainDirectionalLight()->getDirection());
-        lightingShader.getPtr()->setVec3("light.color", scene_->GetMainDirectionalLight()->getColor());
-        lightingShader.getPtr()->setFloat("light.intensity", scene_->GetMainDirectionalLight()->getIntensity());
+        lightingShader.getPtr()->setVec3("lightPos", mainLight->getDirection()*(-10.0f));
+        lightingShader.getPtr()->setMat4("lightSpaceMatrix", mainLight->LightSpaceMatrix);
+        lightingShader.getPtr()->setVec3("light.direction", mainLight->getDirection());
+        lightingShader.getPtr()->setVec3("light.color", mainLight->getColor());
+        lightingShader.getPtr()->setFloat("light.intensity", mainLight->getIntensity());
         lightingShader.getPtr()->setVec3("ambient", 0.3f, 0.3f, 0.3f);
         lightingShader.getPtr()->setVec3("diffuse", 0.6f, 0.6f, 0.6f);
         lightingShader.getPtr()->setVec3("specular", 1.0f, 1.0f, 1.0f);
@@ -162,9 +173,9 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
         lightingShader.getPtr()->setBool("isGlass", false);
         lightingShader.getPtr()->setInt("baseTexture", 0);
         lightingShader.getPtr()->setInt("shadowMap", 1);
-        renderContext->bindTexture(scene_->GetMainDirectionalLight()->getShadow()->depthMap->id, 1);
-        for (int i = 1; i<scene_->lights.size(); i++) {
-            PointLight* light = dynamic_cast<PointLight*>(scene_->lights[i]);
+        renderContext->bindTexture(mainLight->getShadow()->depthMap->id, 1);
+        for (int i = 1; i<scene.lights.size(); i++) {
+            PointLight* light = dynamic_cast<PointLight*>(scene.lights[i]);
             lightingShader.getPtr()->setVec3(("point[" + std::to_string(i-1) + "].position").c_str(), light->getPosition());
             lightingShader.getPtr()->setVec3(("point[" + std::to_string(i - 1) + "].color").c_str(), light->getColor());
             lightingShader.getPtr()->setFloat(("point[" + std::to_string(i - 1) + "].intensity").c_str(), light->getIntensity());
@@ -176,10 +187,12 @@ void MeshRenderer::render(Camera* camera, RenderGraph& rg) {
         //render plane
         lightingShader.getPtr()->setMat4("model", glm::mat4(1.0));
         renderContext->bindVertexArray(planeVAO);
-        renderContext->bindTexture(floor->id, 0);
+        if (floor) {
+            renderContext->bindTexture(floor->id, 0);
+        }
         renderContext->drawArrays(0, 6);
 
-        scene_->RenderObject();
+        scene.RenderObject();
 
         renderContext->bindVertexArray(0);
         renderContext->endRendering();

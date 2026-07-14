@@ -19,7 +19,7 @@ public:
 		name = sceneName;
 		root = new GameObject(name);
 	};
-	~Scene() = default;
+	~Scene();
 	void addRenderable(Renderable* newMesh);
 	void storeObjectMeshes(GameObject* go);
 	void createModel(const std::string& modelPath);
@@ -62,6 +62,7 @@ public:
 	std::vector<Light*> lights;
 	DirectionLight* mainDirectionalLight = nullptr;
 	std::vector<GameObject*> renderableObjects;
+	std::vector<Model*> models;
 	std::string name = "scene";
 private:
 	

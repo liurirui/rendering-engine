@@ -1,7 +1,9 @@
 #pragma once
 
 #ifndef RenderGraph_h
+#define RenderGraph_h
 
+#include <memory>
 #include <vector>
 #include"RenderGraphPass.h"
 
@@ -18,7 +20,7 @@ public:
     RenderGraph();
     virtual ~RenderGraph();
 
-    std::vector<RenderGraphPass*> passes;
+    std::vector<std::unique_ptr<RenderGraphPass>> passes;
 
     void execute(RenderContext* renderContext);
 

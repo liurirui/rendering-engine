@@ -18,8 +18,9 @@ PostProcessRenderer::PostProcessRenderer() {
     CartoonShader = TRefCountPtr<Shader>(new Shader(Vert_quad, Frag_cartoon));
     RippleShader = TRefCountPtr<Shader>(new Shader(Vert_quad, Frag_ripple));
 
-    lastTexture = RenderContext::getInstance()->createTexture2D(TextureUsage::RenderTarget, TextureFormat::RGBA32F, RenderContext::getInstance()->windowsWidth,
+    historySeedTexture = RenderContext::getInstance()->createTexture2D(TextureUsage::RenderTarget, TextureFormat::RGBA32F, RenderContext::getInstance()->windowsWidth,
         RenderContext::getInstance()->windowsHeight);
+    lastTexture = historySeedTexture;
 
     //set HightLightFramebuffer's Texture Attachments
     SamplerInfo bloomSampler;
@@ -127,7 +128,7 @@ PostProcessRenderer::PostProcessRenderer() {
 
 }
 
-void PostProcessRenderer::render(RenderGraph& rg, FrameBufferInfo* sceneFBO) {
+void PostProcessRenderer::render(RenderGraph& rg, FrameBufferInfo* sceneFBO, int effectNo) {
     ////Bloom
     const char* bloomPassName = "bloomPass";
     rg.addPass(bloomPassName, sceneFBO, [this, sceneFBO](RenderContext* renderContext) {
@@ -190,12 +191,18 @@ void PostProcessRenderer::render(RenderGraph& rg, FrameBufferInfo* sceneFBO) {
         bloomTexture = BloomFramebuffer.colorAttachments[0].texture;
         renderContext->endRendering();
         });
+
+    if (effectNo == 1) {
+        return;
+    }
     
     //Radial Blur
-    PostProcessRenderer_graphicsPipeline.shader = RadialBlurShader.getPtr();
-    const char* RadialPassName = "RadialPass";
-    rg.addPass(RadialPassName, bloomTexture, [this](RenderContext* renderContext) {
+    if (effectNo == 2) {
+        PostProcessRenderer_graphicsPipeline.shader = RadialBlurShader.getPtr();
+        const char* RadialPassName = "RadialPass";
+        rg.addPass(RadialPassName, bloomTexture, [this](RenderContext* renderContext) {
         //Radial Blur
+        PostProcessRenderer_graphicsPipeline.shader = RadialBlurShader.getPtr();
         renderContext->beginRendering(RadialFramebuffer);
         renderContext->bindPipeline(PostProcessRenderer_graphicsPipeline);
         int errorCode = glGetError();
@@ -208,12 +215,16 @@ void PostProcessRenderer::render(RenderGraph& rg, FrameBufferInfo* sceneFBO) {
         renderContext->bindVertexArray(quadVAO);
         renderContext->drawArrays(0, 6);
         renderContext->endRendering();
-    });
+        });
+        return;
+    }
 
     //Motion Blur
-    const char* MotionPassName = "MotionPass";
-    PostProcessRenderer_graphicsPipeline.shader = MotionBlurShader.getPtr();
-    rg.addPass(MotionPassName, bloomTexture, [this](RenderContext* renderContext) {
+    if (effectNo == 3) {
+        const char* MotionPassName = "MotionPass";
+        PostProcessRenderer_graphicsPipeline.shader = MotionBlurShader.getPtr();
+        rg.addPass(MotionPassName, bloomTexture, [this](RenderContext* renderContext) {
+        PostProcessRenderer_graphicsPipeline.shader = MotionBlurShader.getPtr();
         NowFramebuffer = useFramebufferA ? &MotionFramebufferA: &MotionFramebufferB;
         if (firstRender) {
             lastTexture = bloomTexture;
@@ -233,13 +244,18 @@ void PostProcessRenderer::render(RenderGraph& rg, FrameBufferInfo* sceneFBO) {
         renderContext->drawArrays(0, 6);
         renderContext->endRendering();
         useFramebufferA = !useFramebufferA;
-    });
+        });
+        return;
+    }
 
 
     //Cartoon effect
-    const char* CartoonPassName = "CartoonPass";
-    rg.addPass(CartoonPassName, bloomTexture, [this](RenderContext* renderContext) {
+    if (effectNo == 4) {
+        const char* CartoonPassName = "CartoonPass";
+        rg.addPass(CartoonPassName, bloomTexture, [this](RenderContext* renderContext) {
+        PostProcessRenderer_graphicsPipeline.shader = CartoonShader.getPtr();
         renderContext->beginRendering(CartoonFramebuffer);
+        renderContext->bindPipeline(PostProcessRenderer_graphicsPipeline);
         CartoonShader.getPtr()->use();
        int errorCode = glGetError(); 
         renderContext->bindVertexArray(quadVAO);
@@ -248,12 +264,17 @@ void PostProcessRenderer::render(RenderGraph& rg, FrameBufferInfo* sceneFBO) {
         renderContext->drawArrays(0, 6);
         renderContext->endRendering();
         });
+        return;
+    }
 
     //Ripple effect
-    const char* RipplePassName = "RipplePass";
-    rg.addPass(RipplePassName, bloomTexture, [this](RenderContext* renderContext) {
+    if (effectNo == 5) {
+        const char* RipplePassName = "RipplePass";
+        rg.addPass(RipplePassName, bloomTexture, [this](RenderContext* renderContext) {
         //Radial Blur
+        PostProcessRenderer_graphicsPipeline.shader = RippleShader.getPtr();
         renderContext->beginRendering(RippleFramebuffer);
+        renderContext->bindPipeline(PostProcessRenderer_graphicsPipeline);
         int errorCode = glGetError();
         RippleShader.getPtr()->use();
         errorCode = glGetError();
@@ -268,6 +289,7 @@ void PostProcessRenderer::render(RenderGraph& rg, FrameBufferInfo* sceneFBO) {
         renderContext->drawArrays(0, 6);
         renderContext->endRendering();
         });
+    }
 
    
 }
@@ -276,7 +298,7 @@ unsigned int PostProcessRenderer::getTargetColorTextureID(int  attachment, int e
     switch (effectNo) {
     case 1:  useFrameBufferInfo = &BloomFramebuffer;   break;
     case 2:  useFrameBufferInfo = &RadialFramebuffer;  break;
-    case 3:  useFrameBufferInfo = &MotionFramebufferB; break;
+    case 3:  useFrameBufferInfo = NowFramebuffer ? NowFramebuffer : &MotionFramebufferA; break;
     case 4:  useFrameBufferInfo = &CartoonFramebuffer; break;
     case 5:  useFrameBufferInfo = &RippleFramebuffer;  break;
     }
@@ -287,7 +309,18 @@ unsigned int PostProcessRenderer::getTargetColorTextureID(int  attachment, int e
 }
 
 PostProcessRenderer::~PostProcessRenderer() {
-
+    delete historySeedTexture;
+    delete fboBrightTexture;
+    for (int i = 0; i < bloomLevel; i++) {
+        delete fboUpSampleColorTexture[i];
+        delete fboDownSampleColorTexture[i];
+    }
+    delete fboRadialTexture;
+    delete fboMotionTextureA;
+    delete fboMotionTextureB;
+    delete fboBloomTexture;
+    delete fboCartoonTexture;
+    delete fboRippleTexture;
 }
 
 
