@@ -371,6 +371,7 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
     std::string texturepath = rootPath + "/resources/textures/background.jpg";
     
     Scene* scene = new Scene("scene");
+    scene->setAssetManager(assetManager);
     scene->Start();
     scene->AddLight(LightType::Direction, glm::vec3(-0.5f, -0.8f, -0.5f), glm::vec3(2.0f, 2.0f, 2.0f), 1.0f);
     scene->AddLight(LightType::Point, glm::vec3(0.0f, 6.0f, 5.0f), glm::vec3(6.0f, 0.0f, 0.0f), 0.4f);
@@ -481,7 +482,7 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
             if (ImGuiFileDialog::Instance()->Display("ChooseTextureDlgKey")) {
                 if (ImGuiFileDialog::Instance()->IsOk()) {
                     selectedFilePath = ImGuiFileDialog::Instance()->GetFilePathName();
-                    renderer->getMeshRenderer().setFloorTexture(assetManager->loadTexture2D(selectedFilePath));
+                    renderer->getMeshRenderer().setFloorTexture(assetManager->loadTexture2D(selectedFilePath).get());
                 }
                 ImGuiFileDialog::Instance()->Close();
             }

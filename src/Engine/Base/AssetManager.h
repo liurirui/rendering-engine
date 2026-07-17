@@ -1,9 +1,9 @@
-#pragma once
+﻿#pragma once
 
 #include "Constants.h"
 #include <memory>
 #include <string>
-#include <vector>
+#include <unordered_map>
 
 NAMESPACE_START
 
@@ -17,12 +17,13 @@ public:
     const std::string& getRootPath() const { return rootPath_; }
     std::string resolvePath(const std::string& relativePath) const;
 
-    Texture2D* loadTexture2D(const std::string& relativePath);
+    std::shared_ptr<Texture2D> loadTexture2D(const std::string& path);
+    std::shared_ptr<Texture2D> loadEmbeddedTexture2D(const std::string& key, const unsigned char* encodedData, int dataSize);
 
 private:
     RenderContext& renderContext_;
     std::string rootPath_;
-    std::vector<std::unique_ptr<Texture2D>> textures_;
+    std::unordered_map<std::string, std::shared_ptr<Texture2D>> textureCache_;
 };
 
 NAMESPACE_END

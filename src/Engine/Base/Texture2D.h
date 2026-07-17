@@ -121,6 +121,8 @@ public:
     // ------------------------------------------------------------------------
     Texture2D(const char* path);
 
+    Texture2D(const unsigned char* encodedData, int dataSize);
+
     Texture2D(const TextureUsage & usage, const TextureFormat & textureFormat, SamplerInfo sampler, const int width, const int height, const unsigned char* data = nullptr);
 
     void initTexture(const TextureUsage& usage, const TextureFormat& textureFormat, const int width, const int height, const unsigned char* data = nullptr);

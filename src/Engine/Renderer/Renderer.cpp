@@ -13,7 +13,7 @@ NAMESPACE_START
 Renderer::Renderer(RenderContext& renderContext, AssetManager& assetManager)
     : renderContext_(renderContext), assetManager_(assetManager) {
     meshRenderer_.reset(new MeshRenderer());
-    meshRenderer_->setFloorTexture(assetManager_.loadTexture2D("resources/textures/wood.png"));
+    meshRenderer_->setFloorTexture(assetManager_.loadTexture2D("resources/textures/wood.png").get());
     postProcessRenderer_.reset(new PostProcessRenderer());
 }
 

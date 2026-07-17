@@ -1,229 +1,218 @@
-#include "Model.h"
-#include<stb_image.h>
-#include<RHI/RenderContext.h>
-#include"Texture2D.h"
-#include"Renderable.h"
+﻿#include "Model.h"
+#include "AssetManager.h"
+#include <RHI/RenderContext.h>
+#include "Renderable.h"
 #include <algorithm>
 
 NAMESPACE_START
-Model::Model(string const& path, bool gamma ) : gammaCorrection(gamma)
-{
+
+static std::string normalizePath(std::string path) {
+    std::replace(path.begin(), path.end(), '\\', '/');
+    return path;
+}
+
+Model::Model(string const& path, bool gamma)
+    : Model(path, nullptr, gamma) {
+}
+
+Model::Model(string const& path, AssetManager* assetManager, bool gamma)
+    : gammaCorrection(gamma), assetManager(assetManager) {
     model_go = loadModel(path);
 }
+
 Model::~Model() {
     delete transform;
 }
 
-GameObject* Model::loadModel(string const& path)
-{
-    // read file via ASSIMP
+GameObject* Model::loadModel(string const& path) {
     Assimp::Importer importer;
-    const aiScene* scene = importer.ReadFile(path, aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_FlipUVs | aiProcess_CalcTangentSpace);
-    // check for errors
-    if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) // if is Not Zero
-    {
+    const unsigned int importFlags = aiProcess_Triangulate |
+        aiProcess_GenSmoothNormals |
+        aiProcess_FlipUVs |
+        aiProcess_CalcTangentSpace |
+        aiProcess_JoinIdenticalVertices |
+        aiProcess_ImproveCacheLocality |
+        aiProcess_OptimizeMeshes;
+
+    const aiScene* scene = importer.ReadFile(path, importFlags);
+    if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
         cout << "ERROR::ASSIMP:: " << importer.GetErrorString() << endl;
-        string a = importer.GetErrorString();
         return nullptr;
     }
-    // retrieve the directory path of the filepath
+
     size_t lastSlash = path.find_last_of("/\\");
     if (lastSlash != string::npos) {
-        directory = path.substr(0, lastSlash);
-    } else {
+        directory = normalizePath(path.substr(0, lastSlash));
+    }
+    else {
         directory = "";
     }
-    // Normalize directory separators to forward slashes (Windows accepts both)
-    std::replace(directory.begin(), directory.end(), '\\', '/');
 
-    // process ASSIMP's root node recursively
     return processNode(scene->mRootNode, scene);
 }
 
-GameObject* Model::processNode(aiNode* node, const aiScene* scene)
-{
+GameObject* Model::processNode(aiNode* node, const aiScene* scene) {
     GameObject* go = new GameObject(node->mName.C_Str());
-     
-    // process each mesh located at the current node
-    for (unsigned int i = 0; i < node->mNumMeshes; i++)
-    {
-        // the node object only contains indices to index the actual objects in the scene. 
-        // the scene contains all the data, node is just to keep stuff organized (like relations between nodes).
+
+    for (unsigned int i = 0; i < node->mNumMeshes; i++) {
         aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
         go->meshes.emplace_back(processMesh(mesh, scene));
     }
-    // after we've processed all of the meshes (if any) we then recursively process each of the children nodes
-    for (unsigned int i = 0; i < node->mNumChildren; i++)
-    {
-        go->addChildren(processNode(node->mChildren[i], scene));
+
+    for (unsigned int i = 0; i < node->mNumChildren; i++) {
+        GameObject* child = processNode(node->mChildren[i], scene);
+        if (child) {
+            go->addChildren(child);
+        }
     }
     return go;
 }
 
-Mesh* Model::processMesh(aiMesh* mesh, const aiScene* scene)
-{
-    Mesh* new_Mesh = new Mesh();
-    new_Mesh->hasNormals = (mesh->mNormals != nullptr);
-    new_Mesh->hasTexCoords = (mesh->mTextureCoords[0] != nullptr);
-    new_Mesh->hasTangents = (mesh->mTangents != nullptr);
+Mesh* Model::processMesh(aiMesh* mesh, const aiScene* scene) {
+    Mesh* newMesh = new Mesh();
+    newMesh->hasNormals = (mesh->mNormals != nullptr);
+    newMesh->hasTexCoords = (mesh->mTextureCoords[0] != nullptr);
+    newMesh->hasTangents = (mesh->mTangents != nullptr && mesh->mBitangents != nullptr);
 
-    new_Mesh->name = mesh->mName.C_Str();
-    for (unsigned int i = 0; i < mesh->mNumVertices; i++){
+    newMesh->name = mesh->mName.C_Str();
+    for (unsigned int i = 0; i < mesh->mNumVertices; i++) {
         Mesh::Vertex vertex;
         vertex.position = glm::vec3(mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z);
-        vertex.normal = glm::vec3(mesh->mNormals[i].x, mesh->mNormals[i].y, mesh->mNormals[i].z);
-        if (mesh->mTextureCoords[0]) {
-            vertex.texCoords = glm::vec2(mesh->mTextureCoords[0][i].x, mesh->mTextureCoords[0][i].y);          
-        }
-        else {
-            vertex.texCoords = glm::vec2(0.0f);         
-        }
-        if (mesh->mTangents) {
+        vertex.normal = newMesh->hasNormals ? glm::vec3(mesh->mNormals[i].x, mesh->mNormals[i].y, mesh->mNormals[i].z) : glm::vec3(0.0f, 1.0f, 0.0f);
+        vertex.texCoords = newMesh->hasTexCoords ? glm::vec2(mesh->mTextureCoords[0][i].x, mesh->mTextureCoords[0][i].y) : glm::vec2(0.0f);
+        if (newMesh->hasTangents) {
             vertex.tangent = glm::vec3(mesh->mTangents[i].x, mesh->mTangents[i].y, mesh->mTangents[i].z);
+            vertex.bitangent = glm::vec3(mesh->mBitangents[i].x, mesh->mBitangents[i].y, mesh->mBitangents[i].z);
         }
-        if (mesh->mBitangents) {
-            vertex.bitangent = glm::vec3(mesh->mBitangents[i].x, mesh->mBitangents[i].y, mesh->mBitangents[i].z
-            );
-        }
-        new_Mesh->vertices.emplace_back(vertex);
+        newMesh->vertices.emplace_back(vertex);
     }
+
     for (unsigned int i = 0; i < mesh->mNumFaces; i++) {
         aiFace face = mesh->mFaces[i];
         for (unsigned int j = 0; j < face.mNumIndices; j++) {
-            new_Mesh->indices.push_back(face.mIndices[j]);
+            newMesh->indices.push_back(face.mIndices[j]);
         }
     }
+
     if (mesh->mMaterialIndex >= 0) {
         aiMaterial* mat = scene->mMaterials[mesh->mMaterialIndex];
-        new_Mesh->material = loadMaterial(mat);
+        newMesh->material = loadMaterial(mat, scene);
     }
-    new_Mesh->setupMesh(); // 生成 VAO/VBO/EBO
-    return new_Mesh;
+    else {
+        newMesh->material = new Material();
+        newMesh->material->generateShader();
+    }
+
+    newMesh->setupMesh();
+    return newMesh;
 }
 
-Material* Model::loadMaterial(aiMaterial* mat) {
+std::shared_ptr<Texture2D> Model::loadMaterialTexture(aiMaterial* mat, const aiScene* scene, aiTextureType type, unsigned int index, const std::string& semanticName) {
+    aiString texturePath;
+    if (mat->GetTexture(type, index, &texturePath) != AI_SUCCESS) {
+        return nullptr;
+    }
+
+    std::string rawPath = normalizePath(texturePath.C_Str());
+    if (rawPath.empty()) {
+        return nullptr;
+    }
+
+    if (const aiTexture* embeddedTexture = scene->GetEmbeddedTexture(rawPath.c_str())) {
+        if (embeddedTexture->mHeight == 0) {
+            const unsigned char* data = reinterpret_cast<const unsigned char*>(embeddedTexture->pcData);
+            int dataSize = static_cast<int>(embeddedTexture->mWidth);
+            std::string key = "embedded:" + directory + ":" + rawPath + ":" + semanticName;
+            if (assetManager) {
+                return assetManager->loadEmbeddedTexture2D(key, data, dataSize);
+            }
+            auto it = localTextureCache.find(key);
+            if (it != localTextureCache.end()) {
+                return it->second;
+            }
+            std::shared_ptr<Texture2D> texture(new Texture2D(data, dataSize));
+            localTextureCache[key] = texture;
+            return texture;
+        }
+        cout << "WARN::ASSIMP:: unsupported uncompressed embedded texture: " << rawPath << endl;
+        return nullptr;
+    }
+
+    std::string filename = rawPath;
+    if (!(filename.size() > 1 && filename[1] == ':') && !directory.empty()) {
+        filename = directory + "/" + filename;
+    }
+    filename = normalizePath(filename);
+
+    if (assetManager) {
+        return assetManager->loadTexture2D(filename);
+    }
+
+    auto it = localTextureCache.find(filename);
+    if (it != localTextureCache.end()) {
+        return it->second;
+    }
+    std::shared_ptr<Texture2D> texture(new Texture2D(filename.c_str()));
+    localTextureCache[filename] = texture;
+    return texture;
+}
+
+Material* Model::loadMaterial(aiMaterial* mat, const aiScene* scene) {
     Material* material = new Material();
 
-    // Load diffuse maps
-    for (unsigned int i = 0; i < mat->GetTextureCount(aiTextureType_DIFFUSE); i++) {
-        aiString str;
-        mat->GetTexture(aiTextureType_DIFFUSE, i, &str);
-        string filename = directory.empty() ? string(str.C_Str()) : directory + "/" + string(str.C_Str());
-        // Normalize path separators to forward slashes
-        std::replace(filename.begin(), filename.end(), '\\', '/');
-        auto it = s_TextureCache.find(filename);
-        if (it != s_TextureCache.end()) {
-            material->setDiffuseMap((it->second).lock());  // 命中缓存
-        }
-        else {
-            auto texture = std::make_shared<Texture2D>(filename.c_str());
-            material->setDiffuseMap(texture);
-            s_TextureCache[filename] = texture;
-        }
+    if (auto texture = loadMaterialTexture(mat, scene, aiTextureType_BASE_COLOR, 0, "baseColor")) {
+        material->setDiffuseMap(texture);
+    }
+    else if (auto texture = loadMaterialTexture(mat, scene, aiTextureType_DIFFUSE, 0, "diffuse")) {
+        material->setDiffuseMap(texture);
     }
 
-    // Load specular maps
-    for (unsigned int i = 0; i < mat->GetTextureCount(aiTextureType_SPECULAR); i++) {
-        aiString str;
-        mat->GetTexture(aiTextureType_SPECULAR, i, &str);
-        string filename = directory.empty() ? string(str.C_Str()) : directory + "/" + string(str.C_Str());
-        // Normalize path separators to forward slashes
-        std::replace(filename.begin(), filename.end(), '\\', '/');
-        auto it = s_TextureCache.find(filename);
-        if (it != s_TextureCache.end()) {
-            material->setSpecularMap((it->second).lock());  // 命中缓存
-        }
-        else {
-            auto texture = std::make_shared<Texture2D>(filename.c_str());
-            material->setSpecularMap(texture);
-            s_TextureCache[filename] = texture;
-        }
+    if (auto texture = loadMaterialTexture(mat, scene, aiTextureType_NORMALS, 0, "normal")) {
+        material->setNormalMap(texture);
+    }
+    else if (auto texture = loadMaterialTexture(mat, scene, aiTextureType_HEIGHT, 0, "heightAsNormal")) {
+        material->setNormalMap(texture);
     }
 
-    // Load normal maps
-    for (unsigned int i = 0; i < mat->GetTextureCount(aiTextureType_HEIGHT); i++) {
-        aiString str;
-        mat->GetTexture(aiTextureType_HEIGHT, i, &str);
-        string filename = directory.empty() ? string(str.C_Str()) : directory + "/" + string(str.C_Str());
-        // Normalize path separators to forward slashes
-        std::replace(filename.begin(), filename.end(), '\\', '/');
-        auto it = s_TextureCache.find(filename);
-        if (it != s_TextureCache.end()) {
-            material->setNormalMap((it->second).lock());  // 命中缓存
-        }
-        else {
-            auto texture = std::make_shared<Texture2D>(filename.c_str());
-            material->setNormalMap(texture);
-            s_TextureCache[filename] = texture;
-        }
+    if (auto texture = loadMaterialTexture(mat, scene, aiTextureType_SPECULAR, 0, "specular")) {
+        material->setSpecularMap(texture);
     }
 
-    // 金属度贴图
-    for (unsigned int i = 0; i < mat->GetTextureCount(aiTextureType_METALNESS); i++) {
-        aiString str;
-        mat->GetTexture(aiTextureType_METALNESS, i, &str);
-        string filename = directory.empty() ? string(str.C_Str()) : directory + "/" + string(str.C_Str());
-        // Normalize path separators to forward slashes
-        std::replace(filename.begin(), filename.end(), '\\', '/');
-        auto it = s_TextureCache.find(filename);
-        if (it != s_TextureCache.end()) {
-            material->setMetallicMap((it->second).lock());  // 命中缓存
-        }
-        else {
-            auto texture = std::make_shared<Texture2D>(filename.c_str());
-            material->setMetallicMap(texture);
-            s_TextureCache[filename] = texture;
-        }
+    if (auto texture = loadMaterialTexture(mat, scene, aiTextureType_METALNESS, 0, "metallic")) {
+        material->setMetallicMap(texture);
     }
 
-    // 金属度贴图
-    for (unsigned int i = 0; i < mat->GetTextureCount(aiTextureType_DIFFUSE_ROUGHNESS); i++) {
-        aiString str;
-        mat->GetTexture(aiTextureType_DIFFUSE_ROUGHNESS, i, &str);
-        string filename = directory.empty() ? string(str.C_Str()) : directory + "/" + string(str.C_Str());
-        // Normalize path separators to forward slashes
-        std::replace(filename.begin(), filename.end(), '\\', '/');
-        auto it = s_TextureCache.find(filename);
-        if (it != s_TextureCache.end()) {
-            material->setRoughnessMap((it->second).lock());  // 命中缓存
-        }
-        else {
-            auto texture = std::make_shared<Texture2D>(filename.c_str());
-            material->setRoughnessMap(texture);
-            s_TextureCache[filename] = texture;
-        }
+    if (auto texture = loadMaterialTexture(mat, scene, aiTextureType_DIFFUSE_ROUGHNESS, 0, "roughness")) {
+        material->setRoughnessMap(texture);
     }
 
-    // 金属度贴图
-    for (unsigned int i = 0; i < mat->GetTextureCount(aiTextureType_AMBIENT_OCCLUSION); i++) {
-        aiString str;
-        mat->GetTexture(aiTextureType_AMBIENT_OCCLUSION, i, &str);
-        string filename = directory.empty() ? string(str.C_Str()) : directory + "/" + string(str.C_Str());
-        std::replace(filename.begin(), filename.end(), '\\', '/');
-        auto it = s_TextureCache.find(filename);
-        if (it != s_TextureCache.end()) {
-            material->setAoMap((it->second).lock());  // 命中缓存
-        }
-        else {
-            auto texture = std::make_shared<Texture2D>(filename.c_str());
-            material->setAoMap(texture);
-            s_TextureCache[filename] = texture;
-        }
+    if (auto texture = loadMaterialTexture(mat, scene, aiTextureType_AMBIENT_OCCLUSION, 0, "ao")) {
+        material->setAoMap(texture);
     }
 
-    // Load other properties if needed
-   /* aiColor3D color(1.f, 1.f, 1.f);
-    mat->Get(AI_MATKEY_COLOR_DIFFUSE, color);
-    material->diffuseColor = glm::vec3(color.r, color.g, color.b);
-    
-   
+    if (auto texture = loadMaterialTexture(mat, scene, aiTextureType_EMISSIVE, 0, "emissive")) {
+        material->setEmissiveMap(texture);
+    }
 
-    mat->Get(AI_MATKEY_COLOR_SPECULAR, color);
-    material->specularColor = glm::vec3(color.r, color.g, color.b);
+    aiColor3D color(1.0f, 1.0f, 1.0f);
+    if (mat->Get(AI_MATKEY_COLOR_DIFFUSE, color) == AI_SUCCESS) {
+        material->diffuseColor = glm::vec3(color.r, color.g, color.b);
+    }
+    if (mat->Get(AI_MATKEY_COLOR_SPECULAR, color) == AI_SUCCESS) {
+        material->specularColor = glm::vec3(color.r, color.g, color.b);
+    }
+    if (mat->Get(AI_MATKEY_COLOR_EMISSIVE, color) == AI_SUCCESS) {
+        material->emissiveColor = glm::vec3(color.r, color.g, color.b);
+    }
 
-    float shininess;
-    mat->Get(AI_MATKEY_SHININESS, shininess);
-    material->shininess = shininess;*/
+    float value = 0.0f;
+    if (mat->Get(AI_MATKEY_SHININESS, value) == AI_SUCCESS) {
+        material->shininess = value;
+    }
+    if (mat->Get(AI_MATKEY_OPACITY, value) == AI_SUCCESS) {
+        material->opacity = value;
+    }
+
     material->generateShader();
     materials.push_back(material);
     return material;

@@ -39,7 +39,7 @@ void Scene::storeObjectMeshes(GameObject* go) {
 }
 
 void Scene::createModel(const std::string& modelPath){
-	Model* nowModel= new Model(modelPath);
+	Model* nowModel= new Model(modelPath, assetManager);
 	if (!nowModel->model_go) {
 		delete nowModel;
 		return;

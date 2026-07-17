@@ -13,6 +13,7 @@
 #include "Base/ShaderCode.h"
 #include"Camera.h"
 NAMESPACE_START
+class AssetManager;
 class Scene {
 public:
 	Scene(const std::string& sceneName) {
@@ -22,6 +23,7 @@ public:
 	~Scene();
 	void addRenderable(Renderable* newMesh);
 	void storeObjectMeshes(GameObject* go);
+	void setAssetManager(AssetManager* manager) { assetManager = manager; }
 	void createModel(const std::string& modelPath);
 	void updateMeshTransform();
 
@@ -65,7 +67,7 @@ public:
 	std::vector<Model*> models;
 	std::string name = "scene";
 private:
-	
+	AssetManager* assetManager = nullptr;
 };
 
 NAMESPACE_END

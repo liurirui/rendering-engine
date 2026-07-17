@@ -1,4 +1,4 @@
-#include "AssetManager.h"
+﻿#include "AssetManager.h"
 
 #include "Texture2D.h"
 #include <RHI/RenderContext.h>
@@ -28,9 +28,27 @@ std::string AssetManager::resolvePath(const std::string& relativePath) const {
     return rootPath_ + "/" + normalized;
 }
 
-Texture2D* AssetManager::loadTexture2D(const std::string& relativePath) {
-    textures_.push_back(std::unique_ptr<Texture2D>(renderContext_.loadTexture2D(resolvePath(relativePath).c_str())));
-    return textures_.back().get();
+std::shared_ptr<Texture2D> AssetManager::loadTexture2D(const std::string& path) {
+    std::string resolvedPath = resolvePath(path);
+    auto it = textureCache_.find(resolvedPath);
+    if (it != textureCache_.end()) {
+        return it->second;
+    }
+
+    std::shared_ptr<Texture2D> texture(renderContext_.loadTexture2D(resolvedPath.c_str()));
+    textureCache_[resolvedPath] = texture;
+    return texture;
+}
+
+std::shared_ptr<Texture2D> AssetManager::loadEmbeddedTexture2D(const std::string& key, const unsigned char* encodedData, int dataSize) {
+    auto it = textureCache_.find(key);
+    if (it != textureCache_.end()) {
+        return it->second;
+    }
+
+    std::shared_ptr<Texture2D> texture(new Texture2D(encodedData, dataSize));
+    textureCache_[key] = texture;
+    return texture;
 }
 
 NAMESPACE_END

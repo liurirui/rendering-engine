@@ -106,7 +106,7 @@ GLint getAddressMode(const SamplerAddressMode& addressMode) {
 Texture2D::Texture2D(const char* path) {
 
     int width, height, nrChannels;
-    unsigned char* data = stbi_load(path, &width, &height, &nrChannels, 0);
+    unsigned char* data = stbi_load(path, &width, &height, &nrChannels, STBI_rgb_alpha);
     if (!data) {
         width = 4;
         height = 4;
@@ -119,12 +119,27 @@ Texture2D::Texture2D(const char* path) {
         if (nrChannels == 3) {
             this->initTexture(TextureUsage::ShaderRead, TextureFormat::RGB, width, height, data);
         }
-        delete[] data;
+        stbi_image_free(data);
     }
     
 
 };
 
+
+Texture2D::Texture2D(const unsigned char* encodedData, int dataSize) {
+
+    int width, height, nrChannels;
+    unsigned char* data = stbi_load_from_memory(encodedData, dataSize, &width, &height, &nrChannels, STBI_rgb_alpha);
+    if (!data) {
+        width = 4;
+        height = 4;
+        this->initTexture(TextureUsage::ShaderRead, TextureFormat::RGBA, width, height, transparentData);
+    }
+    else {
+        this->initTexture(TextureUsage::ShaderRead, TextureFormat::RGBA, width, height, data);
+        stbi_image_free(data);
+    }
+};
 Texture2D::Texture2D(const TextureUsage& usage, const TextureFormat& textureFormat, SamplerInfo samplerInfo, const int width, const int height, const unsigned char* data) {
     this->sampler = samplerInfo;
     this->initTexture(usage, textureFormat, width, height, data);
