@@ -193,9 +193,10 @@ cmake --build build --config Debug
 - `Scene` 现在开始承担对象生命周期，但仍使用裸指针；后续建议继续迁移到 `std::unique_ptr`。
 - `main.cpp` 仍负责最终屏幕 blit，后续可以抽成 `PresentPass`。
 - `BasePassRenderer` 仍保留较多实验代码，后续应决定保留、删除或重构。
-## 未提交 - 模型与材质资源加载流程调整
+## e6cec59 - 完善模型与材质资源加载流程
 
-- 改动时间：2026-07-17
+- 提交时间：2026-07-17 17:15:14 +0800
+- 完整提交：`e6cec596bd425fd90b75d2459e492015edcb4265`
 - 改动类型：资源管理 / 模型导入 / 材质贴图流程 / 架构演进
 
 ### 改动摘要
@@ -252,3 +253,179 @@ Scene::createModel(path)
 - GLB 的 uncompressed embedded texture 目前只提示不支持，常见 GLB 内嵌 PNG/JPEG 已覆盖。
 - PBR factor 的读取需要根据当前 Assimp 版本封装兼容宏；本次先加载 PBR 贴图通道。
 - 后续建议继续新增 `ModelAsset / MeshAsset / MaterialAsset`，让 `Scene` 只引用资源句柄，而不是直接拥有导入产物。
+
+## 待提交 - 重构模型资产与材质 Shader 绑定架构
+
+- 改动时间：2026-07-17
+- 建议提交标题：`重构模型资产与材质 Shader 绑定架构`
+- 改动类型：架构调整 / 资源缓存 / 材质系统 / 渲染流程整理
+
+### 改动摘要
+
+本次改动继续把项目往中小型渲染引擎方向推进：`Material` 不再直接持有 `Shader` 或执行 GL 绑定，模型导入结果拆成 `ModelAsset / MeshAsset / MaterialAsset`，`Scene` 只保存模型资产引用并实例化运行时 `GameObject`，同一路径模型通过 `AssetManager` 缓存，避免重复导入。
+
+### 具体改动
+
+1. `Material` 改为纯材质数据。
+
+- 移除 `Material` 内部的 `Shader` 成员、`generateShader()` 和 `setUniform()`。
+- 保留贴图、颜色、金属度、粗糙度、高光、透明度等材质属性。
+- 新增 `MaterialAsset`，用于承载可被 mesh 共享的材质资源数据。
+
+2. 新增模型资产拆分结构。
+
+- 新增 `AssetTypes.h`。
+- `MeshAsset` 保存 CPU 侧顶点、索引、顶点属性标记和材质引用。
+- `ModelNodeAsset` 保存模型节点层级和 mesh 索引。
+- `ModelAsset` 保存源路径、mesh 资产、material 资产和根节点。
+
+3. `Model` 改为资产导入器和实例化器。
+
+- `Model::loadAsset()` 负责用 Assimp 导入模型并生成 `ModelAsset`。
+- `Model::instantiate()` 负责从 `ModelAsset` 创建运行时 `GameObject / Mesh` 树。
+- 运行时 `Mesh` 复制 `MeshAsset` 的几何数据并引用 `MaterialAsset`。
+- 模型材质贴图继续通过 `AssetManager` 加载，支持外部贴图和 GLB embedded texture。
+
+4. `AssetManager` 增加模型缓存。
+
+- 新增 `loadModelAsset()`。
+- 新增 `modelCache_`，按解析后的路径缓存 `ModelAsset`。
+- 同一个 OBJ / FBX / GLB 路径重复加载时不会重复 Assimp 导入。
+
+5. `Scene` 不再直接拥有 `Model*` 导入对象。
+
+- `Scene::createModel()` 改为通过 `AssetManager::loadModelAsset()` 获取模型资产。
+- `Scene` 保存 `std::shared_ptr<ModelAsset>`，用于保持资产生命周期。
+- 运行时对象仍挂到 `root` 下，`renderableObjects` 仍作为当前阶段的渲染列表。
+
+6. 新增 `MaterialSystem`。
+
+- 新增 `Renderer/MaterialSystem.h/.cpp`。
+- `MaterialSystem` 负责在渲染时把 `Material / MaterialAsset` 绑定到指定 `Shader`。
+- 支持从指定 texture slot 开始绑定，避免覆盖 shadow map 等 pass 级纹理。
+- 为当前旧模型 shader 保留 `baseTexture` 兼容绑定，同时设置新材质 shader 使用的 `diffuseMap / normalMap / metallicMap / roughnessMap` 等 uniform。
+
+7. `MeshRenderer` 改为显式控制材质绑定时机。
+
+- shadow pass 调用 `Scene::DrawObjects(depthShader)`，只设置 model matrix，不绑定材质。
+- scene pass 由 `MeshRenderer` 遍历可渲染对象，根据 `MaterialAsset::shader` 选择 shader，再由 `MaterialSystem` 绑定材质，并从 slot 2 开始避开 `baseTexture`/`shadowMap` 的历史占用。
+
+### 架构影响
+
+新的模型渲染链路变为：
+
+```text
+Scene::createModel(path)
+  -> AssetManager::loadModelAsset(path)
+  -> Model::loadAsset(path)
+  -> ModelAsset / MeshAsset / MaterialAsset
+  -> Scene 保存 ModelAsset shared_ptr
+  -> Model::instantiate(ModelAsset)
+  -> GameObject / Mesh 引用 MaterialAsset
+  -> MeshRenderer 选择 pass shader
+  -> MeshRenderer 按 MaterialAsset::shader 选择 shader
+  -> MaterialSystem 绑定材质数据
+  -> Mesh::draw()
+```
+
+职责边界更清晰：
+
+- `Material`：只描述材质数据，不知道 Shader，不直接调 GL。
+- `MaterialSystem`：负责“材质数据如何绑定到当前 shader”。
+- `ModelAsset / MeshAsset / MaterialAsset`：保存导入后的资源数据。
+- `Model`：负责导入和从资产实例化运行时对象。
+- `AssetManager`：负责资源路径解析、贴图缓存、模型缓存。
+- `Scene`：负责场景对象树和资产引用，不再直接拥有导入器对象，也不参与材质绑定。
+- `MeshRenderer`：负责 pass 级渲染决策，决定阴影 pass 是否跳过材质绑定。
+
+### 验证情况
+
+已做：
+
+- 扫描旧 `mesh->material`、`Material::setUniform()`、`generateShader()` 调用，已清理核心旧材质绑定路径。
+- `git diff --check` 通过，仅有当前仓库行尾转换警告。
+- 检查 CMake：`Renderer/*.cpp` 和 `Base/*.cpp` 使用 glob，新文件会被纳入 engine target。
+
+未完成：
+
+- 当前环境暂未完成真实编译和运行验证。
+
+### 后续注意
+
+- 当前主渲染仍使用旧 `Fragmodel_lighting`，它主要识别 `baseTexture`/`shadowMap`；`MaterialSystem` 已做兼容，但完整 PBR/多贴图效果需要下一步切到统一材质 shader 或引入 shader variant。
+- `Scene` 仍使用裸指针管理 `GameObject / Mesh / Light`，后续应继续迁移到 `std::unique_ptr` 或 ECS/Handle。
+- `MeshAsset` 当前保存 CPU 几何数据，运行时 `Mesh` 每次实例化会重新创建 GPU buffer；后续可继续拆 `MeshAsset` 和 GPU `MeshResource`。
+- 模型缓存目前按解析后路径缓存，不包含导入参数差异；以后如果导入 flags 可配置，需要把 flags 纳入 cache key。
+### 追加改动：Shader 资源引用与渲染层按材质选 shader
+
+本轮继续清理材质和 shader 的职责边界，目标是接近 Unity/中小型渲染引擎常见模型：`MaterialAsset` 可以引用 shader 资源，但不拥有具体 `Shader` 对象，也不直接执行渲染。
+
+具体调整：
+
+1. 新增 `ShaderHandle / ShaderLibrary`。
+
+- 新增 `ShaderLibrary.h/.cpp`。
+- `ShaderHandle` 是轻量资源引用，只保存 shader 名称。
+- `ShaderLibrary` 统一创建和缓存内置 shader：`engine/default-lit`、`engine/depth-only`、`engine/light-debug`。
+- `AssetManager` 持有 `ShaderLibrary`，shader 生命周期进入资源系统。
+
+2. `MaterialAsset` 增加 shader 引用。
+
+- `MaterialAsset` 新增 `ShaderHandle shader`。
+- 默认材质使用 `engine/default-lit`。
+- 这使材质可以描述“使用哪个 shader”，但不会退回到 `Material` 直接持有 `Shader` 并调用 GL 的旧结构。
+
+3. `MeshRenderer` 改为按材质解析 shader。
+
+- `MeshRenderer` 构造函数改为接收 `AssetManager&`。
+- 默认 lit、depth、light debug shader 从 `AssetManager::getShaderLibrary()` 获取。
+- 主渲染 pass 遍历 `Scene::GetRenderableObjects()`，对每个 mesh 通过 `mesh->materialAsset->shader` 找到 shader。
+- 找到 shader 后由 `MeshRenderer` 设置 pass 级 uniform，由 `MaterialSystem` 绑定材质参数，最后提交 draw。
+
+4. `Scene` 不再参与材质绑定。
+
+- `Scene::RenderObject(...)` 改为 `Scene::DrawObjects(Shader&)`。
+- `Scene` 只负责对象列表和 transform，不再 include `MaterialSystem`。
+- 阴影 pass 使用 `DrawObjects(depthShader)`，主渲染 pass 由 `MeshRenderer` 自己按材质处理。
+
+5. `Shader` 补充 GL program 生命周期释放。
+
+- `Shader::ID` 默认初始化为 0。
+- 新增 `Shader::~Shader()`，析构时调用 `glDeleteProgram`。
+- 这是 shader 进入资源库托管后的必要清理。
+
+新的主渲染路径：
+
+```text
+MeshRenderer::render(scene)
+  -> scene.GetRenderableObjects()
+  -> mesh->materialAsset
+  -> materialAsset->shader
+  -> AssetManager::ShaderLibrary::get(shaderHandle)
+  -> MeshRenderer 设置相机/灯光/阴影等 pass uniform
+  -> MaterialSystem 绑定材质贴图和参数
+  -> Mesh::draw()
+```
+
+这次调整后的职责边界：
+
+- `MaterialAsset`：保存 shader 引用和材质参数。
+- `ShaderLibrary`：创建、缓存、管理 Shader 对象。
+- `AssetManager`：统一资源入口，持有 shader library / texture cache / model cache。
+- `Scene`：只关心场景对象和对象列表。
+- `MeshRenderer`：负责根据 pass 和材质选择 shader，并提交 draw。
+- `MaterialSystem`：负责把材质数据绑定到当前 shader。
+
+后续建议：
+
+- 把 `engine/default-lit` 替换成真正统一的材质 shader，消除当前 `baseTexture` 兼容逻辑。
+- 引入 `ShaderPass` 或 `Technique`，让一个 shader 资产能描述 Forward / Shadow / DepthOnly / GBuffer 等多个 pass。
+- 把 `GraphicsPipeline` 从临时结构升级成可缓存的 `PipelineState`，避免每个 mesh 反复拼 pipeline。
+### 追加改动：删除旧 BasePassRenderer 实验 pass
+
+本轮还清理了旧的 `BasePassRenderer`：
+
+- 从 `Example/main.cpp` 删除旧备用入口函数和 `BasePassRenderer` 注释残留。
+- 删除 `Renderer/BasePassRenderer.h/.cpp`。
+- 原因：该类已经不在新 `Renderer` 主流程中使用，并且保留旧式 `TRefCountPtr<Shader>`、直接资源路径、独立 pass 组织方式，继续保留会干扰当前架构方向。
+- 后续如需要 base pass，应基于 `Renderer + RenderGraph + AssetManager + MaterialSystem` 重新实现，而不是恢复旧类。

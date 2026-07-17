@@ -2,14 +2,14 @@
 
 #include"Constants.h"
 #include<vector>
-#include"Texture2D.h"
-#include"Material.h"
-
 #include<glm/vec3.hpp>
 #include<glm/vec2.hpp>
 #include<string>
+#include<memory>
 
 NAMESPACE_START
+
+class MaterialAsset;
 
     class Mesh
     {
@@ -43,7 +43,7 @@ NAMESPACE_START
         unsigned int vbo = 0;   // 顶点缓冲
         unsigned int ibo = 0;   // 索引缓冲
         std::string name;
-        Material* material = nullptr;
+        std::shared_ptr<MaterialAsset> materialAsset;
          
     };
 

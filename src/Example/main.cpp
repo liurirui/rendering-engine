@@ -13,7 +13,6 @@
 #include<Engine/Base/Light.h>
 #include <Engine/RHI/OpenGL/OpenGLRenderContext.h>
 #include<Engine/Renderer/RenderGraph/RenderGraph.h>
-#include<Engine/Renderer/BasePassRenderer.h>
 #include<Engine/Renderer/MeshRenderer.h>
 #include<Engine/Renderer/PostProcessRenderer.h>
 #include<Engine/Renderer/Renderer.h>
@@ -109,135 +108,6 @@ static std::string findProjectRoot()
 
     return ".";
 }
-
-//#include <direct.h>
-//int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR lpCmdLine, _In_ int nShowCmd)
-int asdasdasdsa(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR lpCmdLine, _In_ int nShowCmd)
-{
-
-    //char* path = NULL;
-    //path = _getcwd(NULL, 1);
-    //puts(path);
-    //delete path;
-
-    std::string rootPath = findProjectRoot();
-    // glfw: initialize and configure
-    // ------------------------------
-    glfwInit();
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-
-#ifdef __APPLE__
-    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
-#endif
-
-    // glfw window creation
-    // --------------------
-    GLFWwindow* window = glfwCreateWindow(SRC_WIDTH, SRC_HEIGHT, "RenderEngine", NULL, NULL);
-    if (window == NULL)
-    {
-        std::cout << "Failed to create GLFW window" << std::endl;
-        glfwTerminate();
-        return -1;
-    }
-    glfwMakeContextCurrent(window);
-    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
-    glfwSetCursorPosCallback(window, mouse_callback);
-    glfwSetScrollCallback(window, scroll_callback);
-
-    // tell GLFW to capture our mouse
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-
-    // glad: load all OpenGL function pointers
-    // ---------------------------------------
-    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
-    {
-        std::cout << "Failed to initialize GLAD" << std::endl;
-        return -1;
-    }
-
-    screenShader = new Shader(Vert_quad, Frag_quad);
-    screenShader->use();
-    screenShader->setInt("screenTexture", 0);
-    int errorCode = glGetError();
-    // screen quad VAO
-    unsigned int quadVAO, quadVBO;
-    glGenVertexArrays(1, &quadVAO);
-    glGenBuffers(1, &quadVBO);
-    glBindVertexArray(quadVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
-
-    OpenGLRenderContext* openGLRenderContext = new OpenGLRenderContext();
-    openGLRenderContext->windowsWidth = SRC_WIDTH;
-    openGLRenderContext->windowsHeight = SRC_HEIGHT;
-
-    BasePassRenderer* basePassRenderer = new BasePassRenderer;
-    std::string texturepath = rootPath + "/resources/textures/background.jpg";
-    Texture2D* texture = new Texture2D(texturepath.c_str());
-
-    Scene* scene = new Scene("scene");
-    scene->Start();
-    PostProcessRenderer* postprocessRenderer = new PostProcessRenderer;
-     scene->createModel(rootPath + "/resources/objects/nanosuit/nanosuit.obj");
-    // render loop
-    // -----------
-    while (!glfwWindowShouldClose(window))
-    {
-        // per-frame time logic
-        // --------------------
-        float currentFrame = static_cast<float>(glfwGetTime());
-        deltaTime = currentFrame - lastFrame;
-        lastFrame = currentFrame;
- 
-        // input
-        // -----
-        processInput(window);
-
-        RenderGraph renderGraph;
-        
-        //basePassRenderer->render(&camera, renderGraph);
-        scene->Update();
-        scene->Render(&camera, renderGraph);
-
-        //postprocessRenderer->render(renderGraph, scene->meshRenderer->getTargetFrameBuffer());
-        renderGraph.execute(openGLRenderContext);
-
-        glDisable(GL_DEPTH_TEST); // disable depth test so screen-space quad isn't discarded due to depth test.
-        glDepthMask(GL_FALSE);
-        glDisable(GL_CULL_FACE);
-        screenShader->use();
-        glBindVertexArray(quadVAO);
-
-        glActiveTexture(GL_TEXTURE0);
-        //glBindTexture(GL_TEXTURE_2D, basePassRenderer->getTargetColorTexture(0));	// use the color attachment texture as the texture of the quad plane
-        //glBindTexture(GL_TEXTURE_2D, scene->meshRenderer->getTargetColorTextureID(0));
-        //glBindTexture(GL_TEXTURE_2D, postprocessRenderer->getTargetColorTextureID(0));
-        glDrawArrays(GL_TRIANGLES, 0, 6);
-
-        // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
-        // -------------------------------------------------------------------------------
-        glfwSwapBuffers(window);
-        glfwPollEvents();
-    }
-    delete scene;
-    delete basePassRenderer;
-    delete texture;
-    delete postprocessRenderer;
-    delete openGLRenderContext;
-    glDeleteVertexArrays(1, &quadVAO);
-
-    // glfw: terminate, clearing all previously allocated GLFW resources.
-    // ------------------------------------------------------------------
-    glfwTerminate();
-    return 0;
-}
-
 
 static void glfw_error_callback(int error, const char* description)
 {
@@ -367,7 +237,6 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
     AssetManager* assetManager = new AssetManager(*openGLRenderContext, rootPath);
     Renderer* renderer = new Renderer(*openGLRenderContext, *assetManager);
 
-    //BasePassRenderer* basePassRenderer = new BasePassRenderer;
     std::string texturepath = rootPath + "/resources/textures/background.jpg";
     
     Scene* scene = new Scene("scene");
@@ -603,7 +472,6 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
         glBindVertexArray(quadVAO);
 
         glActiveTexture(GL_TEXTURE0);
-        //glBindTexture(GL_TEXTURE_2D, basePassRenderer->getTargetColorTexture(0));	// use the color attachment texture as the texture of the quad plane
         if(useEffect==0)
         glBindTexture(GL_TEXTURE_2D, renderer->getMeshRenderer().getTargetColorTextureID(0));
         else 
@@ -618,7 +486,6 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
     EMSCRIPTEN_MAINLOOP_END;
 #endif
     delete scene;
-    //delete basePassRenderer;
     delete renderer;
     delete assetManager;
     delete openGLRenderContext;

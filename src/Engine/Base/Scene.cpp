@@ -1,6 +1,9 @@
 #include"Scene.h"
 #include<iostream>
 #include <algorithm>
+#include "AssetManager.h"
+#include "Model.h"
+#include "Base/Shader.h"
 NAMESPACE_START
 Scene::~Scene() {
 	for (auto light : lights) {
@@ -9,10 +12,7 @@ Scene::~Scene() {
 	lights.clear();
 	mainDirectionalLight = nullptr;
 
-	for (auto model : models) {
-		delete model;
-	}
-	models.clear();
+	modelAssets.clear();
 
 	delete root;
 	root = nullptr;
@@ -39,14 +39,21 @@ void Scene::storeObjectMeshes(GameObject* go) {
 }
 
 void Scene::createModel(const std::string& modelPath){
-	Model* nowModel= new Model(modelPath, assetManager);
-	if (!nowModel->model_go) {
-		delete nowModel;
+	std::shared_ptr<ModelAsset> modelAsset = assetManager
+		? assetManager->loadModelAsset(modelPath)
+		: Model::loadAsset(modelPath, nullptr);
+	if (!modelAsset) {
 		return;
 	}
-	models.emplace_back(nowModel);
-	addRootChild(nowModel->model_go);
-	storeObjectMeshes(nowModel->model_go);
+
+	GameObject* modelGo = Model::instantiate(modelAsset);
+	if (!modelGo) {
+		return;
+	}
+
+	modelAssets.emplace_back(modelAsset);
+	addRootChild(modelGo);
+	storeObjectMeshes(modelGo);
 }
 
 
@@ -108,11 +115,11 @@ void Scene::UpdateTransform(GameObject* go) {
 	//updateMeshTransform();
 }
 
-void Scene::RenderObject() {
+void Scene::DrawObjects(Shader& shader) {
+	shader.use();
 	for (auto go : renderableObjects) {
 		for (auto mesh : go->meshes) {
-			mesh->material->setUniform();
-			mesh->material->shader.setMat4("model", go->GetTransform()->worldMaterix);
+			shader.setMat4("model", go->GetTransform()->worldMaterix);
 			mesh->draw();
 		}
 	}

@@ -5,15 +5,17 @@
 #include <unordered_map>
 #include <glm/glm.hpp>
 #include<string>
+#include<memory>
 #include "Base/Light.h"
 #include "Mesh.h"
-#include"Model.h"
+#include "Base/AssetTypes.h"
 #include"Base/Renderable.h"
-#include"Renderer/MeshRenderer.h"
 #include "Base/ShaderCode.h"
 #include"Camera.h"
 NAMESPACE_START
 class AssetManager;
+class Shader;
+class RenderGraph;
 class Scene {
 public:
 	Scene(const std::string& sceneName) {
@@ -35,7 +37,7 @@ public:
 	void Update();
 	void UpdateTransform(GameObject* go);
 	void Render(Camera* camera, RenderGraph& rg);
-	void RenderObject();
+	void DrawObjects(Shader& shader);
 
 	void clear(); 
 
@@ -51,6 +53,7 @@ public:
 	void RemoveLight(Light* light);
 
 	const std::vector<Light*>& GetAllLights() const { return lights; }
+	const std::vector<GameObject*>& GetRenderableObjects() const { return renderableObjects; }
 	DirectionLight* GetMainDirectionalLight() const;
 	std::vector<PointLight*> GetPointLights() const;
 
@@ -64,7 +67,7 @@ public:
 	std::vector<Light*> lights;
 	DirectionLight* mainDirectionalLight = nullptr;
 	std::vector<GameObject*> renderableObjects;
-	std::vector<Model*> models;
+	std::vector<std::shared_ptr<ModelAsset>> modelAssets;
 	std::string name = "scene";
 private:
 	AssetManager* assetManager = nullptr;

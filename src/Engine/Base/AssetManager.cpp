@@ -1,6 +1,7 @@
 ﻿#include "AssetManager.h"
 
 #include "Texture2D.h"
+#include "Model.h"
 #include <RHI/RenderContext.h>
 #include <algorithm>
 #include <utility>
@@ -51,4 +52,18 @@ std::shared_ptr<Texture2D> AssetManager::loadEmbeddedTexture2D(const std::string
     return texture;
 }
 
+
+std::shared_ptr<ModelAsset> AssetManager::loadModelAsset(const std::string& path) {
+    std::string resolvedPath = resolvePath(path);
+    auto it = modelCache_.find(resolvedPath);
+    if (it != modelCache_.end()) {
+        return it->second;
+    }
+
+    std::shared_ptr<ModelAsset> modelAsset = Model::loadAsset(resolvedPath, this);
+    if (modelAsset) {
+        modelCache_[resolvedPath] = modelAsset;
+    }
+    return modelAsset;
+}
 NAMESPACE_END

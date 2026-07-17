@@ -106,7 +106,6 @@ Mesh::~Mesh() {
 	if (vao) RenderContext::getInstance()->deleteVertexArray(vao);
 	if (vbo) RenderContext::getInstance()->deleteVertexBuffer(vbo);
 	if (ibo) RenderContext::getInstance()->deleteVertexBuffer(ibo); 
-	delete material;
 }
 
 void Mesh::setupMesh() {

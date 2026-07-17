@@ -1,14 +1,14 @@
 #pragma once
 #include <Base/Constants.h>
-#include<Base/TRefCountPtr.h>
 #include <RHI/RenderContext.h>
-#include "Base/Model.h" // Include Mesh and Vertex definitions
 #include <unordered_map>
+#include <memory>
 #include"Base/Renderable.h"
 class RenderGraph;
 
 NAMESPACE_START
 
+class AssetManager;
 class Camera;
 class Shader;
 class DirectionLight;
@@ -17,8 +17,7 @@ class Scene;
 class MeshRenderer {
 public:
     friend class Scene;
-    MeshRenderer();
-    MeshRenderer(const std::vector<Renderable*>& translucentMeshes, const std::vector<Renderable*>& opaqueMeshes);
+    explicit MeshRenderer(AssetManager& assetManager);
     ~MeshRenderer();
     virtual void render(Scene& scene, Camera* camera, RenderGraph& rg);
     void addShadowPass(Scene& scene, Camera* camera, RenderGraph& rg);
@@ -32,9 +31,10 @@ public:
 
 private:
     //shader
-    TRefCountPtr<Shader> lightingShader;
-    TRefCountPtr<Shader> lightingShader_cube;
-    TRefCountPtr<Shader> depthMapShader;
+    AssetManager& assetManager_;
+    std::shared_ptr<Shader> defaultLitShader;
+    std::shared_ptr<Shader> lightDebugShader;
+    std::shared_ptr<Shader> depthMapShader;
 
     //FBO
     FrameBufferInfo OriginFramebuffer;

@@ -2,9 +2,8 @@
 #include "Object.h"
 #include <RHI/RenderContext.h>
 #include "Mesh.h"
-#include"Model.h"
 #include "Transform.h"
-#include <Base/Material.h>
+#include <glm/glm.hpp>
 NAMESPACE_START
 class Model;
 class GameObject : public Object

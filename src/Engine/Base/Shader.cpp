@@ -50,6 +50,14 @@ NAMESPACE_START
         glDeleteShader(fragment);
         if (geometryCode != nullptr)    glDeleteShader(geometry);    
     }
+
+    Shader::~Shader()
+    {
+        if (ID != 0) {
+            glDeleteProgram(ID);
+            ID = 0;
+        }
+    }
     // activate the shader
     // ------------------------------------------------------------------------
     void Shader::use() const

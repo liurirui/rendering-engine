@@ -1,4 +1,6 @@
 #include"Renderable.h"
+#include"Model.h"
+#include <limits>
 NAMESPACE_START
 Renderable::Renderable() {}
 
@@ -13,7 +15,10 @@ Renderable::Renderable(Mesh* meshNow, bool NowisTranslucentNow) {
 }
 
 void Renderable::setTransformFromModel(Model* model) {
-    *transform = *model->transform;
+    if (!model || !model->model_go || !model->model_go->GetTransform()) {
+        return;
+    }
+    *transform = *model->model_go->GetTransform();
 }
 
 void Renderable::calculateCenter() {
