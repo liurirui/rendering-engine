@@ -15,7 +15,7 @@ public:
     unsigned int ID = 0;
     // constructor generates the shader on the fly
     // ------------------------------------------------------------------------
-    Shader(const char* vertexCode, const char* fragmentCode,const char* geometryPath = nullptr);
+    Shader(const char* vertexCode, const char* fragmentCode, const char* geometryCode = nullptr, const char* debugName = nullptr);
 
     Shader(){}
     ~Shader();
@@ -55,7 +55,9 @@ public:
 private:
     // utility function for checking shader compilation/linking errors.
     // ------------------------------------------------------------------------
-    void checkCompileErrors(GLuint shader, std::string type);
+    void checkCompileErrors(GLuint shader, const std::string& type, const char* sourceCode = nullptr);
+
+    std::string debugName_ = "UnnamedShader";
 
 };
 

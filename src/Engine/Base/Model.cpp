@@ -3,7 +3,7 @@
 #include "AssetManager.h"
 #include "Renderable.h"
 #include "Texture2D.h"
-#include <iostream>
+#include "Logger.h"
 #include <algorithm>
 
 NAMESPACE_START
@@ -34,7 +34,7 @@ std::shared_ptr<ModelAsset> Model::loadAsset(const std::string& path, AssetManag
 
     const aiScene* scene = importer.ReadFile(path, importFlags);
     if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
-        std::cout << "ERROR::ASSIMP:: " << importer.GetErrorString() << std::endl;
+        Logger::Error("Assimp model import failed. path=" + path + ", error=" + importer.GetErrorString());
         return nullptr;
     }
 
@@ -47,6 +47,7 @@ std::shared_ptr<ModelAsset> Model::loadAsset(const std::string& path, AssetManag
     std::shared_ptr<ModelAsset> modelAsset(new ModelAsset());
     modelAsset->sourcePath = normalizePath(path);
     modelAsset->root = processNode(scene->mRootNode, scene, *modelAsset, assetManager, directory);
+    Logger::Info("Model imported. path=" + modelAsset->sourcePath + ", meshes=" + std::to_string(modelAsset->meshes.size()) + ", materials=" + std::to_string(modelAsset->materials.size()));
     return modelAsset;
 }
 
@@ -129,7 +130,7 @@ std::shared_ptr<Texture2D> Model::loadMaterialTexture(aiMaterial* mat, const aiS
             }
             return std::shared_ptr<Texture2D>(new Texture2D(data, dataSize));
         }
-        std::cout << "WARN::ASSIMP:: unsupported uncompressed embedded texture: " << rawPath << std::endl;
+        Logger::Warn("Unsupported uncompressed embedded texture. path=" + rawPath);
         return nullptr;
     }
 

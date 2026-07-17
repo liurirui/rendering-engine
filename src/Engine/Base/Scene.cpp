@@ -4,6 +4,7 @@
 #include "AssetManager.h"
 #include "Model.h"
 #include "Base/Shader.h"
+#include "Logger.h"
 NAMESPACE_START
 Scene::~Scene() {
 	for (auto light : lights) {
@@ -43,17 +44,20 @@ void Scene::createModel(const std::string& modelPath){
 		? assetManager->loadModelAsset(modelPath)
 		: Model::loadAsset(modelPath, nullptr);
 	if (!modelAsset) {
+		Logger::Error("Scene createModel failed: model asset is null. path=" + modelPath);
 		return;
 	}
 
 	GameObject* modelGo = Model::instantiate(modelAsset);
 	if (!modelGo) {
+		Logger::Error("Scene createModel failed: instantiate returned null. path=" + modelPath);
 		return;
 	}
 
 	modelAssets.emplace_back(modelAsset);
 	addRootChild(modelGo);
 	storeObjectMeshes(modelGo);
+	Logger::Info("Scene model created. path=" + modelPath);
 }
 
 

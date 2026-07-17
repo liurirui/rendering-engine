@@ -1,7 +1,9 @@
 #include"OpenGLRenderContext.h"
 #include <glad.h>
 #include<Base/Texture2D.h>
+#include<Base/Logger.h>
 #include<iostream>
+#include<string>
 
 
 NAMESPACE_START
@@ -71,6 +73,14 @@ void OpenGLRenderContext::beginRendering(FrameBufferInfo& fbo) {
             }
             /*if (fbo.depthStencilAttachment.useStencil)  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, fbo.depthStencilAttachment.texture->id, 0);
             else glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, fbo.depthStencilAttachment.texture->id, 0);*/
+        }
+
+        GLenum framebufferStatus = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+        if (framebufferStatus != GL_FRAMEBUFFER_COMPLETE) {
+            Logger::Error("Framebuffer incomplete. id=" + std::to_string(fbo.id) + ", status=0x" + std::to_string(framebufferStatus));
+        }
+        else {
+            Logger::Info("Framebuffer created. id=" + std::to_string(fbo.id));
         }
     }
 
@@ -175,6 +185,7 @@ GLenum getBlendFactor(BlendFactor & factor) {
 void OpenGLRenderContext::bindPipeline(GraphicsPipeline& pipeline) {
 
     if (!pipeline.shader) {
+        Logger::Error("bindPipeline called with null shader.");
         return;
     }
 

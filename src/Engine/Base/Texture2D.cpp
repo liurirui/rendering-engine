@@ -1,5 +1,7 @@
 #include"Texture2D.h"
+#include "Logger.h"
 #include <stb_image.h>
+#include <string>
 
 NAMESPACE_START
 
@@ -7,6 +9,11 @@ unsigned char transparentData[64] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
                                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+
+static const char* getStbiFailureReason() {
+    const char* reason = getStbiFailureReason();
+    return reason ? reason : "unknown";
+}
 
 GLint getFormat(const TextureFormat& textureFormat) {
 
@@ -108,17 +115,13 @@ Texture2D::Texture2D(const char* path) {
     int width, height, nrChannels;
     unsigned char* data = stbi_load(path, &width, &height, &nrChannels, STBI_rgb_alpha);
     if (!data) {
+        Logger::Error(std::string("Texture load failed. path=") + path + ", reason=" + getStbiFailureReason());
         width = 4;
         height = 4;
         this->initTexture(TextureUsage::ShaderRead, TextureFormat::RGBA, width, height, transparentData);
     }
     else {
-        if (nrChannels == 4) {
-            this->initTexture(TextureUsage::ShaderRead, TextureFormat::RGBA, width, height, data);
-        }
-        if (nrChannels == 3) {
-            this->initTexture(TextureUsage::ShaderRead, TextureFormat::RGB, width, height, data);
-        }
+        this->initTexture(TextureUsage::ShaderRead, TextureFormat::RGBA, width, height, data);
         stbi_image_free(data);
     }
     
@@ -131,6 +134,7 @@ Texture2D::Texture2D(const unsigned char* encodedData, int dataSize) {
     int width, height, nrChannels;
     unsigned char* data = stbi_load_from_memory(encodedData, dataSize, &width, &height, &nrChannels, STBI_rgb_alpha);
     if (!data) {
+        Logger::Error("Embedded texture decode failed. dataSize=" + std::to_string(dataSize) + ", reason=" + getStbiFailureReason());
         width = 4;
         height = 4;
         this->initTexture(TextureUsage::ShaderRead, TextureFormat::RGBA, width, height, transparentData);
@@ -154,6 +158,9 @@ void Texture2D::initTexture(const TextureUsage& usage, const TextureFormat& text
 
     this->height = height;
     glGenTextures(1, &id);
+    if (id == 0) {
+        Logger::Error("glGenTextures returned 0. Texture creation failed or OpenGL context is invalid.");
+    }
     if (useCubeMap) {
         glBindTexture(GL_TEXTURE_CUBE_MAP, id);
 

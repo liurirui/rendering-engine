@@ -17,6 +17,7 @@
 #include<Engine/Renderer/PostProcessRenderer.h>
 #include<Engine/Renderer/Renderer.h>
 #include<Engine/Base/AssetManager.h>
+#include<Engine/Base/Logger.h>
 
 #include <iostream>
 #include<array>
@@ -111,18 +112,41 @@ static std::string findProjectRoot()
 
 static void glfw_error_callback(int error, const char* description)
 {
-    fprintf(stderr, "GLFW Error %d: %s\n", error, description);
+    Logger::Error(std::string("GLFW Error ") + std::to_string(error) + ": " + description);
+}
+
+
+static void APIENTRY opengl_debug_message_callback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* userParam)
+{
+    if (severity == GL_DEBUG_SEVERITY_NOTIFICATION) {
+        return;
+    }
+
+    std::string level = severity == GL_DEBUG_SEVERITY_HIGH ? "HIGH" :
+        severity == GL_DEBUG_SEVERITY_MEDIUM ? "MEDIUM" :
+        severity == GL_DEBUG_SEVERITY_LOW ? "LOW" : "UNKNOWN";
+
+    Logger::Warn("OpenGL debug message. severity=" + level +
+        ", source=" + std::to_string(source) +
+        ", type=" + std::to_string(type) +
+        ", id=" + std::to_string(id) +
+        ", message=" + std::string(message, length));
 }
 
 // Main code
 //int main(int, char**)
 int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR lpCmdLine, _In_ int nShowCmd)
 {
-    glfwSetErrorCallback(glfw_error_callback);
-    if (!glfwInit())
-        return 1;
-
     std::string rootPath = findProjectRoot();
+    Logger::Initialize(rootPath + "/logs", true);
+    Logger::Info("RenderEngine starting. Project root: " + rootPath);
+
+    glfwSetErrorCallback(glfw_error_callback);
+    if (!glfwInit()) {
+        Logger::Error("glfwInit failed.");
+        Logger::Shutdown();
+        return 1;
+    }
 
     // Decide GL+GLSL versions
 #if defined(IMGUI_IMPL_OPENGL_ES2)
@@ -154,8 +178,11 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
 
     // Create window with graphics context
     GLFWwindow* window = glfwCreateWindow(SRC_WIDTH, SRC_HEIGHT, "Dear ImGui GLFW+OpenGL3 example", nullptr, nullptr);
-    if (window == nullptr)
+    if (window == nullptr) {
+        Logger::Error("Failed to create GLFW window.");
+        Logger::Shutdown();
         return 1;
+    }
     glfwMakeContextCurrent(window);
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
     glfwSetCursorPosCallback(window, mouse_callback);
@@ -167,8 +194,19 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
     // ---------------------------------------
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
     {
-        std::cout << "Failed to initialize GLAD" << std::endl;
+        Logger::Error("Failed to initialize GLAD");
+        Logger::Shutdown();
         return -1;
+    }
+
+    if (glDebugMessageCallback) {
+        glEnable(GL_DEBUG_OUTPUT);
+        glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+        glDebugMessageCallback(opengl_debug_message_callback, nullptr);
+        Logger::Info("OpenGL debug callback enabled.");
+    }
+    else {
+        Logger::Warn("OpenGL debug callback is not available on this driver/context.");
     }
 
     // Setup Dear ImGui context
@@ -215,10 +253,13 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
 
-    screenShader = new Shader(Vert_quad, Frag_quad);
+    screenShader = new Shader(Vert_quad, Frag_quad, nullptr, "engine/screen-quad");
     screenShader->use();
     screenShader->setInt("screenTexture", 0);
-    int errorCode = glGetError();
+    GLenum screenShaderError = glGetError();
+    if (screenShaderError != GL_NO_ERROR) {
+        Logger::Warn("OpenGL error after screen shader setup. error=" + std::to_string(screenShaderError));
+    }
     // screen quad VAO
     unsigned int quadVAO, quadVBO;
     glGenVertexArrays(1, &quadVAO);
@@ -499,6 +540,8 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
     ImGui::DestroyContext();
 
     glfwDestroyWindow(window);
+    Logger::Info("RenderEngine shutdown.");
+    Logger::Shutdown();
     glfwTerminate();
 
     return 0;

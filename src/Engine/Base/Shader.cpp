@@ -9,12 +9,16 @@
 #include <iostream>
 
 #include"Shader.h"
+#include "Logger.h"
 
 NAMESPACE_START
 
     // ------------------------------------------------------------------------
-    Shader::Shader(const char* vertexCode, const char* fragmentCode, const char* geometryCode)
+    Shader::Shader(const char* vertexCode, const char* fragmentCode, const char* geometryCode, const char* debugName)
     {
+        if (debugName && debugName[0] != '\0') {
+            debugName_ = debugName;
+        }
     
         // 2. compile shaders
         unsigned int vertex, fragment, geometry;
@@ -22,19 +26,19 @@ NAMESPACE_START
         vertex = glCreateShader(GL_VERTEX_SHADER);
         glShaderSource(vertex, 1, &vertexCode, NULL);
         glCompileShader(vertex);
-        checkCompileErrors(vertex, "VERTEX");
+        checkCompileErrors(vertex, "VERTEX", vertexCode);
         // fragment Shader
         fragment = glCreateShader(GL_FRAGMENT_SHADER);
         glShaderSource(fragment, 1, &fragmentCode, NULL);
         glCompileShader(fragment);
-        checkCompileErrors(fragment, "FRAGMENT");
+        checkCompileErrors(fragment, "FRAGMENT", fragmentCode);
         //If geometry shader code is provided, compile the geometry shader
         if (geometryCode != nullptr)
         {
             geometry = glCreateShader(GL_GEOMETRY_SHADER);
             glShaderSource(geometry, 1, &geometryCode, NULL);
             glCompileShader(geometry);
-            checkCompileErrors(geometry, "GEOMETRY");
+            checkCompileErrors(geometry, "GEOMETRY", geometryCode);
         }
 
         // shader Program
@@ -125,17 +129,37 @@ NAMESPACE_START
 
     // utility function for checking shader compilation/linking errors.
     // ------------------------------------------------------------------------
-    void Shader::checkCompileErrors(GLuint shader, std::string type)
+    static std::string BuildShaderSourcePreview(const char* sourceCode) {
+        if (!sourceCode) {
+            return "";
+        }
+
+        std::stringstream input(sourceCode);
+        std::stringstream preview;
+        std::string line;
+        int lineNumber = 1;
+        const int maxLines = 80;
+        while (std::getline(input, line) && lineNumber <= maxLines) {
+            preview << lineNumber << ": " << line << "\n";
+            lineNumber++;
+        }
+        if (!input.eof()) {
+            preview << "... source truncated after " << maxLines << " lines\n";
+        }
+        return preview.str();
+    }
+
+    void Shader::checkCompileErrors(GLuint shader, const std::string& type, const char* sourceCode)
     {
-        GLint success;
-        GLchar infoLog[1024];
+        GLint success = GL_FALSE;
+        GLchar infoLog[4096] = {};
         if (type != "PROGRAM")
         {
             glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
             if (!success)
             {
-                glGetShaderInfoLog(shader, 1024, NULL, infoLog);
-                std::cout << "ERROR::SHADER_COMPILATION_ERROR of type: " << type << "\n" << infoLog << "\n -- --------------------------------------------------- -- " << std::endl;
+                glGetShaderInfoLog(shader, sizeof(infoLog), NULL, infoLog);
+                Logger::Error("Shader compile failed. name=" + debugName_ + ", stage=" + type + "\n" + infoLog + "\nSource preview:\n" + BuildShaderSourcePreview(sourceCode));
             }
         }
         else
@@ -143,8 +167,8 @@ NAMESPACE_START
             glGetProgramiv(shader, GL_LINK_STATUS, &success);
             if (!success)
             {
-                glGetProgramInfoLog(shader, 1024, NULL, infoLog);
-                std::cout << "ERROR::PROGRAM_LINKING_ERROR of type: " << type << "\n" << infoLog << "\n -- --------------------------------------------------- -- " << std::endl;
+                glGetProgramInfoLog(shader, sizeof(infoLog), NULL, infoLog);
+                Logger::Error("Shader link failed. name=" + debugName_ + "\n" + infoLog);
             }
         }
     }

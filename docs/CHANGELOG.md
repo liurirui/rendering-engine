@@ -429,3 +429,52 @@ MeshRenderer::render(scene)
 - 删除 `Renderer/BasePassRenderer.h/.cpp`。
 - 原因：该类已经不在新 `Renderer` 主流程中使用，并且保留旧式 `TRefCountPtr<Shader>`、直接资源路径、独立 pass 组织方式，继续保留会干扰当前架构方向。
 - 后续如需要 base pass，应基于 `Renderer + RenderGraph + AssetManager + MaterialSystem` 重新实现，而不是恢复旧类。
+### 追加改动：运行时可见日志与关键错误输出
+
+本轮增加运行时日志系统，解决 WIN32 子系统启动后没有控制台、shader 编译失败和资源加载失败不容易发现的问题。
+
+具体调整：
+
+1. 新增 `Logger`。
+
+- 新增 `Base/Logger.h/.cpp`。
+- Windows 下启动时主动 `AllocConsole()`，显示 `RenderEngine Log Console`。
+- 同时写入 `logs/engine.log`。
+- 提供 `Logger::Info / Warn / Error`，后续模块统一通过 Logger 输出运行时信息。
+
+2. 应用启动阶段初始化日志。
+
+- `WinMain` 中在 `glfwInit()` 前初始化 Logger。
+- GLFW 初始化失败、窗口创建失败、GLAD 初始化失败都会输出明确错误。
+- 关闭程序时调用 `Logger::Shutdown()`。
+
+3. Shader 编译/链接错误增强。
+
+- `Shader` 构造函数增加 debug name 参数。
+- shader 编译失败时输出 shader 名称、阶段、OpenGL info log。
+- 同时输出 shader 源码前 80 行预览并带行号，方便直接定位语法错误。
+- `ShaderLibrary` 注册 shader 时输出 shader 名称；未知 shader 会输出 fallback warning。
+
+4. 资源加载日志。
+
+- `Texture2D` 贴图文件解码失败时输出路径和 stb failure reason。
+- embedded texture 解码失败时输出数据大小和原因。
+- `AssetManager` 输出 texture/model cache hit、首次加载、模型加载失败等信息。
+- `Model` 输出 Assimp 导入失败路径和错误信息，导入成功时输出 mesh/material 数量。
+- `Scene::createModel` 输出模型资产为空、实例化失败和创建成功信息。
+
+5. 渲染关键错误日志。
+
+- `OpenGLRenderContext::bindPipeline` 遇到 null shader 会输出错误。
+- FBO 创建后检查 `glCheckFramebufferStatus`，不完整时输出 framebuffer id 和状态码。
+- 启动后尽量启用 OpenGL debug callback；如果当前驱动/context 不支持，会输出 warning。
+- 后处理关键 pass 中的 `glGetError()` 检查会通过 Logger 输出上下文信息。
+
+运行后排查方式：
+
+```text
+1. 启动程序后看 RenderEngine Log Console。
+2. 如果窗口闪退或控制台没保留，打开 <项目根目录>/logs/engine.log。
+3. shader 编译错误优先看 "Shader compile failed"，里面会有 shader name、stage、info log、源码预览。
+4. 黑屏优先看 "Framebuffer incomplete"、"bindPipeline called with null shader"、"OpenGL debug message"。
+```

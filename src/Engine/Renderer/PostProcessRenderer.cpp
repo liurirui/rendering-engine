@@ -1,22 +1,31 @@
 #include "PostProcessRenderer.h"
+#include <Base/Logger.h>
 #include "Base/ShaderCode.h"
 #include "Base/Shader.h"
 #include "Base/Camera.h"
 #include "RenderGraph/RenderGraph.h"
 NAMESPACE_START
+
+
+static void LogOpenGLErrorIfAny(const char* context) {
+    GLenum errorCode = glGetError();
+    if (errorCode != GL_NO_ERROR) {
+        realtimerenderingengine::Logger::Warn(std::string("OpenGL error in ") + context + ". error=" + std::to_string(errorCode));
+    }
+}
 PostProcessRenderer::PostProcessRenderer() {
 	PostProcessRenderer_depthStencilState.depthTest = false;
     PostProcessRenderer_depthStencilState.depthWrite = false;
     //PostProcessRenderer_depthStencilState.depthWrite = false;
-    HightLightShader = TRefCountPtr<Shader>(new Shader(Vert_quad, Frag_highlight));
-    BlurShader = TRefCountPtr<Shader>(new Shader(Vert_quad, Frag_blur));
-    DownSampleShader = TRefCountPtr<Shader>(new Shader(Vert_quad, Frag_DownSample));
-    UpSampleShader = TRefCountPtr<Shader>(new Shader(Vert_quad, Frag_UpSample));
-    BloomShader = TRefCountPtr<Shader>(new Shader(Vert_quad, Frag_bloom));
-    RadialBlurShader = TRefCountPtr<Shader>(new Shader(Vert_quad, Frag_Radialblur));
-    MotionBlurShader = TRefCountPtr<Shader>(new Shader(Vert_quad, Frag_Motionblur));
-    CartoonShader = TRefCountPtr<Shader>(new Shader(Vert_quad, Frag_cartoon));
-    RippleShader = TRefCountPtr<Shader>(new Shader(Vert_quad, Frag_ripple));
+    HightLightShader = TRefCountPtr<Shader>(new Shader(Vert_quad, Frag_highlight, nullptr, "post/highlight"));
+    BlurShader = TRefCountPtr<Shader>(new Shader(Vert_quad, Frag_blur, nullptr, "post/blur"));
+    DownSampleShader = TRefCountPtr<Shader>(new Shader(Vert_quad, Frag_DownSample, nullptr, "post/downsample"));
+    UpSampleShader = TRefCountPtr<Shader>(new Shader(Vert_quad, Frag_UpSample, nullptr, "post/upsample"));
+    BloomShader = TRefCountPtr<Shader>(new Shader(Vert_quad, Frag_bloom, nullptr, "post/bloom"));
+    RadialBlurShader = TRefCountPtr<Shader>(new Shader(Vert_quad, Frag_Radialblur, nullptr, "post/radial-blur"));
+    MotionBlurShader = TRefCountPtr<Shader>(new Shader(Vert_quad, Frag_Motionblur, nullptr, "post/motion-blur"));
+    CartoonShader = TRefCountPtr<Shader>(new Shader(Vert_quad, Frag_cartoon, nullptr, "post/cartoon"));
+    RippleShader = TRefCountPtr<Shader>(new Shader(Vert_quad, Frag_ripple, nullptr, "post/ripple"));
 
     historySeedTexture = RenderContext::getInstance()->createTexture2D(TextureUsage::RenderTarget, TextureFormat::RGBA32F, RenderContext::getInstance()->windowsWidth,
         RenderContext::getInstance()->windowsHeight);
@@ -205,9 +214,9 @@ void PostProcessRenderer::render(RenderGraph& rg, FrameBufferInfo* sceneFBO, int
         PostProcessRenderer_graphicsPipeline.shader = RadialBlurShader.getPtr();
         renderContext->beginRendering(RadialFramebuffer);
         renderContext->bindPipeline(PostProcessRenderer_graphicsPipeline);
-        int errorCode = glGetError();
+        LogOpenGLErrorIfAny("post radial after bind pipeline");
         RadialBlurShader.getPtr()->use();
-        errorCode = glGetError();
+        LogOpenGLErrorIfAny("post radial after use shader");
         RadialBlurShader.getPtr()->setInt("sceneTexture", 0);
         RadialBlurShader.getPtr()->setVec2("center", 0.5, 0.5);
         RadialBlurShader.getPtr()->setFloat("strength", 0.3);
@@ -235,7 +244,7 @@ void PostProcessRenderer::render(RenderGraph& rg, FrameBufferInfo* sceneFBO, int
         renderContext->setDepthStencilState(PostProcessRenderer_depthStencilState);
         renderContext->bindPipeline(PostProcessRenderer_graphicsPipeline);
         MotionBlurShader.getPtr()->use();
-        int errorCode = glGetError();
+        LogOpenGLErrorIfAny("post motion after use shader");
         renderContext->bindVertexArray(quadVAO);
         MotionBlurShader.getPtr()->setInt("sceneTexture", 0);
         MotionBlurShader.getPtr()->setInt("lastTexture", 1);
@@ -257,7 +266,7 @@ void PostProcessRenderer::render(RenderGraph& rg, FrameBufferInfo* sceneFBO, int
         renderContext->beginRendering(CartoonFramebuffer);
         renderContext->bindPipeline(PostProcessRenderer_graphicsPipeline);
         CartoonShader.getPtr()->use();
-       int errorCode = glGetError(); 
+        LogOpenGLErrorIfAny("post cartoon");
         renderContext->bindVertexArray(quadVAO);
         CartoonShader.getPtr()->setInt("sceneTexture", 0);
         renderContext->bindTexture(bloomTexture->id, 0);
@@ -275,9 +284,9 @@ void PostProcessRenderer::render(RenderGraph& rg, FrameBufferInfo* sceneFBO, int
         PostProcessRenderer_graphicsPipeline.shader = RippleShader.getPtr();
         renderContext->beginRendering(RippleFramebuffer);
         renderContext->bindPipeline(PostProcessRenderer_graphicsPipeline);
-        int errorCode = glGetError();
+        LogOpenGLErrorIfAny("post ripple after bind pipeline");
         RippleShader.getPtr()->use();
-        errorCode = glGetError();
+        LogOpenGLErrorIfAny("post ripple after use shader");
         renderContext->bindVertexArray(quadVAO);
         RippleShader.getPtr()->setVec2("rippleCenter", glm::vec2(0.5f, 0.5f));
         RippleShader.getPtr()->setFloat("time", time);

@@ -2,6 +2,7 @@
 
 #include "Shader.h"
 #include "ShaderCode.h"
+#include "Logger.h"
 
 NAMESPACE_START
 
@@ -33,7 +34,8 @@ std::shared_ptr<Shader> ShaderLibrary::getOrCreate(const std::string& name) {
 }
 
 std::shared_ptr<Shader> ShaderLibrary::registerShader(const std::string& name, const char* vertexCode, const char* fragmentCode, const char* geometryCode) {
-    auto shader = std::make_shared<Shader>(vertexCode, fragmentCode, geometryCode);
+    Logger::Info("Register shader. name=" + name);
+    auto shader = std::make_shared<Shader>(vertexCode, fragmentCode, geometryCode, name.c_str());
     shaders_[name] = shader;
     return shader;
 }
@@ -48,6 +50,7 @@ std::shared_ptr<Shader> ShaderLibrary::createBuiltin(const std::string& name) {
     if (name == LightDebugShaderName()) {
         return registerShader(name, Vertmodel_lighting, Fragmodel_cube);
     }
+    Logger::Warn("Unknown shader requested. name=" + name + ", fallback=" + DefaultLitShaderName());
     return getOrCreate(DefaultLitShaderName());
 }
 
