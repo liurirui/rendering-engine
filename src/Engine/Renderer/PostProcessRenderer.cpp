@@ -218,8 +218,8 @@ void PostProcessRenderer::render(RenderGraph& rg, FrameBufferInfo* sceneFBO, int
         RadialBlurShader.getPtr()->use();
         LogOpenGLErrorIfAny("post radial after use shader");
         RadialBlurShader.getPtr()->setInt("sceneTexture", 0);
-        RadialBlurShader.getPtr()->setVec2("center", 0.5, 0.5);
-        RadialBlurShader.getPtr()->setFloat("strength", 0.3);
+        RadialBlurShader.getPtr()->setVec2("center", 0.5f, 0.5f);
+        RadialBlurShader.getPtr()->setFloat("strength", 0.3f);
         renderContext->bindTexture(bloomTexture->id, 0);
         renderContext->bindVertexArray(quadVAO);
         renderContext->drawArrays(0, 6);

@@ -2,6 +2,7 @@
 #include <glad.h>
 #include<Base/Texture2D.h>
 #include<Base/Logger.h>
+#include<Base/Shader.h>
 #include<iostream>
 #include<string>
 
@@ -41,38 +42,29 @@ FrameBufferInfo::~FrameBufferInfo() {
 void OpenGLRenderContext::beginRendering(FrameBufferInfo& fbo) {
 
     if (!fbo.id) {
-
         glGenFramebuffers(1, &fbo.id);
-
         glBindFramebuffer(GL_FRAMEBUFFER, fbo.id);
+
         for (auto& colorAttachment : fbo.colorAttachments) {
+            if (!colorAttachment.texture) {
+                Logger::Error("Framebuffer color attachment has null texture. attachment=" + std::to_string(colorAttachment.attachment));
+                continue;
+            }
             glBindTexture(GL_TEXTURE_2D, colorAttachment.texture->id);
             glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + colorAttachment.attachment, GL_TEXTURE_2D, colorAttachment.texture->id, 0);
         }
 
-        //depth texture
         if (fbo.depthStencilAttachment.texture) {
-            glBindTexture(GL_TEXTURE_2D, fbo.depthStencilAttachment.texture->id);
-            if (fbo.depthStencilAttachment.useStencil) {
-                // ʹ�� glFramebufferTexture �����������-ģ�建����
-                if (fbo.depthStencilAttachment.texture->useCubeMap) {
-                    glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, fbo.depthStencilAttachment.texture->id, 0);
-                }
-                else {
-                    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, fbo.depthStencilAttachment.texture->id, 0);
-                }
+            Texture2D* depthTexture = fbo.depthStencilAttachment.texture;
+            glBindTexture(depthTexture->useCubeMap ? GL_TEXTURE_CUBE_MAP : GL_TEXTURE_2D, depthTexture->id);
+
+            GLenum attachment = fbo.depthStencilAttachment.useStencil ? GL_DEPTH_STENCIL_ATTACHMENT : GL_DEPTH_ATTACHMENT;
+            if (depthTexture->useCubeMap) {
+                glFramebufferTexture(GL_FRAMEBUFFER, attachment, depthTexture->id, 0);
             }
             else {
-                // ��ʹ����Ȼ�����
-                if (fbo.depthStencilAttachment.texture->useCubeMap) {
-                    glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, fbo.depthStencilAttachment.texture->id, 0);
-                }
-                else {
-                    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, fbo.depthStencilAttachment.texture->id, 0);
-                }
+                glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, GL_TEXTURE_2D, depthTexture->id, 0);
             }
-            /*if (fbo.depthStencilAttachment.useStencil)  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, fbo.depthStencilAttachment.texture->id, 0);
-            else glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, fbo.depthStencilAttachment.texture->id, 0);*/
         }
 
         GLenum framebufferStatus = glCheckFramebufferStatus(GL_FRAMEBUFFER);
@@ -87,32 +79,29 @@ void OpenGLRenderContext::beginRendering(FrameBufferInfo& fbo) {
     glBindFramebuffer(GL_FRAMEBUFFER, fbo.id);
 
     if (fbo.colorAttachments.empty()) {
-        // ���û����ɫ������������ɫ�������
         glDrawBuffer(GL_NONE);
         glReadBuffer(GL_NONE);
     }
     else {
-        static const GLenum kDrawBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3,
-            GL_COLOR_ATTACHMENT4, GL_COLOR_ATTACHMENT5, GL_COLOR_ATTACHMENT6, GL_COLOR_ATTACHMENT7 };
-        glDrawBuffers(fbo.colorAttachments.size(), kDrawBuffers);
+        static const GLenum kDrawBuffers[] = {
+            GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3,
+            GL_COLOR_ATTACHMENT4, GL_COLOR_ATTACHMENT5, GL_COLOR_ATTACHMENT6, GL_COLOR_ATTACHMENT7
+        };
+        glDrawBuffers(static_cast<GLsizei>(fbo.colorAttachments.size()), kDrawBuffers);
     }
 
-    // �����ɫ����
     for (auto& colorAttachment : fbo.colorAttachments) {
         if (colorAttachment.action == AttachmentAction::Clear) {
-            GLuint attachments[] = { GL_COLOR_ATTACHMENT0 + colorAttachment.attachment };
-            glClearBufferfv(GL_COLOR, colorAttachment.attachment, &colorAttachment.clearColor.x); // �Ը���0ʹ�������ɫ
+            glClearBufferfv(GL_COLOR, colorAttachment.attachment, &colorAttachment.clearColor.x);
         }
     }
 
-    if (fbo.depthStencilAttachment.texture) {
-        if (fbo.depthStencilAttachment.action == AttachmentAction::Clear) {
-            glDepthMask(GL_TRUE);
-            glClearDepth(fbo.depthStencilAttachment.depthClearValue); // �������ֵ��1.0 ��ʾ��Զ
-            glClearStencil(fbo.depthStencilAttachment.stencilClearValue);
-            glClear(GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT); // �����Ȼ�����
-            glDepthMask(GL_FALSE);
-        }
+    if (fbo.depthStencilAttachment.texture && fbo.depthStencilAttachment.action == AttachmentAction::Clear) {
+        glDepthMask(GL_TRUE);
+        glClearDepth(fbo.depthStencilAttachment.depthClearValue);
+        glClearStencil(fbo.depthStencilAttachment.stencilClearValue);
+        glClear(GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+        glDepthMask(GL_FALSE);
     }
 
 }
@@ -180,6 +169,8 @@ GLenum getBlendFactor(BlendFactor & factor) {
         return GL_ONE_MINUS_SRC_ALPHA;
 #endif
     }
+
+    return GL_ONE;
 }
 
 void OpenGLRenderContext::bindPipeline(GraphicsPipeline& pipeline) {
@@ -188,6 +179,8 @@ void OpenGLRenderContext::bindPipeline(GraphicsPipeline& pipeline) {
         Logger::Error("bindPipeline called with null shader.");
         return;
     }
+
+    pipeline.shader->use();
 
     if (pipeline.rasterizationState.cullMode != CullMode::None) {
 

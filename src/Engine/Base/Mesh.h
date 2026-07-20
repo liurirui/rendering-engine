@@ -9,7 +9,7 @@
 
 NAMESPACE_START
 
-class MaterialAsset;
+struct MaterialAsset;
 
     class Mesh
     {

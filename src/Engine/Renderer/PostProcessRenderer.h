@@ -2,6 +2,7 @@
 
 #include <Base/Constants.h>
 #include<Base/TRefCountPtr.h>
+#include <Base/Shader.h>
 #include <RHI/RenderContext.h>
 class RenderGraph;
 NAMESPACE_START

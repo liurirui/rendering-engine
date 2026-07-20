@@ -8,7 +8,7 @@
 
 NAMESPACE_START
 
-class ModelAsset;
+struct ModelAsset;
 class RenderContext;
 class Texture2D;
 

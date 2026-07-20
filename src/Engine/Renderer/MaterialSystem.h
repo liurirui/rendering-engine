@@ -5,7 +5,7 @@
 NAMESPACE_START
 
 class Material;
-class MaterialAsset;
+struct MaterialAsset;
 class Shader;
 
 class MaterialSystem {

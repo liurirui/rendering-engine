@@ -1,4 +1,4 @@
-﻿# 项目变更记录
+# 项目变更记录
 
 本文档用于记录每一次提交具体改动了什么功能、修复了什么问题、调整了什么架构，以及这些改动的原因和影响范围。
 
@@ -478,3 +478,71 @@ MeshRenderer::render(scene)
 3. shader 编译错误优先看 "Shader compile failed"，里面会有 shader name、stage、info log、源码预览。
 4. 黑屏优先看 "Framebuffer incomplete"、"bindPipeline called with null shader"、"OpenGL debug message"。
 ```
+
+## 未提交 - 修复运行时日志可见性与 OpenGL 状态错误
+
+- 提交时间：待提交
+- 改动类型：修复 / 运行时诊断 / 渲染稳定性 / 构建验证
+- 建议提交标题：`修复运行时诊断日志与 OpenGL 状态绑定问题`
+
+### 改动摘要
+
+本轮目标是让程序运行失败时能直接看到错误原因，并修复验证过程中暴露出的 OpenGL 状态问题。当前 Release 版本已经可以正常启动，运行日志会输出到控制台和 `logs/engine.log`。
+
+### 具体改动
+
+1. 修复 `RenderGraph` 前置声明命名空间不一致。
+
+- `RenderGraph` 当前是全局类，`Scene.h` 之前把它声明在 `realtimerenderingengine` 命名空间内，导致 `Scene`、`MeshRenderer` 使用到的类型不一致。
+- 调整后 `Scene` 与渲染 pass 使用同一个 `::RenderGraph` 类型，避免编译期签名不匹配。
+
+2. 重写 `OpenGLRenderContext::beginRendering(FrameBufferInfo&)` 的 FBO 创建逻辑。
+
+- 清理原先损坏的括号和乱码注释区域，避免语法级联错误。
+- 创建 framebuffer 后立即检查 `glCheckFramebufferStatus`。
+- color attachment 为空时输出明确错误。
+- depth / depth-stencil / cubemap depth attachment 的绑定路径统一处理。
+
+3. 修复 pipeline 绑定时没有激活 shader 的问题。
+
+- `OpenGLRenderContext::bindPipeline()` 现在会调用 `pipeline.shader->use()`。
+- 原问题会导致后续 uniform 写入落到上一个仍处于 active 状态的 program 上，运行时表现为 OpenGL 报 `Uniform must be a matrix type in call to UniformMatrix*` 或渲染结果异常。
+- 这是典型 OpenGL 状态机问题：`GraphicsPipeline` 绑定不完整时，材质和 pass 的 uniform 设置无法保证作用到目标 shader。
+
+4. 修复贴图采样参数导致的 `GL_INVALID_ENUM`。
+
+- `GL_TEXTURE_MAG_FILTER` 只能使用 `GL_LINEAR` 或 `GL_NEAREST`，不能使用 mipmap filter。
+- 2D texture 不再设置 `GL_TEXTURE_WRAP_R`。
+- mipmap 生成条件从只判断 `Linear` 调整为只要不是 `MipmapMode::None` 就生成。
+
+5. 补齐编译稳定性修复。
+
+- `MaterialAsset`、`ModelAsset` 的前置声明从 `class` 改为 `struct`，与真实定义一致。
+- `PostProcessRenderer.h` 引入完整 `Shader` 类型，避免 `TRefCountPtr<Shader>` 析构时类型不完整。
+- `main.cpp` 引入 `Shader.h`，并显式使用 `std::to_string`。
+- `getBlendFactor()` 增加兜底返回值，避免控制流缺少返回值。
+- 后处理 shader 参数字面量改为 `float`，消除类型警告。
+
+6. 修复 Assimp 运行时 DLL 需要手动复制的问题。
+
+- `Example/CMakeLists.txt` 增加 `ASSIMP_RUNTIME_DLL` 变量，集中记录 `assimp-vc142-mt.dll` 路径。
+- 保留 `example` 的 `POST_BUILD copy_if_different`，确保 `example.exe` 链接完成后把 Assimp DLL 复制到 `$<TARGET_FILE_DIR:example>`。
+- 新增 `copy_example_runtime_dlls` 目标并加入 `ALL`，即使 `example` 本身被判断为 up-to-date，构建 solution 时也会检查并补齐运行时 DLL。
+- 原因：Windows 运行 exe 时默认不会去第三方库目录找 DLL，动态库必须位于 exe 同目录、系统目录或 PATH 中；只链接 `.lib` 不能自动解决运行时 DLL 部署。
+
+7. 忽略运行产物。
+
+- `.gitignore` 增加 `logs/` 和 `imgui.ini`。
+- 原因：这些文件由本地运行生成，不属于源码提交内容；如果一次性暂存未暂存文件，容易把本机日志和 UI 状态提交进去。
+
+### 验证情况
+
+- `cmake --build build --config Debug`：通过。
+- `cmake --build build --config Release`：通过。
+- `build/src/Example/Release/example.exe`：正常启动，8 秒启动检查期间进程保持运行。
+- `logs/engine.log`：成功生成，当前启动日志未出现 shader 编译失败、framebuffer incomplete 或高优先级 OpenGL 错误。
+
+### 后续注意
+
+- Debug exe 直接双击如果退出码为 `0xC0000135`，原因通常是缺少 Visual Studio Debug CRT DLL，并不是引擎主逻辑已经进入后崩溃；用 Visual Studio F5、Developer Command Prompt、补齐 Debug CRT PATH，或直接运行 Release。
+- 后续如果继续往中小型渲染引擎方向推进，建议把当前日志继续扩展成 `Logger + Assert + GL_CHECK` 的统一诊断层，而不是在各模块零散调用 `glGetError()`。

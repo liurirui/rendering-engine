@@ -11,7 +11,7 @@ unsigned char transparentData[64] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
                                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
 static const char* getStbiFailureReason() {
-    const char* reason = getStbiFailureReason();
+    const char* reason = stbi_failure_reason();
     return reason ? reason : "unknown";
 }
 
@@ -93,6 +93,10 @@ GLint getTexelFilter(const TexelFilter& texelFilter, const MipmapMode& mipmapMod
     else   return GL_LINEAR;
 }
 
+GLint getMagnificationFilter(const TexelFilter& texelFilter) {
+    return texelFilter == TexelFilter::Linear ? GL_LINEAR : GL_NEAREST;
+}
+
 GLint getAddressMode(const SamplerAddressMode& addressMode) {
     if (addressMode == SamplerAddressMode::Repeat) {
         return GL_REPEAT;
@@ -166,7 +170,7 @@ void Texture2D::initTexture(const TextureUsage& usage, const TextureFormat& text
 
         for (unsigned int i = 0; i < 6; ++i)  glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, getInternalformat(textureFormat), width, height, 0, getFormat(textureFormat), getDataType(textureFormat), data);
         glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, getTexelFilter(sampler.minFilter, sampler.mipmapMode));
-        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, getTexelFilter(sampler.minFilter, sampler.mipmapMode));
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, getMagnificationFilter(sampler.magFilter));
         glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
@@ -180,16 +184,15 @@ void Texture2D::initTexture(const TextureUsage& usage, const TextureFormat& text
         //GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum format, GLenum type, const void* pixels
         //glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, getFormat(textureFormat), getDataType(textureFormat), data);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, getTexelFilter(sampler.minFilter, sampler.mipmapMode));
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, getTexelFilter(sampler.magFilter, sampler.mipmapMode));
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, getMagnificationFilter(sampler.magFilter));
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, getAddressMode(sampler.addressMode));
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, getAddressMode(sampler.addressMode));
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_R, getAddressMode(sampler.addressMode));
         if (sampler.addressMode == SamplerAddressMode::ClampToBorder) {
             GLfloat borderColor[] = { 1.0, 1.0, 1.0, 1.0 };
             glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
         }
         
-        if (sampler.mipmapMode == MipmapMode::Linear)  glGenerateMipmap(GL_TEXTURE_2D);
+        if (sampler.mipmapMode != MipmapMode::None)  glGenerateMipmap(GL_TEXTURE_2D);
         glBindTexture(GL_TEXTURE_2D, 0);
     }
 }

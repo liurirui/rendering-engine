@@ -18,6 +18,7 @@
 #include<Engine/Renderer/Renderer.h>
 #include<Engine/Base/AssetManager.h>
 #include<Engine/Base/Logger.h>
+#include <Engine/Base/Shader.h>
 
 #include <iostream>
 #include<array>
@@ -38,6 +39,7 @@
 #endif
 
 using namespace realtimerenderingengine;
+using std::to_string;
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);

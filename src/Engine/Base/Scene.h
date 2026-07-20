@@ -12,10 +12,10 @@
 #include"Base/Renderable.h"
 #include "Base/ShaderCode.h"
 #include"Camera.h"
+class RenderGraph;
 NAMESPACE_START
 class AssetManager;
 class Shader;
-class RenderGraph;
 class Scene {
 public:
 	Scene(const std::string& sceneName) {
