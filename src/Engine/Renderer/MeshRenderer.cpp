@@ -7,10 +7,12 @@
 #include "Base/Material.h"
 #include "Base/AssetManager.h"
 #include "Renderer/MaterialSystem.h"
+#include "Renderer/IBLSystem.h"
 #include "Base/Scene.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <glad.h>
 
 NAMESPACE_START
 
@@ -24,40 +26,57 @@ static Shader& resolveMaterialShader(AssetManager& assetManager, Mesh* mesh, con
     return *fallbackShader;
 }
 
-static void setupLitShaderCommon(Shader& shader, Scene& scene, Camera* camera, DirectionLight* mainLight, const glm::mat4& projection) {
+static void setupLitShaderCommon(Shader& shader, Scene& scene, Camera* camera, DirectionLight* mainLight, const glm::mat4& projection, const IBLSystem* iblSystem) {
     shader.use();
     shader.setMat4("projection", projection);
     shader.setMat4("view", camera->GetViewMatrix());
     shader.setVec3("viewPos", camera->Position);
-    shader.setVec3("lightPos", mainLight->getDirection() * (-10.0f));
+
     shader.setMat4("lightSpaceMatrix", mainLight->LightSpaceMatrix);
+
     shader.setVec3("light.direction", mainLight->getDirection());
     shader.setVec3("light.color", mainLight->getColor());
     shader.setFloat("light.intensity", mainLight->getIntensity());
+
     shader.setVec3("ambient", 0.3f, 0.3f, 0.3f);
     shader.setVec3("diffuse", 0.6f, 0.6f, 0.6f);
     shader.setVec3("specular", 1.0f, 1.0f, 1.0f);
     shader.setVec3("objectColor", 1.0f, 1.0f, 1.0f);
+    shader.setVec3("ambientColor", 0.03f, 0.03f, 0.03f);
     shader.setFloat("shininess", 32.0f);
     shader.setBool("isMirror", false);
     shader.setBool("isGlass", false);
+    shader.setBool("receiveShadows", true);
     shader.setInt("shadowMap", 1);
+    if (iblSystem) {
+        iblSystem->bindToShader(shader);
+    }
+    else {
+        shader.setBool("hasIBL", false);
+        shader.setFloat("iblIntensity", 0.0f);
+    }
 
-    for (int i = 1; i < scene.lights.size(); i++) {
-        PointLight* light = dynamic_cast<PointLight*>(scene.lights[i]);
-        if (!light) {
+    int pointLightCount = 0;
+    for (Light* lightBase : scene.lights) {
+        PointLight* light = dynamic_cast<PointLight*>(lightBase);
+        if (!light || pointLightCount >= 4) {
             continue;
         }
-        shader.setVec3(("point[" + std::to_string(i - 1) + "].position").c_str(), light->getPosition());
-        shader.setVec3(("point[" + std::to_string(i - 1) + "].color").c_str(), light->getColor());
-        shader.setFloat(("point[" + std::to_string(i - 1) + "].intensity").c_str(), light->getIntensity());
-        shader.setFloat(("point[" + std::to_string(i - 1) + "].constant").c_str(), light->getConstantAttenuation());
-        shader.setFloat(("point[" + std::to_string(i - 1) + "].linear").c_str(), light->getLinearAttenuation());
-        shader.setFloat(("point[" + std::to_string(i - 1) + "].quadratic").c_str(), light->getQuadraticAttenuation());
+
+        const std::string prefix = "point[" + std::to_string(pointLightCount) + "].";
+        shader.setVec3((prefix + "position").c_str(), light->getPosition());
+        shader.setVec3((prefix + "color").c_str(), light->getColor());
+        shader.setFloat((prefix + "intensity").c_str(), light->getIntensity());
+        shader.setFloat((prefix + "constant").c_str(), light->getConstantAttenuation());
+        shader.setFloat((prefix + "linear").c_str(), light->getLinearAttenuation());
+        shader.setFloat((prefix + "quadratic").c_str(), light->getQuadraticAttenuation());
+        shader.setFloat((prefix + "range").c_str(), light->getRange());
+        pointLightCount++;
     }
+    shader.setInt("pointLightCount", pointLightCount);
 }
 
-static void renderSceneObjectsWithMaterials(RenderContext* renderContext, AssetManager& assetManager, Scene& scene, Camera* camera, DirectionLight* mainLight, const glm::mat4& projection, GraphicsPipeline basePipeline, const std::shared_ptr<Shader>& fallbackShader) {
+static void renderSceneObjectsWithMaterials(RenderContext* renderContext, AssetManager& assetManager, Scene& scene, Camera* camera, DirectionLight* mainLight, const glm::mat4& projection, GraphicsPipeline basePipeline, const std::shared_ptr<Shader>& fallbackShader, const IBLSystem* iblSystem) {
     Shader* boundShader = nullptr;
 
     for (auto go : scene.GetRenderableObjects()) {
@@ -73,7 +92,7 @@ static void renderSceneObjectsWithMaterials(RenderContext* renderContext, AssetM
             if (boundShader != &shader) {
                 basePipeline.shader = &shader;
                 renderContext->bindPipeline(basePipeline);
-                setupLitShaderCommon(shader, scene, camera, mainLight, projection);
+                setupLitShaderCommon(shader, scene, camera, mainLight, projection, iblSystem);
                 renderContext->bindTexture(mainLight->getShadow()->depthMap->id, 1);
                 boundShader = &shader;
             }
@@ -93,6 +112,16 @@ MeshRenderer::MeshRenderer(AssetManager& assetManager)
     depthMapShader = assetManager_.getShaderLibrary().getOrCreate(ShaderLibrary::DepthOnlyShaderName());
     defaultLitShader = assetManager_.getShaderLibrary().getOrCreate(ShaderLibrary::DefaultLitShaderName());
     lightDebugShader = assetManager_.getShaderLibrary().getOrCreate(ShaderLibrary::LightDebugShaderName());
+
+    iblSystem_.reset(new IBLSystem());
+    iblSystem_->initialize(assetManager_.resolvePath("resources/textures/hdr/newport_loft.hdr"));
+
+    floorMaterial_.reset(new MaterialAsset());
+    floorMaterial_->name = "engine/floor";
+    floorMaterial_->material.name = floorMaterial_->name;
+    floorMaterial_->material.diffuseColor = glm::vec3(1.0f);
+    floorMaterial_->material.roughness = 0.75f;
+    floorMaterial_->material.metallic = 0.0f;
 
     //set  Originframebuffer's Texture Attachments
     SamplerInfo depthSampler;
@@ -140,8 +169,13 @@ MeshRenderer::MeshRenderer(AssetManager& assetManager)
         RenderContext::getInstance()->setUpVertexBufferLayoutInfo(planeVBO, planeVAO, 2, 8 * sizeof(float), 2, 6);
     }
 }
-void MeshRenderer::setFloorTexture(Texture2D* texture) {
-    floor = texture;
+void MeshRenderer::setFloorTexture(const std::shared_ptr<Texture2D>& texture) {
+    if (!floorMaterial_) {
+        floorMaterial_.reset(new MaterialAsset());
+        floorMaterial_->name = "engine/floor";
+        floorMaterial_->material.name = floorMaterial_->name;
+    }
+    floorMaterial_->material.setDiffuseMap(texture);
 }
 
 void MeshRenderer::addShadowPass(Scene& scene, Camera* camera, RenderGraph& rg) {
@@ -150,19 +184,35 @@ void MeshRenderer::addShadowPass(Scene& scene, Camera* camera, RenderGraph& rg) 
     }
 
     rg.addPass("shadowPass", &camera, [this, &scene, camera](RenderContext* renderContext) {
+        DirectionLight* light = scene.GetMainDirectionalLight();
+        Shadow* shadow = light->getShadow();
+        GLint previousViewport[4];
+        glGetIntegerv(GL_VIEWPORT, previousViewport);
+        const GLboolean polygonOffsetWasEnabled = glIsEnabled(GL_POLYGON_OFFSET_FILL);
+
         depthStencilState.depthTest = true;
         depthStencilState.depthWrite = true;
-        renderContext->beginRendering(scene.GetMainDirectionalLight()->getShadow()->DepthMapFramebuffer);
+        renderContext->beginRendering(shadow->DepthMapFramebuffer);
+        glViewport(0, 0, static_cast<GLsizei>(shadow->SHADOW_WIDTH), static_cast<GLsizei>(shadow->SHADOW_HEIGHT));
+        if (!polygonOffsetWasEnabled) {
+            glEnable(GL_POLYGON_OFFSET_FILL);
+        }
+        // Offset depth-map rasterization to prevent a receiver from shadowing itself.
+        glPolygonOffset(2.0f, 4.0f);
+
         renderContext->setDepthStencilState(depthStencilState);
         renderContext->bindPipeline(graphicsPipeline_DepthMap);
-        depthMapShader->setMat4("lightSpaceMatrix", scene.GetMainDirectionalLight()->LightSpaceMatrix);
-        //plane(shadow)
+        depthMapShader->setMat4("lightSpaceMatrix", light->LightSpaceMatrix);
         depthMapShader->setMat4("model", glm::mat4(1.0f));
         renderContext->bindVertexArray(planeVAO);
         renderContext->drawArrays(0, 6);
-        //gameObject(shadow)
         scene.DrawObjects(*depthMapShader);
         renderContext->endRendering();
+
+        if (!polygonOffsetWasEnabled) {
+            glDisable(GL_POLYGON_OFFSET_FILL);
+        }
+        glViewport(previousViewport[0], previousViewport[1], previousViewport[2], previousViewport[3]);
         });
 }
 
@@ -208,6 +258,7 @@ void MeshRenderer::render(Scene& scene, Camera* camera, RenderGraph& rg) {
         light_model = glm::scale(light_model, glm::vec3(3.0f, 3.0f, 3.0f));
         lightDebugShader->setMat4("model", light_model);
         lightDebugShader->setVec3("lightColor", mainLight->getColor());
+        lightDebugShader->setFloat("lightVisualIntensity", 4.0f);
         renderContext->bindVertexArray(cubeVAO);
         renderContext->drawArrays(0, 36);
 
@@ -222,6 +273,7 @@ void MeshRenderer::render(Scene& scene, Camera* camera, RenderGraph& rg) {
                 light_model = glm::scale(light_model, glm::vec3(0.1f, 0.1f, 0.1f));
                 lightDebugShader->setMat4("model", light_model);
                 lightDebugShader->setVec3("lightColor", pointLight->getColor());
+                lightDebugShader->setFloat("lightVisualIntensity", 4.0f);
                 renderContext->bindVertexArray(cubeVAO);
                 renderContext->drawArrays(0, 36);
             }
@@ -229,19 +281,16 @@ void MeshRenderer::render(Scene& scene, Camera* camera, RenderGraph& rg) {
 
         graphicsPipeline.shader = defaultLitShader.get();
         renderContext->bindPipeline(graphicsPipeline);
-        setupLitShaderCommon(*defaultLitShader, scene, camera, mainLight, projection);
-        defaultLitShader->setInt("baseTexture", 0);
+        setupLitShaderCommon(*defaultLitShader, scene, camera, mainLight, projection, iblSystem_.get());
         renderContext->bindTexture(mainLight->getShadow()->depthMap->id, 1);
 
         //render plane
-        defaultLitShader->setMat4("model", glm::mat4(1.0));
+        MaterialSystem::bindMaterialAsset(floorMaterial_.get(), *defaultLitShader, 2);
+        defaultLitShader->setMat4("model", glm::mat4(1.0f));
         renderContext->bindVertexArray(planeVAO);
-        if (floor) {
-            renderContext->bindTexture(floor->id, 0);
-        }
         renderContext->drawArrays(0, 6);
 
-        renderSceneObjectsWithMaterials(renderContext, assetManager_, scene, camera, mainLight, projection, graphicsPipeline, defaultLitShader);
+        renderSceneObjectsWithMaterials(renderContext, assetManager_, scene, camera, mainLight, projection, graphicsPipeline, defaultLitShader, iblSystem_.get());
 
         renderContext->bindVertexArray(0);
         renderContext->endRendering();
@@ -264,6 +313,5 @@ FrameBufferInfo* MeshRenderer::getTargetFrameBuffer() {
 MeshRenderer::~MeshRenderer() {
     delete fboColorTexture;
     delete fboDepthTexture;
-    delete baseTexture;
 }
 NAMESPACE_END

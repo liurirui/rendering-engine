@@ -104,6 +104,8 @@ public:
     float getConstantAttenuation() const;
     float getLinearAttenuation() const;
     float getQuadraticAttenuation() const;
+    float getRange() const;
+    void setRange(float value);
     void setAttenuation(float constant, float linear, float quadratic);
 
     glm::mat4 calculateShadowViewMatrix(int faceIndex);
@@ -114,6 +116,7 @@ private:
     float constant = 1.0f;       // Decay constant term
     float linear = 0.09f;        // decay linear term
     float quadratic = 0.032f;    // decay quadratic term
+    float range = 8.0f;          // finite point-light influence range
 };
 
 

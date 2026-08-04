@@ -1,4 +1,4 @@
-﻿#include "MaterialSystem.h"
+#include "MaterialSystem.h"
 
 #include <Base/Material.h>
 #include <Base/Shader.h>
@@ -33,6 +33,20 @@ void MaterialSystem::bindMaterial(const Material& material, Shader& shader, int 
     shader.setFloat("roughness", material.roughness);
     shader.setFloat("shininess", material.shininess);
     shader.setFloat("opacity", material.opacity);
+    const bool usesMetallicRoughness = material.workflow == MaterialWorkflow::MetallicRoughness;
+    const bool usesSpecularGlossiness = material.workflow == MaterialWorkflow::SpecularGlossiness;
+    shader.setBool("usesSpecularGlossinessWorkflow", usesSpecularGlossiness);
+
+    shader.setBool("hasDiffuseMap", material.hasDiffuseMap());
+    shader.setBool("hasNormalMap", material.hasNormalMap());
+    shader.setBool("hasSpecularMap", material.hasSpecularMap());
+    shader.setBool("hasReflectionMap", usesSpecularGlossiness && material.hasReflectionMap());
+    shader.setBool("hasMetallicMap", usesMetallicRoughness && material.hasMetallicMap());
+    shader.setBool("hasRoughnessMap", usesMetallicRoughness && material.hasRoughnessMap());
+    shader.setBool("hasMetallicRoughnessMap", usesMetallicRoughness && material.hasMetallicRoughnessMap());
+    shader.setBool("hasAoMap", material.hasAoMap());
+    shader.setBool("hasEmissiveMap", material.hasEmissiveMap());
+    shader.setBool("hasHeightMap", material.hasHeightMap());
 
     int slot = firstTextureSlot;
     int diffuseSlot = -1;
@@ -41,8 +55,10 @@ void MaterialSystem::bindMaterial(const Material& material, Shader& shader, int 
     }
     bindTextureIfPresent(material.normalMap, shader, "normalMap", slot);
     bindTextureIfPresent(material.specularMap, shader, "specularMap", slot);
+    bindTextureIfPresent(material.reflectionMap, shader, "reflectionMap", slot);
     bindTextureIfPresent(material.metallicMap, shader, "metallicMap", slot);
     bindTextureIfPresent(material.roughnessMap, shader, "roughnessMap", slot);
+    bindTextureIfPresent(material.metallicRoughnessMap, shader, "metallicRoughnessMap", slot);
     bindTextureIfPresent(material.aoMap, shader, "aoMap", slot);
     bindTextureIfPresent(material.emissiveMap, shader, "emissiveMap", slot);
     bindTextureIfPresent(material.heightMap, shader, "heightMap", slot);
@@ -50,7 +66,8 @@ void MaterialSystem::bindMaterial(const Material& material, Shader& shader, int 
 
 void MaterialSystem::bindMaterialAsset(const MaterialAsset* materialAsset, Shader& shader, int firstTextureSlot) {
     if (!materialAsset) {
-        shader.use();
+        static Material defaultMaterial;
+        bindMaterial(defaultMaterial, shader, firstTextureSlot);
         return;
     }
     bindMaterial(materialAsset->material, shader, firstTextureSlot);

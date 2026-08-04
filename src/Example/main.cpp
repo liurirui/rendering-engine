@@ -248,6 +248,7 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
 
     //Decide which effect to use
     int useEffect = 0;
+    float exposure = 1.35f;
     
     // Our state
     bool show_demo_window = false;
@@ -258,6 +259,7 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
     screenShader = new Shader(Vert_quad, Frag_quad, nullptr, "engine/screen-quad");
     screenShader->use();
     screenShader->setInt("screenTexture", 0);
+    screenShader->setFloat("exposure", exposure);
     GLenum screenShaderError = glGetError();
     if (screenShaderError != GL_NO_ERROR) {
         Logger::Warn("OpenGL error after screen shader setup. error=" + std::to_string(screenShaderError));
@@ -285,11 +287,16 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
     Scene* scene = new Scene("scene");
     scene->setAssetManager(assetManager);
     scene->Start();
-    scene->AddLight(LightType::Direction, glm::vec3(-0.5f, -0.8f, -0.5f), glm::vec3(2.0f, 2.0f, 2.0f), 1.0f);
-    scene->AddLight(LightType::Point, glm::vec3(0.0f, 6.0f, 5.0f), glm::vec3(6.0f, 0.0f, 0.0f), 0.4f);
-    scene->AddLight(LightType::Point, glm::vec3(-2.0f, 1.0f, -3.0f), glm::vec3(0.0f, 9.0f, 0.0f), 0.4f);
-    scene->AddLight(LightType::Point, glm::vec3(3.0f, 8.5f, 0.0f), glm::vec3(0.0f, 0.0f, 25.0f), 0.2f);
-    scene->AddLight(LightType::Point, glm::vec3(-8.0f, 3.0f, -1.0f), glm::vec3(6.0f, 6.0f, 6.0f), 0.3f);
+    scene->AddLight(LightType::Direction, glm::vec3(-0.5f, -0.8f, -0.5f), glm::vec3(1.0f), 2.0f);
+    auto addPointLight = [scene](const glm::vec3& position, const glm::vec3& color, float intensity, float range) {
+        PointLight* light = static_cast<PointLight*>(scene->AddLight(LightType::Point, position, color, intensity));
+        light->setRange(range);
+    };
+    // Low lighting intensity with bounded influence; visible light cubes stay HDR-emissive for bloom.
+    addPointLight(glm::vec3(0.0f, 6.0f, 5.0f), glm::vec3(1.0f, 0.0f, 0.0f), 1.0f, 7.0f);
+    addPointLight(glm::vec3(-2.0f, 1.0f, -3.0f), glm::vec3(0.0f, 1.0f, 0.0f), 1.0f, 4.0f);
+    addPointLight(glm::vec3(3.0f, 8.5f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f), 1.2f, 7.0f);
+    addPointLight(glm::vec3(-8.0f, 3.0f, -1.0f), glm::vec3(1.0f), 0.9f, 5.0f);
 
     // Main loop
 #ifdef __EMSCRIPTEN__
@@ -339,6 +346,7 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
             ImGui::Checkbox("Another Window", &show_another_window);
 
             ImGui::ColorEdit3("Background Color", (float*)&(renderer->getMeshRenderer().getTargetFrameBuffer()->colorAttachments[0].clearColor)); // Edit 3 floats representing a color
+            ImGui::SliderFloat("Exposure", &exposure, 0.1f, 5.0f, "%.2f");
 
             ImVec4 buttonColor = ImVec4(1.0f, 0.4f, 0.f, 1.0f);      // Color of button
             ImVec4 hoveredColor = ImVec4(0.4f, 0.15f, 0.15f, 1.0f);  // Color on hover
@@ -362,7 +370,7 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
                 config.flags = ImGuiFileDialogFlags_None;           // No special flags
 
                 // Open model file dialog
-                ImGuiFileDialog::Instance()->OpenDialog("ChooseModelDlgKey", "Choose Model", ".obj,.fbx,.dae", config);
+                ImGuiFileDialog::Instance()->OpenDialog("ChooseModelDlgKey", "Choose Model", ".obj,.fbx,.glb,.gltf,.dae", config);
                 openModelDialog = false;
             }
 
@@ -394,7 +402,7 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
             if (ImGuiFileDialog::Instance()->Display("ChooseTextureDlgKey")) {
                 if (ImGuiFileDialog::Instance()->IsOk()) {
                     selectedFilePath = ImGuiFileDialog::Instance()->GetFilePathName();
-                    renderer->getMeshRenderer().setFloorTexture(assetManager->loadTexture2D(selectedFilePath).get());
+                    renderer->getMeshRenderer().setFloorTexture(assetManager->loadTexture2D(selectedFilePath));
                 }
                 ImGuiFileDialog::Instance()->Close();
             }
@@ -512,6 +520,7 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
         glDepthMask(GL_FALSE);
         glDisable(GL_CULL_FACE);
         screenShader->use();
+        screenShader->setFloat("exposure", exposure);
         glBindVertexArray(quadVAO);
 
         glActiveTexture(GL_TEXTURE0);

@@ -26,9 +26,9 @@ public:
     static GameObject* instantiate(const std::shared_ptr<ModelAsset>& asset);
 
 private:
-    static std::shared_ptr<ModelNodeAsset> processNode(aiNode* node, const aiScene* scene, ModelAsset& modelAsset, AssetManager* assetManager, const std::string& directory);
-    static std::shared_ptr<MeshAsset> processMesh(aiMesh* mesh, const aiScene* scene, ModelAsset& modelAsset, AssetManager* assetManager, const std::string& directory);
-    static std::shared_ptr<MaterialAsset> loadMaterial(aiMaterial* mat, const aiScene* scene, AssetManager* assetManager, const std::string& directory);
+    static std::shared_ptr<ModelNodeAsset> processNode(aiNode* node, const aiScene* scene, ModelAsset& modelAsset);
+    static std::shared_ptr<MeshAsset> processMesh(aiMesh* mesh, ModelAsset& modelAsset);
+    static std::shared_ptr<MaterialAsset> loadMaterial(aiMaterial* mat, const aiScene* scene, AssetManager* assetManager, const std::string& directory, bool sourceIsGltf);
     static std::shared_ptr<Texture2D> loadMaterialTexture(aiMaterial* mat, const aiScene* scene, AssetManager* assetManager, const std::string& directory, aiTextureType type, unsigned int index, const std::string& semanticName);
     static GameObject* instantiateNode(const std::shared_ptr<ModelNodeAsset>& node, const std::shared_ptr<ModelAsset>& asset);
 };

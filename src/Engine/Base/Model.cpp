@@ -1,16 +1,30 @@
-﻿#include "Model.h"
+#include "Model.h"
 
 #include "AssetManager.h"
 #include "Renderable.h"
 #include "Texture2D.h"
 #include "Logger.h"
+#include <assimp/pbrmaterial.h>
 #include <algorithm>
+#include <cctype>
 
 NAMESPACE_START
 
 static std::string normalizePath(std::string path) {
     std::replace(path.begin(), path.end(), '\\', '/');
     return path;
+}
+
+static bool isGltfPath(const std::string& path) {
+    const size_t extensionStart = path.find_last_of('.');
+    if (extensionStart == std::string::npos) {
+        return false;
+    }
+
+    std::string extension = path.substr(extensionStart);
+    std::transform(extension.begin(), extension.end(), extension.begin(),
+        [](unsigned char value) { return static_cast<char>(std::tolower(value)); });
+    return extension == ".gltf" || extension == ".glb";
 }
 
 Model::Model(const std::string& path, bool gamma)
@@ -46,18 +60,23 @@ std::shared_ptr<ModelAsset> Model::loadAsset(const std::string& path, AssetManag
 
     std::shared_ptr<ModelAsset> modelAsset(new ModelAsset());
     modelAsset->sourcePath = normalizePath(path);
-    modelAsset->root = processNode(scene->mRootNode, scene, *modelAsset, assetManager, directory);
+    const bool sourceIsGltf = isGltfPath(path);
+    modelAsset->materials.reserve(scene->mNumMaterials);
+    for (unsigned int materialIndex = 0; materialIndex < scene->mNumMaterials; ++materialIndex) {
+        modelAsset->materials.push_back(loadMaterial(scene->mMaterials[materialIndex], scene, assetManager, directory, sourceIsGltf));
+    }
+    modelAsset->root = processNode(scene->mRootNode, scene, *modelAsset);
     Logger::Info("Model imported. path=" + modelAsset->sourcePath + ", meshes=" + std::to_string(modelAsset->meshes.size()) + ", materials=" + std::to_string(modelAsset->materials.size()));
     return modelAsset;
 }
 
-std::shared_ptr<ModelNodeAsset> Model::processNode(aiNode* node, const aiScene* scene, ModelAsset& modelAsset, AssetManager* assetManager, const std::string& directory) {
+std::shared_ptr<ModelNodeAsset> Model::processNode(aiNode* node, const aiScene* scene, ModelAsset& modelAsset) {
     std::shared_ptr<ModelNodeAsset> nodeAsset(new ModelNodeAsset());
     nodeAsset->name = node->mName.C_Str();
 
     for (unsigned int i = 0; i < node->mNumMeshes; i++) {
         aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
-        std::shared_ptr<MeshAsset> meshAsset = processMesh(mesh, scene, modelAsset, assetManager, directory);
+        std::shared_ptr<MeshAsset> meshAsset = processMesh(mesh, modelAsset);
         if (meshAsset) {
             modelAsset.meshes.push_back(meshAsset);
             nodeAsset->meshIndices.push_back(modelAsset.meshes.size() - 1);
@@ -65,7 +84,7 @@ std::shared_ptr<ModelNodeAsset> Model::processNode(aiNode* node, const aiScene* 
     }
 
     for (unsigned int i = 0; i < node->mNumChildren; i++) {
-        std::shared_ptr<ModelNodeAsset> child = processNode(node->mChildren[i], scene, modelAsset, assetManager, directory);
+        std::shared_ptr<ModelNodeAsset> child = processNode(node->mChildren[i], scene, modelAsset);
         if (child) {
             nodeAsset->children.push_back(child);
         }
@@ -73,7 +92,7 @@ std::shared_ptr<ModelNodeAsset> Model::processNode(aiNode* node, const aiScene* 
     return nodeAsset;
 }
 
-std::shared_ptr<MeshAsset> Model::processMesh(aiMesh* mesh, const aiScene* scene, ModelAsset& modelAsset, AssetManager* assetManager, const std::string& directory) {
+std::shared_ptr<MeshAsset> Model::processMesh(aiMesh* mesh, ModelAsset& modelAsset) {
     std::shared_ptr<MeshAsset> meshAsset(new MeshAsset());
     meshAsset->name = mesh->mName.C_Str();
     meshAsset->hasNormals = (mesh->mNormals != nullptr);
@@ -99,12 +118,12 @@ std::shared_ptr<MeshAsset> Model::processMesh(aiMesh* mesh, const aiScene* scene
         }
     }
 
-    if (mesh->mMaterialIndex >= 0) {
-        aiMaterial* mat = scene->mMaterials[mesh->mMaterialIndex];
-        meshAsset->material = loadMaterial(mat, scene, assetManager, directory);
-        if (meshAsset->material) {
-            modelAsset.materials.push_back(meshAsset->material);
-        }
+    if (mesh->mMaterialIndex < modelAsset.materials.size()) {
+        meshAsset->material = modelAsset.materials[mesh->mMaterialIndex];
+    }
+    else {
+        Logger::Warn("Mesh references an invalid source material index. mesh=" + meshAsset->name +
+            ", materialIndex=" + std::to_string(mesh->mMaterialIndex));
     }
     return meshAsset;
 }
@@ -146,13 +165,18 @@ std::shared_ptr<Texture2D> Model::loadMaterialTexture(aiMaterial* mat, const aiS
     return std::shared_ptr<Texture2D>(new Texture2D(filename.c_str()));
 }
 
-std::shared_ptr<MaterialAsset> Model::loadMaterial(aiMaterial* mat, const aiScene* scene, AssetManager* assetManager, const std::string& directory) {
+std::shared_ptr<MaterialAsset> Model::loadMaterial(aiMaterial* mat, const aiScene* scene, AssetManager* assetManager, const std::string& directory, bool sourceIsGltf) {
     std::shared_ptr<MaterialAsset> materialAsset(new MaterialAsset());
     materialAsset->name = mat->GetName().C_Str();
     Material& material = materialAsset->material;
     material.name = materialAsset->name;
 
-    if (auto texture = loadMaterialTexture(mat, scene, assetManager, directory, aiTextureType_BASE_COLOR, 0, "baseColor")) {
+    // Assimp exposes glTF base-color as DIFFUSE at texture index 1.  Prefer
+    // that semantic over the generic texture slots used by legacy formats.
+    if (auto texture = loadMaterialTexture(mat, scene, assetManager, directory, AI_MATKEY_GLTF_PBRMETALLICROUGHNESS_BASE_COLOR_TEXTURE, "baseColor")) {
+        material.setDiffuseMap(texture);
+    }
+    else if (auto texture = loadMaterialTexture(mat, scene, assetManager, directory, aiTextureType_BASE_COLOR, 0, "baseColor")) {
         material.setDiffuseMap(texture);
     }
     else if (auto texture = loadMaterialTexture(mat, scene, assetManager, directory, aiTextureType_DIFFUSE, 0, "diffuse")) {
@@ -169,11 +193,8 @@ std::shared_ptr<MaterialAsset> Model::loadMaterial(aiMaterial* mat, const aiScen
     if (auto texture = loadMaterialTexture(mat, scene, assetManager, directory, aiTextureType_SPECULAR, 0, "specular")) {
         material.setSpecularMap(texture);
     }
-    if (auto texture = loadMaterialTexture(mat, scene, assetManager, directory, aiTextureType_METALNESS, 0, "metallic")) {
-        material.setMetallicMap(texture);
-    }
-    if (auto texture = loadMaterialTexture(mat, scene, assetManager, directory, aiTextureType_DIFFUSE_ROUGHNESS, 0, "roughness")) {
-        material.setRoughnessMap(texture);
+    if (auto texture = loadMaterialTexture(mat, scene, assetManager, directory, aiTextureType_AMBIENT, 0, "legacyReflection")) {
+        material.setReflectionMap(texture);
     }
     if (auto texture = loadMaterialTexture(mat, scene, assetManager, directory, aiTextureType_AMBIENT_OCCLUSION, 0, "ao")) {
         material.setAoMap(texture);
@@ -182,24 +203,87 @@ std::shared_ptr<MaterialAsset> Model::loadMaterial(aiMaterial* mat, const aiScen
         material.setEmissiveMap(texture);
     }
 
-    aiColor3D color(1.0f, 1.0f, 1.0f);
-    if (mat->Get(AI_MATKEY_COLOR_DIFFUSE, color) == AI_SUCCESS) {
-        material.diffuseColor = glm::vec3(color.r, color.g, color.b);
+    // A material only opts into metallic-roughness when its source actually
+    // declares that workflow.  OBJ/MTL, DAE and arbitrary FBX properties are
+    // not reliably convertible to PBR, so they use the engine default data.
+    bool hasMetallicFactor = false;
+    bool hasRoughnessFactor = false;
+    float value = 0.0f;
+    if (mat->Get(AI_MATKEY_GLTF_PBRMETALLICROUGHNESS_METALLIC_FACTOR, value) == AI_SUCCESS) {
+        material.metallic = value;
+        hasMetallicFactor = true;
     }
-    if (mat->Get(AI_MATKEY_COLOR_SPECULAR, color) == AI_SUCCESS) {
-        material.specularColor = glm::vec3(color.r, color.g, color.b);
-    }
-    if (mat->Get(AI_MATKEY_COLOR_EMISSIVE, color) == AI_SUCCESS) {
-        material.emissiveColor = glm::vec3(color.r, color.g, color.b);
+    if (mat->Get(AI_MATKEY_GLTF_PBRMETALLICROUGHNESS_ROUGHNESS_FACTOR, value) == AI_SUCCESS) {
+        material.roughness = value;
+        hasRoughnessFactor = true;
     }
 
-    float value = 0.0f;
-    if (mat->Get(AI_MATKEY_SHININESS, value) == AI_SUCCESS) {
-        material.shininess = value;
+    const bool hasPbrTexture = mat->GetTextureCount(aiTextureType_METALNESS) > 0 ||
+        mat->GetTextureCount(aiTextureType_DIFFUSE_ROUGHNESS) > 0 ||
+        mat->GetTextureCount(aiTextureType_UNKNOWN) > 0 ||
+        mat->GetTextureCount(aiTextureType_DIFFUSE) > 1;
+    const bool usesMetallicRoughness = sourceIsGltf || hasMetallicFactor || hasRoughnessFactor || hasPbrTexture;
+
+    if (usesMetallicRoughness) {
+        material.workflow = MaterialWorkflow::MetallicRoughness;
+        // glTF defaults these factors to 1.0 when a factor is omitted.
+        if (!hasMetallicFactor) {
+            material.metallic = 1.0f;
+        }
+        if (!hasRoughnessFactor) {
+            material.roughness = 1.0f;
+        }
+        if (auto texture = loadMaterialTexture(mat, scene, assetManager, directory, aiTextureType_METALNESS, 0, "metallic")) {
+            material.setMetallicMap(texture);
+        }
+        if (auto texture = loadMaterialTexture(mat, scene, assetManager, directory, aiTextureType_DIFFUSE_ROUGHNESS, 0, "roughness")) {
+            material.setRoughnessMap(texture);
+        }
+        if (auto texture = loadMaterialTexture(mat, scene, assetManager, directory, AI_MATKEY_GLTF_PBRMETALLICROUGHNESS_METALLICROUGHNESS_TEXTURE, "metallicRoughness")) {
+            material.setMetallicRoughnessMap(texture);
+        }
+
+        aiColor4D baseColorFactor(1.0f, 1.0f, 1.0f, 1.0f);
+        if (mat->Get(AI_MATKEY_GLTF_PBRMETALLICROUGHNESS_BASE_COLOR_FACTOR, baseColorFactor) == AI_SUCCESS) {
+            material.diffuseColor = glm::vec3(baseColorFactor.r, baseColorFactor.g, baseColorFactor.b);
+            material.opacity = baseColorFactor.a;
+        }
     }
-    if (mat->Get(AI_MATKEY_OPACITY, value) == AI_SUCCESS) {
-        material.opacity = value;
+    else {
+        // Explicitly convert the old specular-gloss workflow when it is
+        // actually present.  This preserves legacy PBR-like assets without
+        // treating every diffuse-only OBJ/DAE material as specular-gloss.
+        float shininess = 0.0f;
+        const bool hasShininess = mat->Get(AI_MATKEY_SHININESS, shininess) == AI_SUCCESS;
+        if (material.hasSpecularMap() || material.hasReflectionMap() || hasShininess) {
+            material.workflow = MaterialWorkflow::SpecularGlossiness;
+            material.metallic = 0.0f;
+
+            if (hasShininess) {
+                material.shininess = shininess;
+                material.roughness = glm::clamp(glm::sqrt(2.0f / (shininess + 2.0f)), 0.04f, 1.0f);
+            }
+
+            aiColor3D color(1.0f, 1.0f, 1.0f);
+            if (mat->Get(AI_MATKEY_COLOR_DIFFUSE, color) == AI_SUCCESS) {
+                material.diffuseColor = glm::vec3(color.r, color.g, color.b);
+            }
+            if (mat->Get(AI_MATKEY_COLOR_SPECULAR, color) == AI_SUCCESS) {
+                material.specularColor = glm::vec3(color.r, color.g, color.b);
+            }
+        }
     }
+
+    const char* workflowName = material.workflow == MaterialWorkflow::MetallicRoughness ? "metallicRoughness" :
+        material.workflow == MaterialWorkflow::SpecularGlossiness ? "specularGlossiness" : "engineDefault";
+    Logger::Info("Material imported. name=" + material.name +
+        ", workflow=" + workflowName +
+        ", diffuse=" + std::to_string(material.hasDiffuseMap()) +
+        ", normal=" + std::to_string(material.hasNormalMap()) +
+        ", specular=" + std::to_string(material.hasSpecularMap()) +
+        ", reflection=" + std::to_string(material.hasReflectionMap()) +
+        ", metallic=" + std::to_string(material.metallic) +
+        ", roughness=" + std::to_string(material.roughness));
 
     return materialAsset;
 }

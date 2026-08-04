@@ -42,7 +42,7 @@ std::shared_ptr<Shader> ShaderLibrary::registerShader(const std::string& name, c
 
 std::shared_ptr<Shader> ShaderLibrary::createBuiltin(const std::string& name) {
     if (name == DefaultLitShaderName()) {
-        return registerShader(name, Vertmodel_lighting, Fragmodel_lighting);
+        return registerShader(name, general_pbr_vert, general_pbr_frag);
     }
     if (name == DepthOnlyShaderName()) {
         return registerShader(name, Vert_depth_map, Frag_depth_map);

@@ -16,6 +16,54 @@
 - 后续注意：
 ```
 
+## 未提交 - 完善 PBR/IBL 渲染与多格式模型材质导入
+
+- 改动类型：渲染功能 / 材质导入 / 阴影修复 / 示例工具 / 构建部署 / 文档
+- 建议提交标题：`feat: 完善 PBR IBL 与多格式模型材质导入`
+
+### 改动摘要
+
+本轮将默认 lit pass 切换至完整的 metallic-roughness PBR，并补齐 IBL 环境光、HDR tone mapping、方向光阴影稳定性和有限范围点光。模型导入同时支持 glTF/GLB 原生 PBR 材质与旧式 specular-gloss 材质转换；示例程序的模型选择窗口默认展示 OBJ、FBX、GLB、GLTF、DAE。
+
+### 具体改动
+
+1. PBR 与 IBL
+
+- 新增 `IBLSystem`：从 HDR 环境贴图生成 environment cubemap、irradiance map、prefiltered environment map 和 BRDF LUT。
+- `engine/default-lit` 使用 GGX/Smith/Fresnel metallic-roughness BRDF，同时叠加方向光、点光、阴影和 IBL。
+- 屏幕 pass 改为 exponential tone mapping + sRGB gamma；Example 提供 Exposure 调节，默认值为 `1.35`。
+
+2. 材质导入与资源复用
+
+- `Material` 保持纯数据对象，`MaterialSystem` 统一绑定参数及纹理；材质不再持有 Shader 或直接发起 GL 调用。
+- GLB/GLTF 或明确声明 PBR 数据的材质使用模型自带的 base color、metallic、roughness 及合并 metallic-roughness 贴图；正确按 glTF 语义读取 G=roughness、B=metallic。
+- 非 PBR 模型使用引擎默认材质因子：`metallic=0`、`roughness=0.5`，同时仍读取基础色、法线、AO、发光等兼容贴图。
+- 旧式 specular-gloss 材质可转换：`map_Kd`→base color，`map_Bump`→normal，`map_Ks + Ks`→dielectric F0，`map_Ka`→IBL 反射遮罩，`Ns`→感知 roughness。nanosuit 的 `Ns=96.078` 转换结果约为 `0.143`。
+- 按 Assimp 源材质索引只创建一次 `MaterialAsset`，同一模型内的多个 mesh 共享材质资源。
+- 重建法线贴图 TBN 的正交基与手性，减少导入模型因切线空间失真造成的异常高光。
+
+3. 灯光、阴影与泛光
+
+- 方向光 shadow bias 改为使用恒定的 `-light.direction`；正交阴影范围扩大至 `±38`，并在 shadow pass 设置 viewport、polygon offset 及状态恢复。
+- `PointLight` 增加平滑衰减的有限 `range`，低强度点光不再远距离染色场景。
+- 灯光调试 cube 的 HDR 可见亮度与真实照明强度分离，保留 Bloom 效果。
+
+4. 工具与构建
+
+- 模型选择器默认过滤 `.obj,.fbx,.glb,.gltf,.dae`。
+- 构建后自动复制运行时 Assimp DLL；忽略运行日志及 ImGui 本地布局文件。
+
+### 验证情况
+
+- `cmake --build build --config Debug`：通过。
+- `cmake --build build --config Release`：通过。
+- `git diff --check`：通过。
+
+### 推送前检查
+
+- `resources` 是独立 Git 子模块；其中 `objects/qingtianzhu/qingtianzhu.glb` 与 `objects/zhangjiajie/zhangjiajie.glb` 目前未被跟踪。若要随项目发布，应先在该子模块中单独提交并推送，再在主项目提交更新后的子模块指针。
+- 真实透明玻璃仍未实现 glTF alpha mode、transmission、IOR、thickness；Glass 当前是旧式不透明 specular-gloss 近似。
+
 ## bfbdc98 - 调整架构
 
 - 提交时间：2026-07-14 17:51:52 +0800
@@ -479,9 +527,9 @@ MeshRenderer::render(scene)
 4. 黑屏优先看 "Framebuffer incomplete"、"bindPipeline called with null shader"、"OpenGL debug message"。
 ```
 
-## 未提交 - 修复运行时日志可见性与 OpenGL 状态错误
+## 076e0e5 - 修复运行时诊断日志与 OpenGL 状态绑定问题
 
-- 提交时间：待提交
+- 提交时间：2026-07-20 14:52:14 +0800
 - 改动类型：修复 / 运行时诊断 / 渲染稳定性 / 构建验证
 - 建议提交标题：`修复运行时诊断日志与 OpenGL 状态绑定问题`
 

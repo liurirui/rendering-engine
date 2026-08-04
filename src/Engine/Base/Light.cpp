@@ -89,10 +89,12 @@ glm::vec3 DirectionLight::getDirection() const {
 
 void DirectionLight::setDirection(const glm::vec3& direction) { 
     this->direction = direction; 
+    calculateLightSpaceMatrix();
 }
 
 void DirectionLight::calculateLightSpaceMatrix() {
-    glm::mat4 lightProjection = glm::ortho(-25.0f, 25.0f, -25.0f, 25.0f, shadow->near_plane, shadow->far_plane);
+    constexpr float shadowExtent = 38.0f; // Covers the rotated 50 x 50 demo floor.
+    glm::mat4 lightProjection = glm::ortho(-shadowExtent, shadowExtent, -shadowExtent, shadowExtent, shadow->near_plane, shadow->far_plane);
 
     glm::vec3 lightPos = -glm::normalize(direction) * 40.0f;     
     glm::vec3 target = glm::vec3(0.0f, 0.0f, 0.0f); 
@@ -132,6 +134,14 @@ float PointLight::getQuadraticAttenuation() const {
     return quadratic; 
 }
 
+float PointLight::getRange() const {
+    return range;
+}
+
+void PointLight::setRange(float value) {
+    range = value > 0.01f ? value : 0.01f;
+}
+
 void PointLight::setAttenuation(float constant, float linear, float quadratic) {
     this->constant = constant;
     this->linear = linear;
@@ -143,7 +153,7 @@ glm::mat4 PointLight::calculateShadowViewMatrix(int faceIndex) {
     glm::mat4 lightProjection = glm::perspective(glm::radians(90.0f), aspect, shadow->near_plane, shadow->far_plane);
     glm::vec3 up;
     glm::vec3 target;
-    // ���Դ����������+X, -X, +Y, -Y, +Z, -Z
+    // Cubemap faces: +X, -X, +Y, -Y, +Z, -Z.
     switch (faceIndex) {
     case 0: target = position + glm::vec3(1.0f, 0.0f, 0.0f); up = glm::vec3(0.0f, -1.0f, 0.0f); break; // +X
     case 1: target = position + glm::vec3(-1.0f, 0.0f, 0.0f); up = glm::vec3(0.0f, -1.0f, 0.0f); break; // -X

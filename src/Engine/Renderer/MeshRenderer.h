@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <Base/Constants.h>
 #include <RHI/RenderContext.h>
 #include <unordered_map>
@@ -11,9 +11,12 @@ NAMESPACE_START
 class AssetManager;
 class Camera;
 class Shader;
+class Texture2D;
+struct MaterialAsset;
 class DirectionLight;
 class PointLight;
 class Scene;
+class IBLSystem;
 class MeshRenderer {
 public:
     friend class Scene;
@@ -21,13 +24,12 @@ public:
     ~MeshRenderer();
     virtual void render(Scene& scene, Camera* camera, RenderGraph& rg);
     void addShadowPass(Scene& scene, Camera* camera, RenderGraph& rg);
-    void setFloorTexture(Texture2D* texture);
+    void setFloorTexture(const std::shared_ptr<Texture2D>& texture);
     unsigned int getTargetColorTextureID(int  attachment);
     FrameBufferInfo* getTargetFrameBuffer();
 
     //Model mesh textures that need to be stored in advance
     std::unordered_map<std::string, Texture2D*> ColorTextureMap;
-    Texture2D* floor = nullptr;
 
 private:
     //shader
@@ -43,7 +45,8 @@ private:
     //Texture
     Texture2D* fboColorTexture = nullptr;
     Texture2D* fboDepthTexture = nullptr;
-    Texture2D* baseTexture = nullptr;
+    std::shared_ptr<MaterialAsset> floorMaterial_;
+    std::unique_ptr<IBLSystem> iblSystem_;
 
   
 
