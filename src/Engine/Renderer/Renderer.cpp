@@ -5,6 +5,7 @@
 #include "RenderGraph/RenderGraph.h"
 #include <Base/AssetManager.h>
 #include <Base/Camera.h>
+#include <Base/Logger.h>
 #include <Base/Scene.h>
 #include <glad.h>
 
@@ -34,6 +35,20 @@ void Renderer::render(Scene& scene, Camera& camera, int postProcessEffect) {
     glDisable(GL_DEPTH_TEST);
     glDepthMask(GL_FALSE);
     glDisable(GL_CULL_FACE);
+}
+
+void Renderer::resize(int width, int height) {
+    if (width <= 0 || height <= 0) {
+        return;
+    }
+    const bool sizeChanged = renderContext_.windowsWidth != width || renderContext_.windowsHeight != height;
+    renderContext_.windowsWidth = width;
+    renderContext_.windowsHeight = height;
+    meshRenderer_->resize(width, height);
+    postProcessRenderer_->resize(width, height);
+    if (sizeChanged) {
+        Logger::Info("Renderer resized. width=" + std::to_string(width) + ", height=" + std::to_string(height));
+    }
 }
 
 MeshRenderer& Renderer::getMeshRenderer() {

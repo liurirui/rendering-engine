@@ -24,6 +24,7 @@ public:
     ~MeshRenderer();
     virtual void render(Scene& scene, Camera* camera, RenderGraph& rg);
     void addShadowPass(Scene& scene, Camera* camera, RenderGraph& rg);
+    void resize(int width, int height);
     void setFloorTexture(const std::shared_ptr<Texture2D>& texture);
     unsigned int getTargetColorTextureID(int  attachment);
     FrameBufferInfo* getTargetFrameBuffer();
@@ -58,9 +59,6 @@ private:
     const std::vector<Renderable*> translucentMeshes;  
     const std::vector<Renderable*> opaqueMeshes;       
     
-    const unsigned int SCR_WIDTH = 800;
-    const unsigned int SCR_HEIGHT = 600;
-
     //cube
     unsigned int cubeVAO=0,cubeVBO=0;
     float cubeVertices[288] = {

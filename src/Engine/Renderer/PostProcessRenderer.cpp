@@ -4,6 +4,7 @@
 #include "Base/Shader.h"
 #include "Base/Camera.h"
 #include "RenderGraph/RenderGraph.h"
+#include <algorithm>
 NAMESPACE_START
 
 
@@ -135,6 +136,33 @@ PostProcessRenderer::PostProcessRenderer() {
         RenderContext::getInstance()->setUpVertexBufferLayoutInfo(VBO, quadVAO, 2, 4 * sizeof(float), 1, 2);
     }
 
+}
+
+void PostProcessRenderer::resize(int width, int height) {
+    if (width <= 0 || height <= 0) {
+        return;
+    }
+
+    historySeedTexture->resize(width, height);
+    fboBrightTexture->resize(width, height);
+    fboBloomTexture->resize(width, height);
+    fboRadialTexture->resize(width, height);
+    fboMotionTextureA->resize(width, height);
+    fboMotionTextureB->resize(width, height);
+    fboCartoonTexture->resize(width, height);
+    fboRippleTexture->resize(width, height);
+
+    for (int i = 0; i < bloomLevel; ++i) {
+        const int mipWidth = std::max(1, width / (1 << (i + 1)));
+        const int mipHeight = std::max(1, height / (1 << (i + 1)));
+        fboDownSampleColorTexture[i]->resize(mipWidth, mipHeight);
+        fboUpSampleColorTexture[i]->resize(mipWidth, mipHeight);
+    }
+
+    firstRender = true;
+    useFramebufferA = true;
+    NowFramebuffer = nullptr;
+    lastTexture = historySeedTexture;
 }
 
 void PostProcessRenderer::render(RenderGraph& rg, FrameBufferInfo* sceneFBO, int effectNo) {

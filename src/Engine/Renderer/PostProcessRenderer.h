@@ -11,6 +11,7 @@ public:
     PostProcessRenderer();
     ~PostProcessRenderer();
     virtual void render(RenderGraph& rg, FrameBufferInfo* sceneFBO, int effectNo);
+    void resize(int width, int height);
     unsigned int getTargetColorTextureID(int  attachment,int effectNo );
     float time=0;
 private:
@@ -58,9 +59,6 @@ private:
 
     bool firstRender = true;
     bool useFramebufferA = true;
-
-    const unsigned int SCR_WIDTH = 800;
-    const unsigned int SCR_HEIGHT = 600;
 
     unsigned int VBO = 0, quadVAO = 0;
     float quadVertices[24] = {

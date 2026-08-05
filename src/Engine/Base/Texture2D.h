@@ -127,6 +127,8 @@ public:
 
     void initTexture(const TextureUsage& usage, const TextureFormat& textureFormat, const int width, const int height, const unsigned char* data = nullptr);
 
+    void resize(int newWidth, int newHeight);
+
     ~Texture2D();
 
 };

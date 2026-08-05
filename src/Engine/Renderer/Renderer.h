@@ -18,6 +18,7 @@ public:
     ~Renderer();
 
     void render(Scene& scene, Camera& camera, int postProcessEffect);
+    void resize(int width, int height);
 
     MeshRenderer& getMeshRenderer();
     PostProcessRenderer& getPostProcessRenderer();

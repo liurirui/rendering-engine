@@ -6,6 +6,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <glm/glm.hpp>
 
 NAMESPACE_START
 
@@ -21,12 +22,14 @@ struct MeshAsset {
 
 struct ModelNodeAsset {
     std::string name;
+    glm::mat4 localTransform = glm::mat4(1.0f);
     std::vector<size_t> meshIndices;
     std::vector<std::shared_ptr<ModelNodeAsset>> children;
 };
 
 struct ModelAsset {
     std::string sourcePath;
+    size_t transformedNodeCount = 0;
     std::vector<std::shared_ptr<MeshAsset>> meshes;
     std::vector<std::shared_ptr<MaterialAsset>> materials;
     std::shared_ptr<ModelNodeAsset> root;

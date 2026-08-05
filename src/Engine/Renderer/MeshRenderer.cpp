@@ -178,6 +178,18 @@ void MeshRenderer::setFloorTexture(const std::shared_ptr<Texture2D>& texture) {
     floorMaterial_->material.setDiffuseMap(texture);
 }
 
+void MeshRenderer::resize(int width, int height) {
+    if (width <= 0 || height <= 0) {
+        return;
+    }
+    if (fboColorTexture) {
+        fboColorTexture->resize(width, height);
+    }
+    if (fboDepthTexture) {
+        fboDepthTexture->resize(width, height);
+    }
+}
+
 void MeshRenderer::addShadowPass(Scene& scene, Camera* camera, RenderGraph& rg) {
     if (!scene.GetMainDirectionalLight()) {
         return;
@@ -228,7 +240,13 @@ void MeshRenderer::render(Scene& scene, Camera* camera, RenderGraph& rg) {
         depthStencilState.depthTest = true;
         depthStencilState.depthWrite = true;
         // Update Camera UBO
-        glm::mat4 projection = glm::perspective(glm::radians(camera->Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 1000.0f);
+        const int renderWidth = renderContext->windowsWidth;
+        const int renderHeight = renderContext->windowsHeight;
+        if (renderWidth <= 0 || renderHeight <= 0) {
+            return;
+        }
+        glm::mat4 projection = glm::perspective(glm::radians(camera->Zoom),
+            static_cast<float>(renderWidth) / static_cast<float>(renderHeight), 0.1f, 1000.0f);
         if (camera->getUBOID() == 0) {
             camera->createUBO();
         }
@@ -244,6 +262,7 @@ void MeshRenderer::render(Scene& scene, Camera* camera, RenderGraph& rg) {
         Light::bindUBO();
 
         renderContext->beginRendering(OriginFramebuffer);
+        glViewport(0, 0, renderWidth, renderHeight);
         renderContext->setDepthStencilState(depthStencilState);
         GraphicsPipeline lightDebugPipeline = graphicsPipeline;
         lightDebugPipeline.shader = lightDebugShader.get();

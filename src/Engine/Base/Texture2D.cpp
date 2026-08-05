@@ -197,6 +197,23 @@ void Texture2D::initTexture(const TextureUsage& usage, const TextureFormat& text
     }
 }
 
+void Texture2D::resize(int newWidth, int newHeight) {
+    if (useCubeMap || newWidth <= 0 || newHeight <= 0 ||
+        (width == static_cast<unsigned int>(newWidth) && height == static_cast<unsigned int>(newHeight))) {
+        return;
+    }
+
+    width = static_cast<unsigned int>(newWidth);
+    height = static_cast<unsigned int>(newHeight);
+    glBindTexture(GL_TEXTURE_2D, id);
+    glTexImage2D(GL_TEXTURE_2D, 0, getInternalformat(textureFormat), newWidth, newHeight, 0,
+        getFormat(textureFormat), getDataType(textureFormat), nullptr);
+    if (sampler.mipmapMode != MipmapMode::None) {
+        glGenerateMipmap(GL_TEXTURE_2D);
+    }
+    glBindTexture(GL_TEXTURE_2D, 0);
+}
+
 Texture2D::~Texture2D() {
 
     if (id >= 0) {
@@ -206,4 +223,3 @@ Texture2D::~Texture2D() {
 }
 
 NAMESPACE_END
-

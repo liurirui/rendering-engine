@@ -7,6 +7,7 @@
 #include <assimp/pbrmaterial.h>
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 
 NAMESPACE_START
 
@@ -25,6 +26,26 @@ static bool isGltfPath(const std::string& path) {
     std::transform(extension.begin(), extension.end(), extension.begin(),
         [](unsigned char value) { return static_cast<char>(std::tolower(value)); });
     return extension == ".gltf" || extension == ".glb";
+}
+
+static glm::mat4 toGlmMatrix(const aiMatrix4x4& matrix) {
+    return glm::mat4(
+        matrix.a1, matrix.b1, matrix.c1, matrix.d1,
+        matrix.a2, matrix.b2, matrix.c2, matrix.d2,
+        matrix.a3, matrix.b3, matrix.c3, matrix.d3,
+        matrix.a4, matrix.b4, matrix.c4, matrix.d4);
+}
+
+static bool isIdentityMatrix(const glm::mat4& matrix) {
+    const glm::mat4 identity(1.0f);
+    for (int column = 0; column < 4; ++column) {
+        for (int row = 0; row < 4; ++row) {
+            if (std::abs(matrix[column][row] - identity[column][row]) > 0.00001f) {
+                return false;
+            }
+        }
+    }
+    return true;
 }
 
 Model::Model(const std::string& path, bool gamma)
@@ -66,13 +87,20 @@ std::shared_ptr<ModelAsset> Model::loadAsset(const std::string& path, AssetManag
         modelAsset->materials.push_back(loadMaterial(scene->mMaterials[materialIndex], scene, assetManager, directory, sourceIsGltf));
     }
     modelAsset->root = processNode(scene->mRootNode, scene, *modelAsset);
-    Logger::Info("Model imported. path=" + modelAsset->sourcePath + ", meshes=" + std::to_string(modelAsset->meshes.size()) + ", materials=" + std::to_string(modelAsset->materials.size()));
+    Logger::Info("Model imported. path=" + modelAsset->sourcePath +
+        ", meshes=" + std::to_string(modelAsset->meshes.size()) +
+        ", materials=" + std::to_string(modelAsset->materials.size()) +
+        ", transformedNodes=" + std::to_string(modelAsset->transformedNodeCount));
     return modelAsset;
 }
 
 std::shared_ptr<ModelNodeAsset> Model::processNode(aiNode* node, const aiScene* scene, ModelAsset& modelAsset) {
     std::shared_ptr<ModelNodeAsset> nodeAsset(new ModelNodeAsset());
     nodeAsset->name = node->mName.C_Str();
+    nodeAsset->localTransform = toGlmMatrix(node->mTransformation);
+    if (!isIdentityMatrix(nodeAsset->localTransform)) {
+        ++modelAsset.transformedNodeCount;
+    }
 
     for (unsigned int i = 0; i < node->mNumMeshes; i++) {
         aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
@@ -297,6 +325,7 @@ GameObject* Model::instantiate(const std::shared_ptr<ModelAsset>& asset) {
 
 GameObject* Model::instantiateNode(const std::shared_ptr<ModelNodeAsset>& node, const std::shared_ptr<ModelAsset>& asset) {
     GameObject* go = new GameObject(node->name);
+    go->GetTransform()->SetSourceLocalMatrix(node->localTransform);
 
     for (size_t meshIndex : node->meshIndices) {
         if (meshIndex >= asset->meshes.size()) {

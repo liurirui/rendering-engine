@@ -72,6 +72,10 @@ static bool isWindowOpen = false;
 
 bool debugGPU = true;
 
+struct WindowRenderState {
+    Renderer* renderer = nullptr;
+};
+
 float quadVertices[] = { // vertex attributes for a quad that fills the entire screen in Normalized Device Coordinates. NOTE that this plane is now much smaller and at the top of the screen
         // positions   // texCoords
         -1.0f,  -1.0f,  0.0f, 0.0f,
@@ -281,6 +285,13 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
     openGLRenderContext->windowsHeight = SRC_HEIGHT;
     AssetManager* assetManager = new AssetManager(*openGLRenderContext, rootPath);
     Renderer* renderer = new Renderer(*openGLRenderContext, *assetManager);
+    WindowRenderState windowRenderState;
+    windowRenderState.renderer = renderer;
+    glfwSetWindowUserPointer(window, &windowRenderState);
+    int initialFramebufferWidth = 0;
+    int initialFramebufferHeight = 0;
+    glfwGetFramebufferSize(window, &initialFramebufferWidth, &initialFramebufferHeight);
+    renderer->resize(initialFramebufferWidth, initialFramebufferHeight);
 
     std::string texturepath = rootPath + "/resources/textures/background.jpg";
     
@@ -537,6 +548,8 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
 #ifdef __EMSCRIPTEN__
     EMSCRIPTEN_MAINLOOP_END;
 #endif
+    glfwSetWindowUserPointer(window, nullptr);
+    windowRenderState.renderer = nullptr;
     delete scene;
     delete renderer;
     delete assetManager;
@@ -573,6 +586,10 @@ void processInput(GLFWwindow *window)
         camera.ProcessKeyboard(LEFT, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
         camera.ProcessKeyboard(RIGHT, deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
+        camera.ProcessKeyboard(UP, deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
+        camera.ProcessKeyboard(DOWN, deltaTime);
 
     //Control whether the cursor should be hidden
     if (!isWindowOpen) {             //When the window is not expanded
@@ -602,6 +619,10 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
     // make sure the viewport matches the new window dimensions; note that width and 
     // height will be significantly larger than specified on retina displays.
     glViewport(0, 0, width, height);
+    WindowRenderState* state = static_cast<WindowRenderState*>(glfwGetWindowUserPointer(window));
+    if (state && state->renderer) {
+        state->renderer->resize(width, height);
+    }
 }
 
 

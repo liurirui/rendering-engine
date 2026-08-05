@@ -16,10 +16,64 @@
 - 后续注意：
 ```
 
-## 未提交 - 完善 PBR/IBL 渲染与多格式模型材质导入
+## 未提交 - 修复模型节点变换并适配动态窗口尺寸
 
+- 改动类型：模型导入 / 相机控制 / 渲染修复 / 窗口适配
+- 建议提交标题：`fix: 修复模型节点变换并完善相机与窗口适配`
+
+### 改动摘要
+
+修复 Assimp 节点局部矩阵在 `ModelAsset` 和场景实例化流程中丢失的问题；增加 Q/E 世界空间垂直相机移动；完善窗口 resize 链路，使投影矩阵、主场景 HDR/Depth 纹理和全部后处理纹理随 framebuffer 尺寸同步调整，避免最大化或改变窗口尺寸后画面被拉伸。
+
+### 具体改动
+
+1. 模型节点变换
+
+- `ModelNodeAsset` 增加 `localTransform`，保存 Assimp 节点的 `aiNode::mTransformation`。
+- 补充 Assimp 矩阵到 GLM 矩阵的正确转换，并在 `Model::instantiateNode()` 中应用到场景对象。
+- `Transform` 增加源局部矩阵，最终局部矩阵按“运行时 TRS × 导入节点矩阵”组合，避免运行时编辑覆盖模型文件自带变换。
+- `ModelAsset` 增加 `transformedNodeCount` 导入诊断；使用 `cat_mask.fbx` 验证得到 `transformedNodes=1`。
+
+2. 相机输入
+
+- `Camera_Movement` 增加 `UP` 和 `DOWN`。
+- Q 键沿世界 Y 轴上升，E 键沿世界 Y 轴下降。
+- 垂直移动继续使用 `MovementSpeed` 和 `deltaTime`，与原有相机移动速度保持一致。
+
+3. 动态窗口尺寸
+
+- `Texture2D` 增加 `resize()`，在保留 OpenGL texture ID 的情况下重新分配纹理存储。
+- `Renderer::resize()` 更新 `RenderContext` 尺寸，并把新尺寸传递给 `MeshRenderer` 和 `PostProcessRenderer`。
+- 主场景 HDR color/depth 纹理以及 Bloom、downsample、upsample、radial、motion、cartoon、ripple 后处理纹理全部同步 resize。
+- 相机投影宽高比改为使用实时 framebuffer 宽高，不再固定为 `800 / 600`。
+- GLFW framebuffer size callback 除更新 viewport 外，同时通知 `Renderer` 重建相关渲染目标。
+- resize 完成后输出尺寸日志，便于定位窗口与渲染目标不一致的问题。
+
+### 架构影响
+
+- 窗口尺寸变化由应用层 callback 统一传入 `Renderer`，再由 `Renderer` 分发给各渲染模块，避免 Example 直接操作各个 framebuffer 资源。
+- `Transform` 明确区分模型导入产生的源节点矩阵与运行时 TRS，为后续动画、层级变换和编辑器操作保留清晰边界。
+- 当前 resize 仍通过各渲染器主动重分配纹理；后续引入 RenderTargetPool 或完善 RenderGraph 资源系统后，可集中管理瞬时渲染目标。
+
+### 验证情况
+
+- Debug 构建：通过。
+- Release 构建：通过。
+- `git diff --check`：通过。
+- 最大化窗口实测 framebuffer 尺寸为 `1920 × 1009`，主场景显示比例正常。
+- Bloom 后处理完成窗口最大化验证。
+- 未发现 framebuffer incomplete、Shader compile/link 或 OpenGL 功能错误。
+- 验证使用的临时模型自动加载和 Bloom 默认开启代码均已恢复，不包含在待提交改动中。
+
+### 后续注意
+
+- 下一阶段应将 framebuffer/texture 尺寸依赖进一步收敛到统一的 RenderTarget 或 RenderGraph 资源描述中，减少每个 renderer 独立维护 resize 列表的成本。
+
+## d88465d - 完善 PBR IBL 与多格式模型材质导入
+
+- 提交时间：2026-08-04 14:18:29 +0800
+- 完整提交：`d88465d94713dd176ac1117bcde36a8c7c921083`
 - 改动类型：渲染功能 / 材质导入 / 阴影修复 / 示例工具 / 构建部署 / 文档
-- 建议提交标题：`feat: 完善 PBR IBL 与多格式模型材质导入`
 
 ### 改动摘要
 
@@ -59,9 +113,8 @@
 - `cmake --build build --config Release`：通过。
 - `git diff --check`：通过。
 
-### 推送前检查
+### 后续注意
 
-- `resources` 是独立 Git 子模块；其中 `objects/qingtianzhu/qingtianzhu.glb` 与 `objects/zhangjiajie/zhangjiajie.glb` 目前未被跟踪。若要随项目发布，应先在该子模块中单独提交并推送，再在主项目提交更新后的子模块指针。
 - 真实透明玻璃仍未实现 glTF alpha mode、transmission、IOR、thickness；Glass 当前是旧式不透明 specular-gloss 近似。
 
 ## bfbdc98 - 调整架构
