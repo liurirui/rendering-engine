@@ -35,7 +35,7 @@ struct RenderTargetDesc {
     RenderTargetDepthDesc depth;
 };
 
-// Owns the attachment textures used by one framebuffer and keeps their size in sync.
+// RenderTarget 拥有一个 framebuffer 的 attachment 纹理，并统一维护尺寸和生命周期。
 class RenderTarget final {
 public:
     RenderTarget(RenderContext& renderContext, const RenderTargetDesc& desc);

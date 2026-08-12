@@ -21,6 +21,7 @@ Renderer::Renderer(RenderContext& renderContext, AssetManager& assetManager)
 Renderer::~Renderer() = default;
 
 void Renderer::render(Scene& scene, Camera& camera, int postProcessEffect) {
+    // 每帧由 Renderer 组织完整流程；Example 不再直接拼接 shadow、scene 和 post pass。
     RenderGraph renderGraph;
 
     scene.Update();
@@ -38,6 +39,7 @@ void Renderer::render(Scene& scene, Camera& camera, int postProcessEffect) {
 }
 
 void Renderer::resize(int width, int height) {
+    // 窗口尺寸变化由这里统一分发，确保投影矩阵和所有 RenderTarget 同步更新。
     if (width <= 0 || height <= 0) {
         return;
     }

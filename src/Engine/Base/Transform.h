@@ -30,6 +30,7 @@ public:
     void SetSourceLocalMatrix(const glm::mat4& matrix) { m_SourceLocalMatrix = matrix; SetDirty(); }
     const glm::mat4& GetSourceLocalMatrix() const { return m_SourceLocalMatrix; }
 
+    // 运行时编辑矩阵放在导入矩阵左侧，既能移动实例，又不会破坏模型层级变换。
     glm::mat4 getLocalMatrix() const {
         glm::mat4 modelMatrix = glm::mat4(1.0f);
         modelMatrix = glm::translate(modelMatrix, localPosition);

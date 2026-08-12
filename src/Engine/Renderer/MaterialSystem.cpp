@@ -8,6 +8,7 @@
 NAMESPACE_START
 
 static bool bindTextureIfPresent(const std::shared_ptr<Texture2D>& texture, Shader& shader, const char* uniformName, int& slot, int* boundSlot = nullptr) {
+    // 只有存在的贴图才占用 texture unit；slot 从材质起始位置递增，避开 shadow/IBL 保留槽位。
     if (!texture) {
         return false;
     }
@@ -23,6 +24,7 @@ static bool bindTextureIfPresent(const std::shared_ptr<Texture2D>& texture, Shad
 }
 
 void MaterialSystem::bindMaterial(const Material& material, Shader& shader, int firstTextureSlot) {
+    // MaterialSystem 是材质数据到 Shader uniform/texture 的唯一绑定入口。
     shader.use();
     shader.setVec3("ambientColor", material.ambientColor);
     shader.setVec3("diffuseColor", material.diffuseColor);

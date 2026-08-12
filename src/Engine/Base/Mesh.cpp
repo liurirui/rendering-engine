@@ -104,6 +104,7 @@ void Mesh::createIndexBuffer(unsigned int numIndex, unsigned int* indices) {
 }
 
 Mesh::~Mesh() {
+	// 共享资源模式下，GPU 对象由 MeshResource 释放；fallback 模式才由 Mesh 自己释放。
 	if (resource) {
 		return;
 	}
@@ -113,6 +114,7 @@ Mesh::~Mesh() {
 }
 
 void Mesh::setupMesh() {
+	// 旧式调用路径仍可直接从 CPU 数组上传；正常 AssetManager 路径会提前绑定 resource。
 	if (resource) {
 		numVertex = static_cast<unsigned int>(resource->vertexCount());
 		return;
@@ -140,6 +142,7 @@ void Mesh::setupMesh() {
 }
 
 void Mesh::draw() {
+	// draw 不区分材质和 Transform，Renderer 在调用前负责绑定 Shader/uniform。
 	if (resource) {
 		resource->draw();
 		return;

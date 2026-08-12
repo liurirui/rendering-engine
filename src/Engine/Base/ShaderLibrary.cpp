@@ -26,6 +26,7 @@ std::shared_ptr<Shader> ShaderLibrary::get(const ShaderHandle& handle) {
 }
 
 std::shared_ptr<Shader> ShaderLibrary::getOrCreate(const std::string& name) {
+    // ShaderLibrary 是 program 的唯一缓存入口，MaterialAsset 只保存轻量 ShaderHandle。
     auto it = shaders_.find(name);
     if (it != shaders_.end()) {
         return it->second;

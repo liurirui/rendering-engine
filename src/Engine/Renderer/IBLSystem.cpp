@@ -301,6 +301,8 @@ IBLSystem::~IBLSystem() {
 }
 
 bool IBLSystem::initialize(const std::string& hdrPath) {
+    // 初始化阶段一次性预计算环境 cubemap、irradiance、prefilter 和 BRDF LUT，
+    // 运行时 Shader 只做查表采样。
     if (initialized_) {
         return true;
     }

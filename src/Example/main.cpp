@@ -73,6 +73,7 @@ static bool isWindowOpen = false;
 bool debugGPU = true;
 
 struct WindowRenderState {
+    // GLFW callback 通过 user pointer 找到 Renderer，再统一转发窗口 resize。
     Renderer* renderer = nullptr;
 };
 

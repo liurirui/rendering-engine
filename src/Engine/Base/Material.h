@@ -16,6 +16,7 @@ enum class MaterialWorkflow {
 
 class Material {
 public:
+    // Material 是纯材质数据，不持有具体 Shader program，也不直接调用 OpenGL。
     std::string name;
 
     std::shared_ptr<Texture2D> diffuseMap;
@@ -64,6 +65,7 @@ public:
 };
 
 struct MaterialAsset {
+    // ShaderHandle 只表达资源引用；Shader 查找和绑定由 Renderer/MaterialSystem 完成。
     std::string name;
     ShaderHandle shader = ShaderHandle(ShaderLibrary::DefaultLitShaderName());
     Material material;

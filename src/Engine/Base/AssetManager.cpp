@@ -20,6 +20,8 @@ AssetManager::AssetManager(RenderContext& renderContext, std::string rootPath)
 }
 
 std::string AssetManager::resolvePath(const std::string& relativePath) const {
+    // 目前只做斜杠和根目录拼接；后续应补充 canonical/大小写归一化，
+    // 彻底消除 "../a.obj" 与 "objects/a.obj" 产生重复缓存的可能。
     std::string normalized = relativePath;
     std::replace(normalized.begin(), normalized.end(), '\\', '/');
 
@@ -33,6 +35,7 @@ std::string AssetManager::resolvePath(const std::string& relativePath) const {
 }
 
 std::shared_ptr<Texture2D> AssetManager::loadTexture2D(const std::string& path) {
+    // 纹理缓存返回 shared_ptr，材质和 IBL 等多个消费者可以安全共享同一 Texture2D。
     std::string resolvedPath = resolvePath(path);
     auto it = textureCache_.find(resolvedPath);
     if (it != textureCache_.end()) {
@@ -61,9 +64,11 @@ std::shared_ptr<Texture2D> AssetManager::loadEmbeddedTexture2D(const std::string
 
 
 std::shared_ptr<ModelAsset> AssetManager::loadModelAsset(const std::string& path) {
+    // 模型缓存命中后直接返回导入资产；实例化阶段只创建场景对象，避免再次运行 Assimp。
     std::string resolvedPath = resolvePath(path);
     auto it = modelCache_.find(resolvedPath);
     if (it != modelCache_.end()) {
+        // 统计模型级复用：这里不会再次进入 loadMeshResource，因此需要单独记录命中。
         for (const std::shared_ptr<MeshAsset>& meshAsset : it->second->meshes) {
             if (meshAsset && meshAsset->resource) {
                 ++meshResourceStats_.cacheHitCount;
@@ -77,6 +82,8 @@ std::shared_ptr<ModelAsset> AssetManager::loadModelAsset(const std::string& path
     std::shared_ptr<ModelAsset> modelAsset = Model::loadAsset(resolvedPath, this);
     if (modelAsset) {
         size_t uploadedResources = 0;
+        // GPU 上传必须发生在当前 OpenGL Context 有效的线程；未来异步导入需要把这段
+        // CPU Import 与 Render Thread Upload 拆成两个阶段。
         for (size_t meshIndex = 0; meshIndex < modelAsset->meshes.size(); ++meshIndex) {
             const std::shared_ptr<MeshAsset>& meshAsset = modelAsset->meshes[meshIndex];
             if (!meshAsset) {

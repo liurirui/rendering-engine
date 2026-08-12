@@ -40,6 +40,7 @@ FrameBufferInfo::~FrameBufferInfo() {
 }
 
 void OpenGLRenderContext::beginRendering(FrameBufferInfo& fbo) {
+	// FrameBufferInfo 由上层描述 attachment，OpenGL backend 在这里懒创建 FBO 并检查完整性。
 
     if (!fbo.id) {
         glGenFramebuffers(1, &fbo.id);

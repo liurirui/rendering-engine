@@ -9,10 +9,11 @@ class Model;
 class GameObject : public Object
 {
 public:
+    // GameObject 拥有自己的组件、Mesh 实例和子节点；析构时递归释放整棵子树。
     GameObject(const std::string& name = "GameObject")
     {
         m_Name = name;
-        // ÿ�� GameObject �Զ������ҽ�����һ�� Transform
+        // 每个 GameObject 自动创建且仅创建一个 Transform
         m_Transform = new Transform(this);
         m_Components.push_back(m_Transform);
     }
@@ -48,14 +49,14 @@ public:
         }
     }
 
-    // ��ݷ��� Transform
+    // 快捷访问 Transform
     Transform* GetTransform() const { return m_Transform; }
 
-    // ����/δ����
+    // 激活/未激活
     bool IsActiveSelf() const { return m_ActiveSelf; }
     void SetActive(bool active) { m_ActiveSelf = active; }
 
-    // ��������
+    // 生命周期
     void Awake();
     void Start();
     void Update();
@@ -74,10 +75,11 @@ private:
 
 class Renderable {
 public:
+    // 旧的 Renderable 包装仍用于透明排序/包围盒实验，新主流程直接使用 GameObject::meshes。
     Renderable();
     ~Renderable();
 
-    //initialization
+    // 初始化一个 Mesh 与透明标记的组合。
     Renderable(Mesh* mesh, bool isTranslucent);
 
     //Assign the model's Transform to the Renderable

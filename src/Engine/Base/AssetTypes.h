@@ -13,6 +13,7 @@ NAMESPACE_START
 class MeshResource;
 
 struct MeshAsset {
+    // MeshAsset 只描述导入后的 CPU 几何和材质引用；resource 是可共享的 GPU 表示。
     std::string name;
     std::vector<Mesh::Vertex> vertices;
     std::vector<unsigned int> indices;
@@ -24,6 +25,7 @@ struct MeshAsset {
 };
 
 struct ModelNodeAsset {
+    // localTransform 保存 Assimp 节点矩阵，不能在实例化时丢弃，否则 FBX/glTF 层级会变形。
     std::string name;
     glm::mat4 localTransform = glm::mat4(1.0f);
     std::vector<size_t> meshIndices;

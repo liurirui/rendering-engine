@@ -19,6 +19,7 @@ NAMESPACE_START
 
 
 static Shader& resolveMaterialShader(AssetManager& assetManager, Mesh* mesh, const std::shared_ptr<Shader>& fallbackShader) {
+    // 材质只保存 ShaderHandle；实际 program 从 ShaderLibrary 查找，找不到时回退默认 lit。
     if (mesh && mesh->materialAsset && mesh->materialAsset->shader.isValid()) {
         if (std::shared_ptr<Shader> shader = assetManager.getShaderLibrary().get(mesh->materialAsset->shader)) {
             return *shader;
@@ -28,6 +29,7 @@ static Shader& resolveMaterialShader(AssetManager& assetManager, Mesh* mesh, con
 }
 
 static void setupLitShaderCommon(Shader& shader, Scene& scene, Camera* camera, DirectionLight* mainLight, const glm::mat4& projection, const IBLSystem* iblSystem) {
+    // 这些是当前 pass 的共享参数：相机、主方向光、点光源、阴影和 IBL。
     shader.use();
     shader.setMat4("projection", projection);
     shader.setMat4("view", camera->GetViewMatrix());
@@ -78,6 +80,7 @@ static void setupLitShaderCommon(Shader& shader, Scene& scene, Camera* camera, D
 }
 
 static void renderSceneObjectsWithMaterials(RenderContext* renderContext, AssetManager& assetManager, Scene& scene, Camera* camera, DirectionLight* mainLight, const glm::mat4& projection, GraphicsPipeline basePipeline, const std::shared_ptr<Shader>& fallbackShader, const IBLSystem* iblSystem) {
+    // 按对象材质选择 Shader；同一 Shader 连续绘制时复用 pipeline 状态，减少重复绑定。
     Shader* boundShader = nullptr;
 
     for (auto go : scene.GetRenderableObjects()) {
@@ -191,6 +194,7 @@ void MeshRenderer::resize(int width, int height) {
 }
 
 void MeshRenderer::addShadowPass(Scene& scene, Camera* camera, RenderGraph& rg) {
+    // Shadow pass 只写深度和 model/lightSpaceMatrix，不绑定完整材质贴图。
     if (!scene.GetMainDirectionalLight()) {
         return;
     }
@@ -229,6 +233,7 @@ void MeshRenderer::addShadowPass(Scene& scene, Camera* camera, RenderGraph& rg) 
 }
 
 void MeshRenderer::render(Scene& scene, Camera* camera, RenderGraph& rg) {
+    // Forward PBR pass 将场景数据、材质数据和共享 GPU MeshResource 组合后提交绘制。
     addShadowPass(scene, camera, rg);
 
     rg.addPass("scenePass", &camera, [this, &scene, camera](RenderContext* renderContext) {

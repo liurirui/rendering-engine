@@ -16,6 +16,38 @@
 - 后续注意：
 ```
 
+## 未提交 - 补充核心源码中文注释并统一编码
+
+- 改动类型：文档 / 可维护性 / 构建稳定性
+- 建议提交标题：`docs: 补充核心渲染链路中文注释并统一源码编码`
+
+### 改动摘要
+
+为最近十次提交涉及的资源、场景、渲染、后处理和示例入口补充中文架构注释，解释 CPU 资产与 GPU 资源的边界、场景与 Renderer 的职责、材质绑定、RenderTarget 生命周期以及 IBL 预计算流程。本轮不改变渲染行为，只提升代码可读性和后续维护效率。
+
+### 具体改动
+
+- `AssetManager`、`AssetTypes`、`Model`、`Mesh`、`MeshResource`：说明模型导入、资源缓存、GPU 上传和共享所有权。
+- `Material`、`MaterialSystem`、`ShaderLibrary`、`MeshRenderer`：说明材质数据、ShaderHandle 解析和 pass 绑定关系。
+- `Scene`、`Renderable`、`Transform`、`Camera`、`Light`：说明场景树、节点矩阵、相机输入和阴影空间职责。
+- `RenderTarget`、`RenderGraph`、`PostProcessRenderer`、`IBLSystem`、`Renderer`、OpenGL RHI：说明渲染目标、顺序 pass、后处理和 IBL 生命周期。
+- `Example/main.cpp`：说明窗口 resize 转发以及 OpenGL Context 销毁前的资源释放顺序。
+- 新增 `.editorconfig` 与 `.gitattributes`，统一源码、CMake、批处理和 Markdown 为 UTF-8，约束换行和 Git 工作树编码。
+- MSVC 的 Engine/Example target 显式启用 `/utf-8`；历史含中文注释的 Scene、Renderable 文件已转换为 UTF-8。
+
+### 编码与验证
+
+- UTF-8 严格解码检查：本轮修改的源码/文档文件均通过，无非法字节和 `U+FFFD` 替换字符。
+- `git diff --check`：通过。
+- Debug/Release 构建：均已通过，未出现 C4819 或中文编码导致的级联语法错误。
+- Release 程序运行 8 秒：进程保持正常，日志中未发现 Shader 编译/链接失败、Framebuffer incomplete、HIGH severity 或 `[ERROR]`。
+- Git clean 编码转换检查：通过，`.gitattributes` 的 UTF-8 工作树规则可正常处理本轮文件。
+
+### 后续注意
+
+- 编辑器应遵循 `.editorconfig`；如果终端仍显示 `ç›®`、`æ¨¡åž‹` 等文本，那是终端代码页显示问题，不代表文件编码损坏。
+- 新增源文件必须保存为 UTF-8，并避免使用本地 ANSI/GBK 保存。
+
 ## 未提交 - 引入 RenderTarget 统一渲染目标资源
 
 - 改动类型：渲染架构 / GPU 资源生命周期 / 后处理 / 文档

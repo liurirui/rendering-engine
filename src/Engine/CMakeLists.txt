@@ -33,6 +33,11 @@ list(APPEND SOURCES ${Renderer_SOURCES} ${Base_SOURCES} ${RHI_SOURCES})
 # 生成链接库
 add_library(engine ${SOURCES})
 
+# 源码和注释统一保存为 UTF-8；显式指定后，MSVC 不再按系统 CP936 误解析中文。
+if(MSVC)
+    target_compile_options(engine PRIVATE /utf-8)
+endif()
+
 find_package(glad)
 include_directories("${glad_INCLUDE_DIRS}")
 

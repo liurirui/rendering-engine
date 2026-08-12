@@ -38,6 +38,7 @@ Camera::Camera(glm::vec3 position, glm::vec3 up, float yaw, float pitch)
     // processes input received from any keyboard-like input system. Accepts input parameter in the form of camera defined ENUM (to abstract it from windowing systems)
     void Camera::ProcessKeyboard(Camera_Movement direction, float deltaTime)
     {
+        // 所有方向统一使用 deltaTime，保证不同帧率下相机移动速度一致。
         deltaTime =( deltaTime < 0.05f )? deltaTime:0.05f;
         float velocity = MovementSpeed * deltaTime;
         if (direction == FORWARD)
@@ -48,6 +49,7 @@ Camera::Camera(glm::vec3 position, glm::vec3 up, float yaw, float pitch)
             Position -= Right * velocity;
         if (direction == RIGHT)
             Position += Right * velocity;
+        // Q/E 沿世界 Up 移动，而不是相机局部 Up，避免相机翻转后垂直方向改变。
         if (direction == UP)
             Position += WorldUp * velocity;
         if (direction == DOWN)

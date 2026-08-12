@@ -198,6 +198,7 @@ void Texture2D::initTexture(const TextureUsage& usage, const TextureFormat& text
 }
 
 void Texture2D::resize(int newWidth, int newHeight) {
+    // resize 只适用于 2D render target；外部材质纹理和 cubemap 不在窗口 resize 链路中。
     if (useCubeMap || newWidth <= 0 || newHeight <= 0 ||
         (width == static_cast<unsigned int>(newWidth) && height == static_cast<unsigned int>(newHeight))) {
         return;

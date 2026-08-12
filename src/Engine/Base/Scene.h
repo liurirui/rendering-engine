@@ -16,6 +16,7 @@ class RenderGraph;
 NAMESPACE_START
 class AssetManager;
 class Shader;
+// Scene 描述“世界中有什么”，不负责选择 Shader 或绑定材质。
 class Scene {
 public:
 	Scene(const std::string& sceneName) {
@@ -32,16 +33,17 @@ public:
 	float calculateDistance(glm::vec3 cameraPosition, glm::vec3 meshPosition);
 	void sortTranslucentMeshes(glm::vec3 cameraPosition);
 
-	//Interface function
+	// 场景生命周期接口。
 	void Start();
 	void Update();
+	// 从 root 开始递归计算所有 GameObject 的 world matrix。
 	void UpdateTransform(GameObject* go);
 	void Render(Camera* camera, RenderGraph& rg);
 	void DrawObjects(Shader& shader);
 
 	void clear(); 
 
-	// ����/ɾ������
+	// 添加/删除物体
 	void addRootChild(GameObject* go) {
 		root->addChildren(go);
 	}
@@ -57,7 +59,7 @@ public:
 	DirectionLight* GetMainDirectionalLight() const;
 	std::vector<PointLight*> GetPointLights() const;
 
-	// ��Դͳһ����������
+	// 光源统一缓冲区管理
 	void UpdateLightUBO();
 	void addLight(Light* light) {
 		lights.emplace_back(light);
@@ -67,6 +69,7 @@ public:
 	std::vector<Light*> lights;
 	DirectionLight* mainDirectionalLight = nullptr;
 	std::vector<GameObject*> renderableObjects;
+	// 保持模型资产、材质和 MeshResource 的共享生命周期。
 	std::vector<std::shared_ptr<ModelAsset>> modelAssets;
 	std::string name = "scene";
 private:

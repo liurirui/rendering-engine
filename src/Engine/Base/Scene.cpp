@@ -6,6 +6,8 @@
 #include "Base/Shader.h"
 #include "Logger.h"
 NAMESPACE_START
+
+// Scene 管理世界对象、灯光和资源引用；具体渲染 pass 由 Renderer 负责。
 Scene::~Scene() {
 	for (auto light : lights) {
 		delete light;
@@ -33,12 +35,14 @@ void Scene::sortTranslucentMeshes(glm::vec3 cameraPosition) {
 }
 
 void Scene::storeObjectMeshes(GameObject* go) {
+	// 预先收集包含 Mesh 的节点，Renderer 每帧无需重复遍历完整场景树。
 	if (!go->meshes.empty()) renderableObjects.emplace_back(go);
 	for (auto children : go->child) {
 		storeObjectMeshes(children);
 	}
 }
 
+// 通过 AssetManager 获取可共享资源，再实例化为场景 GameObject 树。
 void Scene::createModel(const std::string& modelPath){
 	std::shared_ptr<ModelAsset> modelAsset = assetManager
 		? assetManager->loadModelAsset(modelPath)
@@ -89,7 +93,7 @@ Light* Scene::AddLight(LightType type, const glm::vec3& param, const glm::vec3& 
 			break;
 		}
 		case LightType::Spot: {
-			// ������
+			// 待添加
 			break;
 		}
 	}
@@ -108,6 +112,7 @@ void Scene::Update() {
 	//updateMeshTransform();
 }
 
+// 父节点矩阵递归向下传播，Transform 内部再组合运行时 TRS 与导入矩阵。
 void Scene::UpdateTransform(GameObject* go) {
 	if (!go->GetTransform()) return;
 	glm::mat4 parentWorldMaterix = glm::mat4(1.0);
@@ -120,6 +125,7 @@ void Scene::UpdateTransform(GameObject* go) {
 }
 
 void Scene::DrawObjects(Shader& shader) {
+	// 该接口主要供 depth/shadow pass 使用，只设置 model matrix，不绑定材质。
 	shader.use();
 	for (auto go : renderableObjects) {
 		for (auto mesh : go->meshes) {

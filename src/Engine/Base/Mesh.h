@@ -15,6 +15,7 @@ class MeshResource;
     class Mesh
     {
     public:
+        // Mesh 是场景实例级对象：Transform/Material 属于实例，GPU 几何通过 resource 共享。
         struct Vertex {
             glm::vec3 position;
             glm::vec3 normal;
@@ -34,6 +35,7 @@ class MeshResource;
 
         void createIndexBuffer(unsigned int numIndex, unsigned int* indices);
 
+        // 兼容旧的包围盒和调试代码；使用共享 MeshResource 时不再用这些数组上传 GPU。
         std::vector<Vertex> vertices;
         std::vector<unsigned int> indices;
         bool hasNormals = false;
@@ -45,6 +47,7 @@ class MeshResource;
         unsigned int ibo = 0;   // 索引缓冲
         std::string name;
         std::shared_ptr<MaterialAsset> materialAsset;
+        // 非拥有意义上的“资源引用”：多个 Mesh 实例可指向同一 VAO/VBO/IBO。
         std::shared_ptr<MeshResource> resource;
          
     };

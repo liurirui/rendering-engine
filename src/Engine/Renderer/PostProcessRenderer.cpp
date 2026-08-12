@@ -10,6 +10,7 @@ NAMESPACE_START
 
 
 static void LogOpenGLErrorIfAny(const char* context) {
+    // 局部 pass 检查 OpenGL 状态，日志带上下文名称，避免黑屏时只能看到错误码。
     GLenum errorCode = glGetError();
     if (errorCode != GL_NO_ERROR) {
         realtimerenderingengine::Logger::Warn(std::string("OpenGL error in ") + context + ". error=" + std::to_string(errorCode));
@@ -17,6 +18,7 @@ static void LogOpenGLErrorIfAny(const char* context) {
 }
 static std::unique_ptr<RenderTarget> CreateColorTarget(RenderContext& renderContext, const std::string& name,
     int width, int height, const SamplerInfo& sampler, const glm::vec4& clearColor) {
+    // 所有屏幕后处理目标都通过同一个工厂构造，避免格式、采样器和清屏参数不一致。
     RenderTargetDesc desc;
     desc.debugName = name;
     desc.width = width;
@@ -31,6 +33,7 @@ static std::unique_ptr<RenderTarget> CreateColorTarget(RenderContext& renderCont
 
 PostProcessRenderer::PostProcessRenderer(RenderContext& renderContext)
     : renderContext_(renderContext) {
+	// 后处理目标只保存中间图像；最终 tone mapping 仍由 Example 的屏幕 pass 完成。
 	PostProcessRenderer_depthStencilState.depthTest = false;
     PostProcessRenderer_depthStencilState.depthWrite = false;
     //PostProcessRenderer_depthStencilState.depthWrite = false;
@@ -85,6 +88,7 @@ PostProcessRenderer::PostProcessRenderer(RenderContext& renderContext)
 }
 
 void PostProcessRenderer::resize(int width, int height) {
+    // Bloom mip 链必须按各自目标尺寸 resize，不能只修改默认 viewport。
     if (width <= 0 || height <= 0) {
         return;
     }
@@ -111,6 +115,7 @@ void PostProcessRenderer::resize(int width, int height) {
 }
 
 void PostProcessRenderer::render(RenderGraph& rg, FrameBufferInfo* sceneFBO, int effectNo) {
+    // Bloom 是公共前置 pass；effectNo 决定是否继续追加一个后处理效果。
     ////Bloom
     const char* bloomPassName = "bloomPass";
     rg.addPass(bloomPassName, sceneFBO, [this, sceneFBO](RenderContext* renderContext) {
@@ -127,6 +132,7 @@ void PostProcessRenderer::render(RenderGraph& rg, FrameBufferInfo* sceneFBO, int
         renderContext->drawArrays(0, 6);
         renderContext->endRendering();
 
+        // 逐级降采样提取更大范围的高光，减少全分辨率模糊成本。
         for (int i = 0; i < bloomLevel; i++) {
             RenderTarget& downTarget = *downSampleTargets_[i];
             renderContext->beginRendering(downTarget.framebuffer());
@@ -144,6 +150,7 @@ void PostProcessRenderer::render(RenderGraph& rg, FrameBufferInfo* sceneFBO, int
             renderContext->drawArrays(0, 6);
         }
 
+        // 自底向上合并 mip，恢复到屏幕尺寸附近的柔和 Bloom。
         for (int i = bloomLevel - 2; i >= 0; i--) {
             RenderTarget& upTarget = *upSampleTargets_[i];
             renderContext->beginRendering(upTarget.framebuffer());
@@ -207,7 +214,7 @@ void PostProcessRenderer::render(RenderGraph& rg, FrameBufferInfo* sceneFBO, int
         return;
     }
 
-    //Motion Blur
+    // Motion Blur 使用 A/B ping-pong 保存上一帧输出，resize 后必须重置历史状态。
     if (effectNo == 3) {
         const char* MotionPassName = "MotionPass";
         PostProcessRenderer_graphicsPipeline.shader = MotionBlurShader.getPtr();

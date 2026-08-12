@@ -30,6 +30,7 @@ static bool isGltfPath(const std::string& path) {
 }
 
 static glm::mat4 toGlmMatrix(const aiMatrix4x4& matrix) {
+    // Assimp 与 GLM 的矩阵构造约定不同，必须显式按列传入，避免节点矩阵被转置。
     return glm::mat4(
         matrix.a1, matrix.b1, matrix.c1, matrix.d1,
         matrix.a2, matrix.b2, matrix.c2, matrix.d2,
@@ -59,6 +60,7 @@ Model::Model(const std::string& path, AssetManager* assetManager, bool gamma) {
 }
 
 std::shared_ptr<ModelAsset> Model::loadAsset(const std::string& path, AssetManager* assetManager) {
+    // 这里先生成可缓存的 CPU ModelAsset；GPU MeshResource 由 AssetManager 随后创建。
     Assimp::Importer importer;
     const unsigned int importFlags = aiProcess_Triangulate |
         aiProcess_GenSmoothNormals |
@@ -122,6 +124,7 @@ std::shared_ptr<ModelNodeAsset> Model::processNode(aiNode* node, const aiScene* 
 }
 
 std::shared_ptr<MeshAsset> Model::processMesh(aiMesh* mesh, ModelAsset& modelAsset) {
+    // 只提取导入数据，不在 Assimp 遍历阶段创建 OpenGL buffer，保持 CPU 导入逻辑可复用。
     std::shared_ptr<MeshAsset> meshAsset(new MeshAsset());
     meshAsset->name = mesh->mName.C_Str();
     meshAsset->hasNormals = (mesh->mNormals != nullptr);
@@ -325,6 +328,7 @@ GameObject* Model::instantiate(const std::shared_ptr<ModelAsset>& asset) {
 }
 
 GameObject* Model::instantiateNode(const std::shared_ptr<ModelNodeAsset>& node, const std::shared_ptr<ModelAsset>& asset) {
+    // 实例化只创建场景树和实例状态；MeshAsset 的 GPU resource 通过 shared_ptr 复用。
     GameObject* go = new GameObject(node->name);
     go->GetTransform()->SetSourceLocalMatrix(node->localTransform);
 
@@ -335,6 +339,7 @@ GameObject* Model::instantiateNode(const std::shared_ptr<ModelNodeAsset>& node, 
         const std::shared_ptr<MeshAsset>& meshAsset = asset->meshes[meshIndex];
         Mesh* mesh = new Mesh();
         mesh->name = meshAsset->name;
+        // 保留 CPU 副本以兼容旧包围盒/调试接口；后续可改成 GeometryAsset 共享引用。
         mesh->vertices = meshAsset->vertices;
         mesh->indices = meshAsset->indices;
         mesh->hasNormals = meshAsset->hasNormals;

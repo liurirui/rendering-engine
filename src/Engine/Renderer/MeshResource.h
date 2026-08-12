@@ -9,8 +9,8 @@ NAMESPACE_START
 
 class RenderContext;
 
-// GPU representation of one MeshAsset. It can be shared by any number of
-// scene Mesh instances while transforms and materials remain instance data.
+// 一个 MeshAsset 对应的 GPU 几何资源。多个场景 Mesh 实例共享它；Transform 属于实例，
+// MaterialAsset 属于导入材质资源。
 class MeshResource final {
 public:
     MeshResource(RenderContext& renderContext,

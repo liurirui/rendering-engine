@@ -17,6 +17,11 @@ list(APPEND SOURCES ${Main_SOURCES})
 #add_executable(example ${SOURCES})
 add_executable(example WIN32 ${SOURCES})
 
+# Example 同样包含中文注释和字符串，统一要求 MSVC 使用 UTF-8 解析源码。
+if(MSVC)
+    target_compile_options(example PRIVATE /utf-8)
+endif()
+
 find_package(engine)
 include_directories("${engine_INCLUDE_DIRS}")
 

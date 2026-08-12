@@ -13,6 +13,7 @@ Shadow::Shadow(LightType type) {
 Shadow::~Shadow() { delete depthMap; }
 
 void Shadow::initDirection() {
+    // 方向光使用二维深度纹理；ClampToBorder 让投影范围外默认视为无阴影。
     SamplerInfo depthSampler;
     depthSampler.mipmapMode = MipmapMode::None;
     depthSampler.addressMode = SamplerAddressMode::ClampToBorder;
@@ -93,6 +94,7 @@ void DirectionLight::setDirection(const glm::vec3& direction) {
 }
 
 void DirectionLight::calculateLightSpaceMatrix() {
+    // 当前使用固定正交范围，适合示例场景；大型场景应按相机视锥拟合或升级 CSM。
     constexpr float shadowExtent = 38.0f; // Covers the rotated 50 x 50 demo floor.
     glm::mat4 lightProjection = glm::ortho(-shadowExtent, shadowExtent, -shadowExtent, shadowExtent, shadow->near_plane, shadow->far_plane);
 

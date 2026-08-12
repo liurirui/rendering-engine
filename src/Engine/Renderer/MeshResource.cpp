@@ -13,6 +13,7 @@ MeshResource::MeshResource(RenderContext& renderContext,
     bool hasTexCoords,
     bool hasTangents)
     : renderContext_(renderContext), vertexCount_(vertices.size()), indexCount_(indices.size()) {
+    // 空几何或超出当前 RHI int 参数范围的资源直接拒绝上传，避免产生半有效 VAO。
     if (vertices.empty() || indices.empty()) {
         Logger::Error("MeshResource creation rejected empty geometry. vertices=" +
             std::to_string(vertices.size()) + ", indices=" + std::to_string(indices.size()));
@@ -24,6 +25,7 @@ MeshResource::MeshResource(RenderContext& renderContext,
         return;
     }
 
+    // GPU 上传只在资源首次创建时执行；后续实例只持有 shared_ptr。
     vbo_ = renderContext_.createVertexBuffer(vertices.data(),
         static_cast<int>(vertices.size() * sizeof(Mesh::Vertex)));
     ibo_ = renderContext_.createIndexBuffer(indices.data(),
@@ -53,6 +55,7 @@ MeshResource::MeshResource(RenderContext& renderContext,
 }
 
 MeshResource::~MeshResource() {
+    // 调用者必须保证 RenderContext 对应的 OpenGL Context 仍然有效。
     if (vao_) renderContext_.deleteVertexArray(vao_);
     if (vbo_) renderContext_.deleteVertexBuffer(vbo_);
     if (ibo_) renderContext_.deleteIndexBuffer(ibo_);

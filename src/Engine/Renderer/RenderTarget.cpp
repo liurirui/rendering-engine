@@ -13,6 +13,7 @@ RenderTarget::RenderTarget(RenderContext& renderContext, const RenderTargetDesc&
 }
 
 void RenderTarget::createAttachments() {
+    // FrameBufferInfo 中的 texture 指针只是非拥有视图，真正所有权在下面的 unique_ptr 中。
     framebuffer_.colorAttachments.clear();
     colorTextures_.clear();
     colorTextures_.reserve(desc_.colors.size());
@@ -58,6 +59,7 @@ void RenderTarget::createAttachments() {
 }
 
 void RenderTarget::resize(int width, int height) {
+    // 保留 texture ID，只重新分配 storage；这样引用该 attachment 的 FBO 无需重建。
     width = (std::max)(1, width);
     height = (std::max)(1, height);
     if (desc_.width == width && desc_.height == height) {

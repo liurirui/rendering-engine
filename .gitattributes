@@ -1,0 +1,13 @@
+# 统一源码与文档的字符集，避免 Windows 代码页把中文注释误识别为乱码。
+* text=auto eol=crlf
+*.h text working-tree-encoding=UTF-8
+*.hpp text working-tree-encoding=UTF-8
+*.cpp text working-tree-encoding=UTF-8
+*.c text working-tree-encoding=UTF-8
+*.cc text working-tree-encoding=UTF-8
+*.inl text working-tree-encoding=UTF-8
+*.cmake text working-tree-encoding=UTF-8
+CMakeLists.txt text working-tree-encoding=UTF-8
+*.md text working-tree-encoding=UTF-8
+*.bat text working-tree-encoding=UTF-8
+

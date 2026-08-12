@@ -14,6 +14,7 @@
 NAMESPACE_START
 
     // ------------------------------------------------------------------------
+    // 任一阶段失败都会输出 debug name、阶段、驱动 info log 和带行号源码预览。
     Shader::Shader(const char* vertexCode, const char* fragmentCode, const char* geometryCode, const char* debugName)
     {
         if (debugName && debugName[0] != '\0') {
@@ -174,4 +175,3 @@ NAMESPACE_START
     }
 
 NAMESPACE_END
-
