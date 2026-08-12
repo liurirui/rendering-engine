@@ -4,6 +4,7 @@
 #include "Base/Shader.h"
 #include "Base/Camera.h"
 #include "RenderGraph/RenderGraph.h"
+#include "RenderTarget.h"
 #include <algorithm>
 NAMESPACE_START
 
@@ -14,7 +15,22 @@ static void LogOpenGLErrorIfAny(const char* context) {
         realtimerenderingengine::Logger::Warn(std::string("OpenGL error in ") + context + ". error=" + std::to_string(errorCode));
     }
 }
-PostProcessRenderer::PostProcessRenderer() {
+static std::unique_ptr<RenderTarget> CreateColorTarget(RenderContext& renderContext, const std::string& name,
+    int width, int height, const SamplerInfo& sampler, const glm::vec4& clearColor) {
+    RenderTargetDesc desc;
+    desc.debugName = name;
+    desc.width = width;
+    desc.height = height;
+    RenderTargetColorDesc color;
+    color.format = TextureFormat::RGBA32F;
+    color.sampler = sampler;
+    color.clearColor = clearColor;
+    desc.colors.emplace_back(color);
+    return std::unique_ptr<RenderTarget>(new RenderTarget(renderContext, desc));
+}
+
+PostProcessRenderer::PostProcessRenderer(RenderContext& renderContext)
+    : renderContext_(renderContext) {
 	PostProcessRenderer_depthStencilState.depthTest = false;
     PostProcessRenderer_depthStencilState.depthWrite = false;
     //PostProcessRenderer_depthStencilState.depthWrite = false;
@@ -28,103 +44,33 @@ PostProcessRenderer::PostProcessRenderer() {
     CartoonShader = TRefCountPtr<Shader>(new Shader(Vert_quad, Frag_cartoon, nullptr, "post/cartoon"));
     RippleShader = TRefCountPtr<Shader>(new Shader(Vert_quad, Frag_ripple, nullptr, "post/ripple"));
 
-    historySeedTexture = RenderContext::getInstance()->createTexture2D(TextureUsage::RenderTarget, TextureFormat::RGBA32F, RenderContext::getInstance()->windowsWidth,
-        RenderContext::getInstance()->windowsHeight);
-    lastTexture = historySeedTexture;
-
-    //set HightLightFramebuffer's Texture Attachments
     SamplerInfo bloomSampler;
     bloomSampler.mipmapMode = MipmapMode::None;
     bloomSampler.addressMode = SamplerAddressMode::ClampToEdge;
-    fboBrightTexture = RenderContext::getInstance()->createTexture2D(TextureUsage::RenderTarget, TextureFormat::RGBA32F, RenderContext::getInstance()->windowsWidth,
-        RenderContext::getInstance()->windowsHeight, bloomSampler);
-    ColorAttachment brightAttachment;
-    brightAttachment.attachment = 0;
-    brightAttachment.texture = fboBrightTexture;
-    brightAttachment.clearColor = glm::vec4(0, 1, 0, 1);
-    HighLightFramebuffer.colorAttachments.emplace_back(std::move(brightAttachment));
+    const int width = renderContext_.windowsWidth;
+    const int height = renderContext_.windowsHeight;
+    highLightTarget_ = CreateColorTarget(renderContext_, "post/highlight", width, height, bloomSampler, glm::vec4(0.0f));
     PostProcessRenderer_graphicsPipeline.shader = HightLightShader.getPtr();
     PipelineColorBlendAttachment pipelineColorBlendAttachment;
     pipelineColorBlendAttachment.blendState.enabled = false;
     PostProcessRenderer_graphicsPipeline.rasterizationState.cullMode = CullMode::None;
     PostProcessRenderer_graphicsPipeline.rasterizationState.blendState.attachmentsBlendState.push_back(pipelineColorBlendAttachment);
 
-    //set pingpongFramebuffer's Texture Attachments
-    
-    
     for (int i = 0; i < bloomLevel; i++) {
-        fboDownSampleColorTexture[i] = RenderContext::getInstance()->createTexture2D(TextureUsage::RenderTarget, TextureFormat::RGBA32F, RenderContext::getInstance()->windowsWidth / (1 << (i + 1)),
-            RenderContext::getInstance()->windowsHeight / (1 << (i + 1)), bloomSampler);
-        ColorAttachment downSampleColorAttachment;
-        downSampleColorAttachment.attachment = 0;
-        downSampleColorAttachment.texture = fboDownSampleColorTexture[i];
-        downSampleColorAttachment.clearColor = glm::vec4(1, 0, 0, 1);
-        DownSampleFramebuffer[i].colorAttachments.emplace_back(std::move(downSampleColorAttachment));
+        const int mipWidth = std::max(1, width / (1 << (i + 1)));
+        const int mipHeight = std::max(1, height / (1 << (i + 1)));
+        downSampleTargets_[i] = CreateColorTarget(renderContext_, "post/bloom-down-" + std::to_string(i),
+            mipWidth, mipHeight, bloomSampler, glm::vec4(0.0f));
+        upSampleTargets_[i] = CreateColorTarget(renderContext_, "post/bloom-up-" + std::to_string(i),
+            mipWidth, mipHeight, bloomSampler, glm::vec4(0.0f));
     }
 
-
-    for (int i = 0; i < bloomLevel; i++) {
-        fboUpSampleColorTexture[i] = RenderContext::getInstance()->createTexture2D(TextureUsage::RenderTarget, TextureFormat::RGBA32F, RenderContext::getInstance()->windowsWidth / (1 << (i + 1)),
-            RenderContext::getInstance()->windowsHeight / (1 << (i + 1)), bloomSampler);
-        ColorAttachment upSampleColorAttachment;
-        upSampleColorAttachment.attachment = 0;
-        upSampleColorAttachment.texture = fboUpSampleColorTexture[i];
-        upSampleColorAttachment.clearColor = glm::vec4(1, 0, 0, 1);
-        UpSampleFramebuffer[i].colorAttachments.emplace_back(std::move(upSampleColorAttachment));
-    }
-   
-
-    //set BloomFramebuffer's Texture Attachments
-    fboBloomTexture = RenderContext::getInstance()->createTexture2D(TextureUsage::RenderTarget, TextureFormat::RGBA32F, RenderContext::getInstance()->windowsWidth,
-        RenderContext::getInstance()->windowsHeight, bloomSampler);
-    ColorAttachment bloomColorAttachment;
-    bloomColorAttachment.attachment = 0;
-    bloomColorAttachment.texture = fboBloomTexture;
-    bloomColorAttachment.clearColor = glm::vec4(0, 0, 1, 1);
-    BloomFramebuffer.colorAttachments.emplace_back(std::move(bloomColorAttachment));
-
-    //set RadialFramebuffer's Texture Attachments
-    fboRadialTexture = RenderContext::getInstance()->createTexture2D(TextureUsage::RenderTarget, TextureFormat::RGBA32F, RenderContext::getInstance()->windowsWidth,
-        RenderContext::getInstance()->windowsHeight);
-    ColorAttachment radialAttachment;
-    radialAttachment.attachment = 0;
-    radialAttachment.texture = fboRadialTexture;
-    radialAttachment.clearColor = glm::vec4(1, 1, 1, 1);
-    RadialFramebuffer.colorAttachments.emplace_back(std::move(radialAttachment));
-
-    //set MotionFramebuffer's Texture Attachments
-    fboMotionTextureA = RenderContext::getInstance()->createTexture2D(TextureUsage::RenderTarget, TextureFormat::RGBA32F, RenderContext::getInstance()->windowsWidth,
-        RenderContext::getInstance()->windowsHeight);
-    ColorAttachment motionAttachmentA;
-    motionAttachmentA.attachment = 0;
-    motionAttachmentA.texture = fboMotionTextureA;
-    motionAttachmentA.clearColor = glm::vec4(1, 1, 1, 1);
-    MotionFramebufferA.colorAttachments.emplace_back(std::move(motionAttachmentA));
-    fboMotionTextureB = RenderContext::getInstance()->createTexture2D(TextureUsage::RenderTarget, TextureFormat::RGBA32F, RenderContext::getInstance()->windowsWidth,
-        RenderContext::getInstance()->windowsHeight);
-    ColorAttachment motionAttachmentB;
-    motionAttachmentB.attachment = 0;
-    motionAttachmentB.texture = fboMotionTextureB;
-    motionAttachmentB.clearColor = glm::vec4(1, 1, 1, 1);
-    MotionFramebufferB.colorAttachments.emplace_back(std::move(motionAttachmentB));
-
-    // set cartoonFramebuffer's Texture Attachments
-    fboCartoonTexture = RenderContext::getInstance()->createTexture2D(TextureUsage::RenderTarget, TextureFormat::RGBA32F, RenderContext::getInstance()->windowsWidth,
-        RenderContext::getInstance()->windowsHeight);
-    ColorAttachment cartoonColorAttachment;
-    cartoonColorAttachment.attachment = 0;
-    cartoonColorAttachment.texture = fboCartoonTexture;
-    cartoonColorAttachment.clearColor = glm::vec4(1, 1, 1, 1);
-    CartoonFramebuffer.colorAttachments.emplace_back(std::move(cartoonColorAttachment));
-
-    // set cartoonFramebuffer's Texture Attachments
-    fboRippleTexture = RenderContext::getInstance()->createTexture2D(TextureUsage::RenderTarget, TextureFormat::RGBA32F, RenderContext::getInstance()->windowsWidth,
-        RenderContext::getInstance()->windowsHeight);
-    ColorAttachment rippleColorAttachment;
-    rippleColorAttachment.attachment = 0;
-    rippleColorAttachment.texture = fboRippleTexture;
-    rippleColorAttachment.clearColor = glm::vec4(1, 1, 1, 1);
-    RippleFramebuffer.colorAttachments.emplace_back(std::move(rippleColorAttachment));
+    bloomTarget_ = CreateColorTarget(renderContext_, "post/bloom", width, height, bloomSampler, glm::vec4(0.0f));
+    radialTarget_ = CreateColorTarget(renderContext_, "post/radial", width, height, bloomSampler, glm::vec4(0.0f));
+    motionTargetA_ = CreateColorTarget(renderContext_, "post/motion-a", width, height, bloomSampler, glm::vec4(0.0f));
+    motionTargetB_ = CreateColorTarget(renderContext_, "post/motion-b", width, height, bloomSampler, glm::vec4(0.0f));
+    cartoonTarget_ = CreateColorTarget(renderContext_, "post/cartoon", width, height, bloomSampler, glm::vec4(0.0f));
+    rippleTarget_ = CreateColorTarget(renderContext_, "post/ripple", width, height, bloomSampler, glm::vec4(0.0f));
 
     //set VAO and VBO
     if (!VBO) {
@@ -143,26 +89,25 @@ void PostProcessRenderer::resize(int width, int height) {
         return;
     }
 
-    historySeedTexture->resize(width, height);
-    fboBrightTexture->resize(width, height);
-    fboBloomTexture->resize(width, height);
-    fboRadialTexture->resize(width, height);
-    fboMotionTextureA->resize(width, height);
-    fboMotionTextureB->resize(width, height);
-    fboCartoonTexture->resize(width, height);
-    fboRippleTexture->resize(width, height);
+    highLightTarget_->resize(width, height);
+    bloomTarget_->resize(width, height);
+    radialTarget_->resize(width, height);
+    motionTargetA_->resize(width, height);
+    motionTargetB_->resize(width, height);
+    cartoonTarget_->resize(width, height);
+    rippleTarget_->resize(width, height);
 
     for (int i = 0; i < bloomLevel; ++i) {
         const int mipWidth = std::max(1, width / (1 << (i + 1)));
         const int mipHeight = std::max(1, height / (1 << (i + 1)));
-        fboDownSampleColorTexture[i]->resize(mipWidth, mipHeight);
-        fboUpSampleColorTexture[i]->resize(mipWidth, mipHeight);
+        downSampleTargets_[i]->resize(mipWidth, mipHeight);
+        upSampleTargets_[i]->resize(mipWidth, mipHeight);
     }
 
     firstRender = true;
     useFramebufferA = true;
-    NowFramebuffer = nullptr;
-    lastTexture = historySeedTexture;
+    nowTarget_ = nullptr;
+    lastTexture = nullptr;
 }
 
 void PostProcessRenderer::render(RenderGraph& rg, FrameBufferInfo* sceneFBO, int effectNo) {
@@ -171,7 +116,8 @@ void PostProcessRenderer::render(RenderGraph& rg, FrameBufferInfo* sceneFBO, int
     rg.addPass(bloomPassName, sceneFBO, [this, sceneFBO](RenderContext* renderContext) {
         //get high light
         PostProcessRenderer_graphicsPipeline.shader = HightLightShader.getPtr();
-        renderContext->beginRendering(HighLightFramebuffer);
+        renderContext->beginRendering(highLightTarget_->framebuffer());
+        glViewport(0, 0, highLightTarget_->width(), highLightTarget_->height());
         renderContext->setDepthStencilState(PostProcessRenderer_depthStencilState);
         renderContext->bindPipeline(PostProcessRenderer_graphicsPipeline);
         HightLightShader.getPtr()->use();
@@ -182,50 +128,54 @@ void PostProcessRenderer::render(RenderGraph& rg, FrameBufferInfo* sceneFBO, int
         renderContext->endRendering();
 
         for (int i = 0; i < bloomLevel; i++) {
-            renderContext->beginRendering(DownSampleFramebuffer[i]);
+            RenderTarget& downTarget = *downSampleTargets_[i];
+            renderContext->beginRendering(downTarget.framebuffer());
             PostProcessRenderer_graphicsPipeline.shader = DownSampleShader.getPtr();
-            glViewport(0, 0, RenderContext::getInstance()->windowsWidth / (1 << (i + 1)), RenderContext::getInstance()->windowsHeight / (1 << (i + 1)));
+            glViewport(0, 0, downTarget.width(), downTarget.height());
             renderContext->bindPipeline(PostProcessRenderer_graphicsPipeline);
             DownSampleShader.getPtr()->use();
-            glm::vec2 textureSize = glm::vec2((float)(1 << (i + 1)) / (float)RenderContext::getInstance()->windowsWidth, (float)(1 << (i + 1)) / (float)RenderContext::getInstance()->windowsHeight);
+            glm::vec2 textureSize(1.0f / static_cast<float>(downTarget.width()),
+                1.0f / static_cast<float>(downTarget.height()));
             DownSampleShader.getPtr()->setVec2("textureSize", textureSize);
             DownSampleShader.getPtr()->setInt("u_texture", 0);
-            if (i == 0) renderContext->bindTexture(HighLightFramebuffer.colorAttachments[0].texture->id, 0);
-            else renderContext->bindTexture(DownSampleFramebuffer[i - 1].colorAttachments[0].texture->id, 0);
+            if (i == 0) renderContext->bindTexture(highLightTarget_->colorTexture()->id, 0);
+            else renderContext->bindTexture(downSampleTargets_[i - 1]->colorTexture()->id, 0);
             renderContext->bindVertexArray(quadVAO);
             renderContext->drawArrays(0, 6);
         }
 
         for (int i = bloomLevel - 2; i >= 0; i--) {
-            renderContext->beginRendering(UpSampleFramebuffer[i]);
+            RenderTarget& upTarget = *upSampleTargets_[i];
+            renderContext->beginRendering(upTarget.framebuffer());
             PostProcessRenderer_graphicsPipeline.shader = UpSampleShader.getPtr();
-            glViewport(0, 0, RenderContext::getInstance()->windowsWidth / (1 << (i + 1)), RenderContext::getInstance()->windowsHeight / (1 << (i + 1)));
+            glViewport(0, 0, upTarget.width(), upTarget.height());
             renderContext->bindPipeline(PostProcessRenderer_graphicsPipeline);
             UpSampleShader.getPtr()->use();
-            glm::vec2 textureSize = glm::vec2((float)(1 << (i + 1)) / (float)RenderContext::getInstance()->windowsWidth, (float)(1 << (i + 1)) / (float)RenderContext::getInstance()->windowsHeight);
+            glm::vec2 textureSize(1.0f / static_cast<float>(upTarget.width()),
+                1.0f / static_cast<float>(upTarget.height()));
             UpSampleShader.getPtr()->setVec2("textureSize", textureSize);
             UpSampleShader.getPtr()->setInt("curMipDownSampletexture", 0);
-            renderContext->bindTexture(DownSampleFramebuffer[i].colorAttachments[0].texture->id, 0);
+            renderContext->bindTexture(downSampleTargets_[i]->colorTexture()->id, 0);
             UpSampleShader.getPtr()->setInt("lastMipUpSampletexture", 1);
-            if(i == bloomLevel - 2) renderContext->bindTexture(DownSampleFramebuffer[i + 1].colorAttachments[0].texture->id, 1);
-            else renderContext->bindTexture(UpSampleFramebuffer[i + 1].colorAttachments[0].texture->id, 1);
+            if(i == bloomLevel - 2) renderContext->bindTexture(downSampleTargets_[i + 1]->colorTexture()->id, 1);
+            else renderContext->bindTexture(upSampleTargets_[i + 1]->colorTexture()->id, 1);
             renderContext->bindVertexArray(quadVAO);
             renderContext->drawArrays(0, 6);
         }
 
         //Calculate the final color
         PostProcessRenderer_graphicsPipeline.shader = BloomShader.getPtr();
-        renderContext->beginRendering(BloomFramebuffer);
-        glViewport(0, 0, RenderContext::getInstance()->windowsWidth , RenderContext::getInstance()->windowsHeight);
+        renderContext->beginRendering(bloomTarget_->framebuffer());
+        glViewport(0, 0, bloomTarget_->width(), bloomTarget_->height());
         renderContext->bindPipeline(PostProcessRenderer_graphicsPipeline);
         BloomShader.getPtr()->use();
         BloomShader.getPtr()->setInt("scene", 0);
         BloomShader.getPtr()->setInt("bloomBlur", 1);
         renderContext->bindTexture(sceneFBO->colorAttachments[0].texture->id, 0);
-        renderContext->bindTexture(UpSampleFramebuffer[0].colorAttachments[0].texture->id, 1);
+        renderContext->bindTexture(upSampleTargets_[0]->colorTexture()->id, 1);
         renderContext->bindVertexArray(quadVAO);
         renderContext->drawArrays(0, 6);
-        bloomTexture = BloomFramebuffer.colorAttachments[0].texture;
+        bloomTexture = bloomTarget_->colorTexture();
         renderContext->endRendering();
         });
 
@@ -240,7 +190,8 @@ void PostProcessRenderer::render(RenderGraph& rg, FrameBufferInfo* sceneFBO, int
         rg.addPass(RadialPassName, bloomTexture, [this](RenderContext* renderContext) {
         //Radial Blur
         PostProcessRenderer_graphicsPipeline.shader = RadialBlurShader.getPtr();
-        renderContext->beginRendering(RadialFramebuffer);
+        renderContext->beginRendering(radialTarget_->framebuffer());
+        glViewport(0, 0, radialTarget_->width(), radialTarget_->height());
         renderContext->bindPipeline(PostProcessRenderer_graphicsPipeline);
         LogOpenGLErrorIfAny("post radial after bind pipeline");
         RadialBlurShader.getPtr()->use();
@@ -262,13 +213,14 @@ void PostProcessRenderer::render(RenderGraph& rg, FrameBufferInfo* sceneFBO, int
         PostProcessRenderer_graphicsPipeline.shader = MotionBlurShader.getPtr();
         rg.addPass(MotionPassName, bloomTexture, [this](RenderContext* renderContext) {
         PostProcessRenderer_graphicsPipeline.shader = MotionBlurShader.getPtr();
-        NowFramebuffer = useFramebufferA ? &MotionFramebufferA: &MotionFramebufferB;
+        nowTarget_ = useFramebufferA ? motionTargetA_.get() : motionTargetB_.get();
         if (firstRender) {
             lastTexture = bloomTexture;
             firstRender = false;
         }
-        else lastTexture = useFramebufferA ? MotionFramebufferB.colorAttachments[0].texture : MotionFramebufferA.colorAttachments[0].texture;
-        renderContext->beginRendering(*NowFramebuffer);
+        else lastTexture = useFramebufferA ? motionTargetB_->colorTexture() : motionTargetA_->colorTexture();
+        renderContext->beginRendering(nowTarget_->framebuffer());
+        glViewport(0, 0, nowTarget_->width(), nowTarget_->height());
         renderContext->setDepthStencilState(PostProcessRenderer_depthStencilState);
         renderContext->bindPipeline(PostProcessRenderer_graphicsPipeline);
         MotionBlurShader.getPtr()->use();
@@ -291,7 +243,8 @@ void PostProcessRenderer::render(RenderGraph& rg, FrameBufferInfo* sceneFBO, int
         const char* CartoonPassName = "CartoonPass";
         rg.addPass(CartoonPassName, bloomTexture, [this](RenderContext* renderContext) {
         PostProcessRenderer_graphicsPipeline.shader = CartoonShader.getPtr();
-        renderContext->beginRendering(CartoonFramebuffer);
+        renderContext->beginRendering(cartoonTarget_->framebuffer());
+        glViewport(0, 0, cartoonTarget_->width(), cartoonTarget_->height());
         renderContext->bindPipeline(PostProcessRenderer_graphicsPipeline);
         CartoonShader.getPtr()->use();
         LogOpenGLErrorIfAny("post cartoon");
@@ -310,7 +263,8 @@ void PostProcessRenderer::render(RenderGraph& rg, FrameBufferInfo* sceneFBO, int
         rg.addPass(RipplePassName, bloomTexture, [this](RenderContext* renderContext) {
         //Radial Blur
         PostProcessRenderer_graphicsPipeline.shader = RippleShader.getPtr();
-        renderContext->beginRendering(RippleFramebuffer);
+        renderContext->beginRendering(rippleTarget_->framebuffer());
+        glViewport(0, 0, rippleTarget_->width(), rippleTarget_->height());
         renderContext->bindPipeline(PostProcessRenderer_graphicsPipeline);
         LogOpenGLErrorIfAny("post ripple after bind pipeline");
         RippleShader.getPtr()->use();
@@ -331,34 +285,24 @@ void PostProcessRenderer::render(RenderGraph& rg, FrameBufferInfo* sceneFBO, int
    
 }
 
-unsigned int PostProcessRenderer::getTargetColorTextureID(int  attachment, int effectNo) {
+RenderTarget* PostProcessRenderer::targetForEffect(int effectNo) {
     switch (effectNo) {
-    case 1:  useFrameBufferInfo = &BloomFramebuffer;   break;
-    case 2:  useFrameBufferInfo = &RadialFramebuffer;  break;
-    case 3:  useFrameBufferInfo = NowFramebuffer ? NowFramebuffer : &MotionFramebufferA; break;
-    case 4:  useFrameBufferInfo = &CartoonFramebuffer; break;
-    case 5:  useFrameBufferInfo = &RippleFramebuffer;  break;
+    case 1: return bloomTarget_.get();
+    case 2: return radialTarget_.get();
+    case 3: return nowTarget_ ? nowTarget_ : motionTargetA_.get();
+    case 4: return cartoonTarget_.get();
+    case 5: return rippleTarget_.get();
+    default: return nullptr;
     }
-    if (attachment >= useFrameBufferInfo->colorAttachments.size()) {
-        return 0;
-    }
-    return useFrameBufferInfo->colorAttachments[attachment].texture->id;
 }
 
-PostProcessRenderer::~PostProcessRenderer() {
-    delete historySeedTexture;
-    delete fboBrightTexture;
-    for (int i = 0; i < bloomLevel; i++) {
-        delete fboUpSampleColorTexture[i];
-        delete fboDownSampleColorTexture[i];
-    }
-    delete fboRadialTexture;
-    delete fboMotionTextureA;
-    delete fboMotionTextureB;
-    delete fboBloomTexture;
-    delete fboCartoonTexture;
-    delete fboRippleTexture;
+unsigned int PostProcessRenderer::getTargetColorTextureID(int attachment, int effectNo) {
+    RenderTarget* target = targetForEffect(effectNo);
+    Texture2D* texture = target ? target->colorTexture(static_cast<size_t>(attachment)) : nullptr;
+    return texture ? texture->id : 0;
 }
+
+PostProcessRenderer::~PostProcessRenderer() = default;
 
 
 

@@ -17,10 +17,11 @@ class DirectionLight;
 class PointLight;
 class Scene;
 class IBLSystem;
+class RenderTarget;
 class MeshRenderer {
 public:
     friend class Scene;
-    explicit MeshRenderer(AssetManager& assetManager);
+    MeshRenderer(RenderContext& renderContext, AssetManager& assetManager);
     ~MeshRenderer();
     virtual void render(Scene& scene, Camera* camera, RenderGraph& rg);
     void addShadowPass(Scene& scene, Camera* camera, RenderGraph& rg);
@@ -34,18 +35,14 @@ public:
 
 private:
     //shader
+    RenderContext& renderContext_;
     AssetManager& assetManager_;
     std::shared_ptr<Shader> defaultLitShader;
     std::shared_ptr<Shader> lightDebugShader;
     std::shared_ptr<Shader> depthMapShader;
 
-    //FBO
-    FrameBufferInfo OriginFramebuffer;
-    FrameBufferInfo DepthMapFramebuffer;
-
-    //Texture
-    Texture2D* fboColorTexture = nullptr;
-    Texture2D* fboDepthTexture = nullptr;
+    // Main HDR scene target. Attachment ownership and resizing are centralized here.
+    std::unique_ptr<RenderTarget> sceneTarget_;
     std::shared_ptr<MaterialAsset> floorMaterial_;
     std::unique_ptr<IBLSystem> iblSystem_;
 

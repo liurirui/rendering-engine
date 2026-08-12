@@ -13,9 +13,9 @@ NAMESPACE_START
 
 Renderer::Renderer(RenderContext& renderContext, AssetManager& assetManager)
     : renderContext_(renderContext), assetManager_(assetManager) {
-    meshRenderer_.reset(new MeshRenderer(assetManager_));
+    meshRenderer_.reset(new MeshRenderer(renderContext_, assetManager_));
     meshRenderer_->setFloorTexture(assetManager_.loadTexture2D("resources/textures/wood.png"));
-    postProcessRenderer_.reset(new PostProcessRenderer());
+    postProcessRenderer_.reset(new PostProcessRenderer(renderContext_));
 }
 
 Renderer::~Renderer() = default;

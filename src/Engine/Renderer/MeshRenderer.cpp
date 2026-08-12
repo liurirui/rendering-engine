@@ -8,6 +8,7 @@
 #include "Base/AssetManager.h"
 #include "Renderer/MaterialSystem.h"
 #include "Renderer/IBLSystem.h"
+#include "Renderer/RenderTarget.h"
 #include "Base/Scene.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -103,8 +104,8 @@ static void renderSceneObjectsWithMaterials(RenderContext* renderContext, AssetM
         }
     }
 }
-MeshRenderer::MeshRenderer(AssetManager& assetManager)
-    : assetManager_(assetManager) {
+MeshRenderer::MeshRenderer(RenderContext& renderContext, AssetManager& assetManager)
+    : renderContext_(renderContext), assetManager_(assetManager) {
     depthStencilState.depthTest = true;
     depthStencilState.depthWrite = true;
 
@@ -123,19 +124,21 @@ MeshRenderer::MeshRenderer(AssetManager& assetManager)
     floorMaterial_->material.roughness = 0.75f;
     floorMaterial_->material.metallic = 0.0f;
 
-    //set  Originframebuffer's Texture Attachments
+    // Main scene HDR target.
     SamplerInfo depthSampler;
     depthSampler.mipmapMode = MipmapMode::None;
-    fboColorTexture = RenderContext::getInstance()->createTexture2D(TextureUsage::RenderTarget, TextureFormat::RGBA32F, RenderContext::getInstance()->windowsWidth,
-        RenderContext::getInstance()->windowsHeight);
-    fboDepthTexture = RenderContext::getInstance()->createTexture2D(TextureUsage::DepthStencil, TextureFormat::Depth24_Stencil8, RenderContext::getInstance()->windowsWidth,
-        RenderContext::getInstance()->windowsHeight, depthSampler);
-    ColorAttachment colorAttachment;
-    colorAttachment.attachment = 0;
-    colorAttachment.texture = fboColorTexture;
-    colorAttachment.clearColor = glm::vec4(0.1, 0.05, 0.15, 1);
-    OriginFramebuffer.colorAttachments.emplace_back(std::move(colorAttachment));
-    OriginFramebuffer.depthStencilAttachment.texture = fboDepthTexture;
+    RenderTargetDesc sceneTargetDesc;
+    sceneTargetDesc.debugName = "scene/hdr";
+    sceneTargetDesc.width = renderContext_.windowsWidth;
+    sceneTargetDesc.height = renderContext_.windowsHeight;
+    RenderTargetColorDesc sceneColor;
+    sceneColor.format = TextureFormat::RGBA32F;
+    sceneColor.clearColor = glm::vec4(0.1f, 0.05f, 0.15f, 1.0f);
+    sceneTargetDesc.colors.emplace_back(sceneColor);
+    sceneTargetDesc.depth.enabled = true;
+    sceneTargetDesc.depth.format = TextureFormat::Depth24_Stencil8;
+    sceneTargetDesc.depth.sampler = depthSampler;
+    sceneTarget_.reset(new RenderTarget(renderContext_, sceneTargetDesc));
     graphicsPipeline.shader = defaultLitShader.get();
     PipelineColorBlendAttachment pipelineColorBlendAttachment;
     pipelineColorBlendAttachment.blendState.enabled = true;
@@ -182,11 +185,8 @@ void MeshRenderer::resize(int width, int height) {
     if (width <= 0 || height <= 0) {
         return;
     }
-    if (fboColorTexture) {
-        fboColorTexture->resize(width, height);
-    }
-    if (fboDepthTexture) {
-        fboDepthTexture->resize(width, height);
+    if (sceneTarget_) {
+        sceneTarget_->resize(width, height);
     }
 }
 
@@ -261,7 +261,7 @@ void MeshRenderer::render(Scene& scene, Camera* camera, RenderGraph& rg) {
         Light::updateUBO(scene.lights);
         Light::bindUBO();
 
-        renderContext->beginRendering(OriginFramebuffer);
+        renderContext->beginRendering(sceneTarget_->framebuffer());
         glViewport(0, 0, renderWidth, renderHeight);
         renderContext->setDepthStencilState(depthStencilState);
         GraphicsPipeline lightDebugPipeline = graphicsPipeline;
@@ -318,19 +318,14 @@ void MeshRenderer::render(Scene& scene, Camera* camera, RenderGraph& rg) {
 
 unsigned int MeshRenderer::getTargetColorTextureID(int  attachment) {
 
-    if (attachment >= OriginFramebuffer.colorAttachments.size()) {
-        return 0;
-    }
-    return OriginFramebuffer.colorAttachments[attachment].texture->id;
+    Texture2D* texture = sceneTarget_ ? sceneTarget_->colorTexture(static_cast<size_t>(attachment)) : nullptr;
+    return texture ? texture->id : 0;
 
 }
 
 FrameBufferInfo* MeshRenderer::getTargetFrameBuffer() {
-    return &OriginFramebuffer;
+    return sceneTarget_ ? &sceneTarget_->framebuffer() : nullptr;
 }
 
-MeshRenderer::~MeshRenderer() {
-    delete fboColorTexture;
-    delete fboDepthTexture;
-}
+MeshRenderer::~MeshRenderer() = default;
 NAMESPACE_END

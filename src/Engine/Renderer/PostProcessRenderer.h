@@ -4,17 +4,23 @@
 #include<Base/TRefCountPtr.h>
 #include <Base/Shader.h>
 #include <RHI/RenderContext.h>
+#include <array>
+#include <memory>
 class RenderGraph;
 NAMESPACE_START
+class RenderTarget;
 class PostProcessRenderer {
 public:
-    PostProcessRenderer();
+    explicit PostProcessRenderer(RenderContext& renderContext);
     ~PostProcessRenderer();
     virtual void render(RenderGraph& rg, FrameBufferInfo* sceneFBO, int effectNo);
     void resize(int width, int height);
     unsigned int getTargetColorTextureID(int  attachment,int effectNo );
     float time=0;
 private:
+    RenderTarget* targetForEffect(int effectNo);
+
+    RenderContext& renderContext_;
     //shader
     TRefCountPtr<Shader> HightLightShader;
     TRefCountPtr<Shader> BlurShader;
@@ -26,35 +32,23 @@ private:
     TRefCountPtr<Shader> CartoonShader;
     TRefCountPtr<Shader> RippleShader;
 
-    //fbo
-    const int bloomLevel = 5;
-    FrameBufferInfo HighLightFramebuffer;
-    FrameBufferInfo UpSampleFramebuffer[5];
-    FrameBufferInfo DownSampleFramebuffer[5];
-    FrameBufferInfo BloomFramebuffer;
-    FrameBufferInfo RadialFramebuffer;
-    FrameBufferInfo MotionFramebufferA;
-    FrameBufferInfo MotionFramebufferB;
-    FrameBufferInfo CartoonFramebuffer;
-    FrameBufferInfo RippleFramebuffer;
-    FrameBufferInfo* NowFramebuffer = nullptr;
-    FrameBufferInfo* useFrameBufferInfo = nullptr;
+    // Render targets own all post-process attachment textures.
+    static const int bloomLevel = 5;
+    std::unique_ptr<RenderTarget> highLightTarget_;
+    std::array<std::unique_ptr<RenderTarget>, bloomLevel> upSampleTargets_;
+    std::array<std::unique_ptr<RenderTarget>, bloomLevel> downSampleTargets_;
+    std::unique_ptr<RenderTarget> bloomTarget_;
+    std::unique_ptr<RenderTarget> radialTarget_;
+    std::unique_ptr<RenderTarget> motionTargetA_;
+    std::unique_ptr<RenderTarget> motionTargetB_;
+    std::unique_ptr<RenderTarget> cartoonTarget_;
+    std::unique_ptr<RenderTarget> rippleTarget_;
+    RenderTarget* nowTarget_ = nullptr;
 
     GraphicsPipeline PostProcessRenderer_graphicsPipeline;
     DepthStencilState PostProcessRenderer_depthStencilState;
 
-    //Texture
-    Texture2D* fboBrightTexture = nullptr;
-    Texture2D* fboUpSampleColorTexture[5];
-    Texture2D* fboDownSampleColorTexture[5];
     Texture2D* bloomTexture = nullptr;
-    Texture2D* fboRadialTexture = nullptr;
-    Texture2D* fboMotionTextureA = nullptr;
-    Texture2D* fboMotionTextureB = nullptr;
-    Texture2D* fboBloomTexture = nullptr;
-    Texture2D* fboCartoonTexture = nullptr;
-    Texture2D* fboRippleTexture = nullptr;
-    Texture2D* historySeedTexture = nullptr;
     Texture2D* lastTexture=nullptr;
 
     bool firstRender = true;

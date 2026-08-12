@@ -16,10 +16,71 @@
 - 后续注意：
 ```
 
-## 未提交 - 修复模型节点变换并适配动态窗口尺寸
+## 未提交 - 引入 RenderTarget 统一渲染目标资源
 
+- 改动类型：渲染架构 / GPU 资源生命周期 / 后处理 / 文档
+- 建议提交标题：`refactor: 引入 RenderTarget 统一管理渲染目标`
+
+### 改动摘要
+
+新增 `RenderTargetDesc / RenderTarget`，统一管理 framebuffer 的颜色、深度/模板 attachment、纹理所有权和动态尺寸。主场景 HDR 目标和全部后处理目标完成迁移，删除 Renderer 中分散的裸纹理字段和手工 delete；Bloom 各级 pass 改为使用实际 RenderTarget 尺寸设置 viewport 与 texel size。
+
+### 具体改动
+
+1. 新增 RenderTarget 抽象
+
+- `RenderTargetDesc` 描述名称、宽高、color attachment 和可选 depth/stencil attachment。
+- attachment 描述包含纹理格式、Sampler、clear action、clear color/depth/stencil。
+- `RenderTarget` 通过 `RenderContext` 创建纹理，用 `std::unique_ptr<Texture2D>` 管理生命周期。
+- `FrameBufferInfo` 只保留指向 attachment 的非拥有指针，供 RHI 创建和绑定 FBO。
+- 提供统一 `resize()`、color/depth texture 查询以及实际宽高查询。
+- 禁止复制 RenderTarget，防止 GPU 资源所有权被隐式复制。
+
+2. 主场景与后处理迁移
+
+- `MeshRenderer` 构造函数显式接收 `RenderContext&`。
+- 原主场景 FBO 和 color/depth 裸纹理合并为 `sceneTarget_`。
+- highlight、5 级 downsample、5 级 upsample、Bloom composite 全部改为 RenderTarget。
+- Radial、Motion A/B、Cartoon、Ripple 全部改为 RenderTarget。
+- 删除十余个裸 `Texture2D*` 所有权字段和手工析构列表。
+- 输出纹理通过 `targetForEffect()` 统一查询。
+
+3. Bloom 尺寸修正
+
+- 每一级 downsample/upsample viewport 使用目标自身 width/height。
+- Shader 的 `textureSize` 使用实际目标尺寸的倒数。
+- 极小窗口下 mip 尺寸至少为 1，避免 viewport 为 0 或与纹理存储不一致。
+
+4. 文档
+
+- 重写 README，补充项目定位、构建方式、运行日志和功能列表。
+- 新增 `docs/ARCHITECTURE.md`，整理完整分层、帧流程、资源流程、PBR/IBL 原理、本轮架构改动、C++ 知识点、现存问题和后续路线。
+
+### 原理与架构影响
+
+RenderTarget 把“Framebuffer 使用哪些纹理”和“这些纹理由谁创建、resize、释放”收敛为一个对象。上层 pass 只消费目标，不再同时维护 FBO 描述和纹理所有权。显式注入 `RenderContext&` 也减少了新代码对全局 singleton 的依赖，为后续 RenderTargetPool、RenderGraph transient resource 和多图形后端继续演进提供基础。
+
+### 验证情况
+
+- CMake 重新配置：通过。
+- Debug 构建：通过。
+- Release 构建：通过。
+- 默认场景运行 8 秒：通过。
+- Bloom 完整链路运行 8 秒：通过，运行时 framebuffer id 2-14 正常创建。
+- `1919 × 1009` 与 `800 × 600` 连续 resize：通过。
+- 未出现 Shader compile/link、Framebuffer incomplete 或高优先级 OpenGL 错误。
+- `git diff --check`：通过。
+
+### 后续注意
+
+- Shadow 和 IBL 内部临时 framebuffer 尚未迁移，因为 cubemap/mip/face attachment 需求需要先扩展 RenderTarget 描述。
+- 下一阶段优先增加可共享的 GPU `MeshResource`，避免同一 ModelAsset 多实例重复创建 VAO/VBO/IBO。
+
+## ce6a322 - 修复模型节点变换并完善相机与窗口适配
+
+- 提交时间：2026-08-05 20:32:20 +0800
+- 完整提交：`ce6a322bcd16a1cbbb7354d3df8d2033d01f8c7f`
 - 改动类型：模型导入 / 相机控制 / 渲染修复 / 窗口适配
-- 建议提交标题：`fix: 修复模型节点变换并完善相机与窗口适配`
 
 ### 改动摘要
 
