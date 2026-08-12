@@ -81,12 +81,13 @@ Scene::createModel(path)
           -> Texture cache / GLB embedded image
   -> Model::instantiate(asset)
       -> GameObject / Mesh 运行时树
-      -> 上传 GPU buffer
+      -> AssetManager 创建或复用 MeshResource
+      -> Mesh 实例引用共享 VAO/VBO/IBO
       -> Transform 保存导入节点矩阵
   -> Scene 保存 ModelAsset shared_ptr 并登记可渲染对象
 ```
 
-同一路径模型不会重复 Assimp 导入，同一路径贴图不会重复创建 `Texture2D`。当前 `MeshAsset` 保存 CPU 几何，但每次实例化仍会重新创建 GPU buffer；后续应增加共享 `MeshResource`。
+同一路径模型不会重复 Assimp 导入，同一路径贴图不会重复创建 `Texture2D`。模型首次加载时，`AssetManager` 为每个 `MeshAsset` 创建并缓存 `MeshResource`；后续实例化只共享 VAO/VBO/IBO，Transform 和 Material 仍属于实例或资产数据。
 
 ## 5. Transform 原理
 
@@ -182,7 +183,7 @@ Asset 保存可缓存、可共享的导入数据；GameObject/Mesh/Transform 保
 
 1. Scene/GameObject 仍大量使用裸指针，缺少 Entity Handle/Generation 校验。
 2. `RenderContext` singleton 和直接 OpenGL 调用仍存在，RHI 隔离不完整。
-3. GPU Mesh buffer 不能在同一模型的多个实例间共享。
+3. Mesh 实例仍保留一份 CPU 顶点/索引副本，后续应改为共享只读几何数据或句柄。
 4. Shader 源码硬编码在 `ShaderCode.cpp`，缺少外置文件、variant 和热重载。
 5. RenderGraph 没有资源句柄、读写依赖、自动排序与瞬时资源复用。
 6. 方向光阴影没有相机视锥拟合、CSM 和完善调试工具。
@@ -193,7 +194,7 @@ Asset 保存可缓存、可共享的导入数据；GameObject/Mesh/Transform 保
 
 ## 11. 推荐后续路线
 
-- P0：增加 `MeshResource` 和 GPU 资源缓存，多实例共享 VAO/VBO/IBO。
+- P0（已完成）：`MeshResource` 和 GPU 资源缓存，多实例共享 VAO/VBO/IBO。
 - P1：构建 `RenderItem`、视锥裁剪和按 pipeline/material 排序的渲染队列。
 - P2：Shader 外置，增加 Technique/ShaderPass、宏变体与热重载。
 - P3：让 RenderGraph 声明 texture/buffer 读写依赖，并接入 RenderTargetPool。
@@ -207,3 +208,11 @@ Asset 保存可缓存、可共享的导入数据；GameObject/Mesh/Transform 保
 - Bloom 完整链路持续运行 8 秒，14 个运行时 framebuffer 正常创建。
 - 非标准尺寸 `1919 × 1009` 和 `800 × 600` 连续 resize 通过。
 - 临时测试代码已恢复，Example 默认仍使用 Origin 效果。
+
+## 13. MeshResource 验收补充
+
+- 同一 `cat_mask.fbx` 创建两个场景实例：首次实例化约 `16.6 ms`，缓存实例化约 `0.35 ms`。
+- 日志确认：`Model cache hit`、`resources=1`、`uploads=1`。
+- GPU buffer 统计：`vertices=5469`、`indices=30864`、`gpuBufferBytes=429720`。
+- Example 退出顺序已调整为先释放 Scene/Renderer/AssetManager 与所有 OpenGL 资源，再销毁 GLFW Window/Context。
+- 优雅关闭窗口测试返回码为 `0`，日志输出 `RenderEngine shutdown.`。

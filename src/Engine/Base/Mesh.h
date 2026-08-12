@@ -10,6 +10,7 @@
 NAMESPACE_START
 
 struct MaterialAsset;
+class MeshResource;
 
     class Mesh
     {
@@ -44,9 +45,9 @@ struct MaterialAsset;
         unsigned int ibo = 0;   // 索引缓冲
         std::string name;
         std::shared_ptr<MaterialAsset> materialAsset;
+        std::shared_ptr<MeshResource> resource;
          
     };
 
 
 NAMESPACE_END
-

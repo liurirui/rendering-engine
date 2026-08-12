@@ -10,6 +10,8 @@
 
 NAMESPACE_START
 
+class MeshResource;
+
 struct MeshAsset {
     std::string name;
     std::vector<Mesh::Vertex> vertices;
@@ -18,6 +20,7 @@ struct MeshAsset {
     bool hasTexCoords = false;
     bool hasTangents = false;
     std::shared_ptr<MaterialAsset> material;
+    std::shared_ptr<MeshResource> resource;
 };
 
 struct ModelNodeAsset {

@@ -74,7 +74,50 @@ RenderTarget 把“Framebuffer 使用哪些纹理”和“这些纹理由谁创�
 ### 后续注意
 
 - Shadow 和 IBL 内部临时 framebuffer 尚未迁移，因为 cubemap/mip/face attachment 需求需要先扩展 RenderTarget 描述。
-- 下一阶段优先增加可共享的 GPU `MeshResource`，避免同一 ModelAsset 多实例重复创建 VAO/VBO/IBO。
+- 本阶段已增加可共享的 GPU `MeshResource`，避免同一 ModelAsset 多实例重复创建 VAO/VBO/IBO。
+
+## 未提交 - 增加可共享 MeshResource 与 GPU 资源缓存
+
+- 改动类型：渲染架构 / GPU 资源管理 / 性能优化 / 诊断
+- 建议提交标题：`perf: 缓存共享 MeshResource 避免重复上传 GPU`
+
+### 改动摘要
+
+将模型导入得到的 CPU `MeshAsset` 与运行时 GPU 资源分开。`AssetManager` 在模型首次加载时创建并缓存 `MeshResource`，多个 `Mesh` 实例共享同一组 VAO/VBO/IBO；Transform、Material 和场景对象仍保持实例级/资产级职责。
+
+### 具体改动
+
+- 新增 `Renderer/MeshResource.h/.cpp`，封装 GPU buffer 创建、顶点布局、绘制和 RAII 释放。
+- `MeshAsset` 与 `Mesh` 增加共享 `MeshResource` 引用。
+- `AssetManager` 增加 `meshResourceCache_`、`loadMeshResource()` 和资源统计接口。
+- 模型资源 key 使用规范化模型路径和 mesh 索引，避免不同实例重复上传。
+- 记录上传次数、缓存命中次数、顶点数、索引数和 GPU buffer 字节数。
+- 无 AssetManager 的旧式 Model 构造保留实例上传 fallback，兼容旧调用路径。
+- 修正旧 Mesh fallback 中 index buffer 的释放接口，并清理 size_t 到 RHI 整数参数的编译警告。
+
+### 原理与架构影响
+
+```text
+ModelAsset -> MeshAsset（CPU 顶点/索引）
+          -> MeshResource（共享 GPU VAO/VBO/IBO）
+          -> Mesh 实例（Transform + Material 引用）
+```
+
+资源生命周期由 `shared_ptr` 表达：AssetManager 和 MeshAsset 持有资源所有权，Mesh 实例只共享引用；当最后一个场景实例和 AssetManager 缓存释放后，MeshResource 自动删除 GPU 对象。
+
+### 验证情况
+
+- Debug / Release 构建：通过。
+- 同一 `cat_mask.fbx` 创建两个实例：首实例约 `16.6 ms`，缓存实例约 `0.35 ms`。
+- 日志确认 `Model cache hit`、`resources=1`、`uploads=1`。
+- GPU buffer 统计：`vertices=5469`、`indices=30864`、`gpuBufferBytes=429720`。
+- 默认运行日志无 Shader 编译错误、Framebuffer incomplete 或高优先级 OpenGL 错误。
+- 临时双实例测试代码已恢复，不改变 Example 默认场景。
+
+### 后续注意
+
+- 当前 Mesh 实例仍保留 CPU 顶点/索引副本，下一步应改为共享只读 CPU Geometry 或仅保存包围盒数据。
+- 修复 Example 退出顺序：所有 OpenGL-backed 资源在 GLFW Context 销毁前释放，避免 MeshResource RAII 析构访问失效 Context。
 
 ## ce6a322 - 修复模型节点变换并完善相机与窗口适配
 

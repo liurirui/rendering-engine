@@ -4,6 +4,7 @@
 #include "Renderable.h"
 #include "Texture2D.h"
 #include "Logger.h"
+#include <Renderer/MeshResource.h>
 #include <assimp/pbrmaterial.h>
 #include <algorithm>
 #include <cctype>
@@ -340,7 +341,14 @@ GameObject* Model::instantiateNode(const std::shared_ptr<ModelNodeAsset>& node, 
         mesh->hasTexCoords = meshAsset->hasTexCoords;
         mesh->hasTangents = meshAsset->hasTangents;
         mesh->materialAsset = meshAsset->material;
-        mesh->setupMesh();
+        mesh->resource = meshAsset->resource;
+        if (mesh->resource) {
+            mesh->numVertex = static_cast<unsigned int>(mesh->resource->vertexCount());
+        }
+        else {
+            Logger::Warn("MeshAsset has no shared GPU resource; using instance upload fallback. mesh=" + meshAsset->name);
+            mesh->setupMesh();
+        }
         go->meshes.push_back(mesh);
     }
 

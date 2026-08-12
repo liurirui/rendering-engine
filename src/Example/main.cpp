@@ -553,8 +553,6 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
     delete scene;
     delete renderer;
     delete assetManager;
-    delete openGLRenderContext;
-
     glDeleteVertexArrays(1, &quadVAO);
 
 
@@ -563,6 +561,8 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
 
+    // Release all OpenGL-backed resources before destroying the GLFW context.
+    delete openGLRenderContext;
     glfwDestroyWindow(window);
     Logger::Info("RenderEngine shutdown.");
     Logger::Shutdown();

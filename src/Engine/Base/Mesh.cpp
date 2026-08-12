@@ -1,5 +1,6 @@
 #include "Mesh.h"
 #include<RHI/RenderContext.h>
+#include <Renderer/MeshResource.h>
 
 NAMESPACE_START
 Mesh::Mesh() {
@@ -103,16 +104,24 @@ void Mesh::createIndexBuffer(unsigned int numIndex, unsigned int* indices) {
 }
 
 Mesh::~Mesh() {
+	if (resource) {
+		return;
+	}
 	if (vao) RenderContext::getInstance()->deleteVertexArray(vao);
 	if (vbo) RenderContext::getInstance()->deleteVertexBuffer(vbo);
-	if (ibo) RenderContext::getInstance()->deleteVertexBuffer(ibo); 
+	if (ibo) RenderContext::getInstance()->deleteIndexBuffer(ibo);
 }
 
 void Mesh::setupMesh() {
+	if (resource) {
+		numVertex = static_cast<unsigned int>(resource->vertexCount());
+		return;
+	}
 	RenderContext* renderContext = RenderContext::getInstance();
-	vbo = renderContext->createVertexBuffer(vertices.data(), vertices.size() * sizeof(Vertex));
-	ibo = renderContext->createIndexBuffer(indices.data(), indices.size() * sizeof(unsigned int));
+	vbo = renderContext->createVertexBuffer(vertices.data(), static_cast<int>(vertices.size() * sizeof(Vertex)));
+	ibo = renderContext->createIndexBuffer(indices.data(), static_cast<int>(indices.size() * sizeof(unsigned int)));
 	vao = renderContext->createVertexArray(vbo, ibo);
+	numVertex = static_cast<unsigned int>(vertices.size());
 
 	// position
 	renderContext->setUpVertexBufferLayoutInfo(vbo, vao, 3, sizeof(Vertex), 0, offsetof(Vertex, position) / sizeof(float));
@@ -131,8 +140,12 @@ void Mesh::setupMesh() {
 }
 
 void Mesh::draw() {
+	if (resource) {
+		resource->draw();
+		return;
+	}
 	RenderContext::getInstance()->bindVertexArray(vao);
-	RenderContext::getInstance()->drawElements(indices.size(), 0);
+	RenderContext::getInstance()->drawElements(static_cast<unsigned int>(indices.size()), nullptr);
 	RenderContext::getInstance()->bindVertexArray(0);
 }
 
