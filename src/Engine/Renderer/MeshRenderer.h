@@ -4,6 +4,7 @@
 #include <unordered_map>
 #include <memory>
 #include"Base/Renderable.h"
+#include "Renderer/RenderQueue.h"
 class RenderGraph;
 
 NAMESPACE_START
@@ -24,11 +25,12 @@ public:
     MeshRenderer(RenderContext& renderContext, AssetManager& assetManager);
     ~MeshRenderer();
     virtual void render(Scene& scene, Camera* camera, RenderGraph& rg);
-    void addShadowPass(Scene& scene, Camera* camera, RenderGraph& rg);
+    void addShadowPass(Scene& scene, const std::shared_ptr<RenderQueue>& renderQueue, RenderGraph& rg);
     void resize(int width, int height);
     void setFloorTexture(const std::shared_ptr<Texture2D>& texture);
     unsigned int getTargetColorTextureID(int  attachment);
     FrameBufferInfo* getTargetFrameBuffer();
+    const RenderStats& getRenderStats() const { return lastRenderStats_; }
 
     //Model mesh textures that need to be stored in advance
     std::unordered_map<std::string, Texture2D*> ColorTextureMap;
@@ -45,6 +47,8 @@ private:
     std::unique_ptr<RenderTarget> sceneTarget_;
     std::shared_ptr<MaterialAsset> floorMaterial_;
     std::unique_ptr<IBLSystem> iblSystem_;
+    RenderStats lastRenderStats_;
+    bool hasLoggedRenderStats_ = false;
 
   
 

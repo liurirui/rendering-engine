@@ -1,6 +1,5 @@
 #include"Renderable.h"
 #include"Model.h"
-#include <limits>
 NAMESPACE_START
 Renderable::Renderable() {}
 
@@ -22,14 +21,12 @@ void Renderable::setTransformFromModel(Model* model) {
 }
 
 void Renderable::calculateCenter() {
-    glm::vec3 minVertex(std::numeric_limits<float>::max());
-    glm::vec3 maxVertex(std::numeric_limits<float>::lowest());
-    for (unsigned int i = 0; i < mesh->numVertex; ++i) {
-        glm::vec3 pos = mesh->vertices[i].position;
-        minVertex = glm::min(minVertex, pos);
-        maxVertex = glm::max(maxVertex, pos);
+    if (!mesh || !mesh->localBounds.isValid()) {
+        boundingBoxCenter = glm::vec3(0.0f);
+        return;
     }
-    boundingBoxCenter = (minVertex + maxVertex) * 0.5f;
+    // 包围盒已经在模型导入时计算，实例无需为了中心点再次保留和遍历完整顶点数组。
+    boundingBoxCenter = mesh->localBounds.center();
 }
 
 glm::vec3  Renderable::getWorldCenter(){

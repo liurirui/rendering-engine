@@ -18,6 +18,8 @@ Renderer
   ├─ MeshRenderer：阴影、PBR 场景、灯光调试
   ├─ PostProcessRenderer：Bloom 与屏幕后处理
   ├─ RenderGraph：记录并顺序执行当前帧 pass
+  ├─ RenderQueueBuilder：把场景对象转换成轻量 RenderItem，执行视锥裁剪与分类
+  ├─ RenderQueue：保存 shadow / opaque / transparent 队列并完成排序
   ├─ RenderTarget：拥有 framebuffer attachment 和尺寸
   └─ MaterialSystem：把材质数据绑定到 Shader
 
@@ -65,7 +67,19 @@ Application Loop
   -> ImGui -> swap buffers
 ```
 
-当前 `RenderGraph` 是轻量顺序 pass 列表，能够把 pass 组织从应用层移走，但尚未分析资源依赖、自动排序、做 transient aliasing 或 barrier 管理。
+当前 `RenderGraph` 是轻量顺序 pass 列表，能够把 pass 组织从应用层移走，但尚未分析资源依赖、自动排序、做 transient aliasing 或 barrier 管理。每帧执行前，`RenderQueueBuilder` 从 Scene 收集渲染数据，生成不依赖场景树结构的 `RenderItem` 快照；各 pass 只消费对应队列。
+
+```text
+Scene / GameObject
+  -> RenderQueueBuilder
+      -> local Bounds × world matrix
+      -> camera frustum culling
+      -> shadowCasters / opaqueItems / transparentItems
+      -> pipeline / material / mesh 排序
+  -> Shadow Pass / Forward PBR Pass
+```
+
+不透明队列按 Shader、Material、MeshResource 和距离排序，减少状态切换；透明队列按相机距离从远到近绘制，并在透明阶段关闭深度写入。阴影 caster 暂时不按相机视锥裁剪，因为相机视野外物体仍可能向画面内投影，后续应改成按方向光阴影视锥裁剪。
 
 ## 4. 模型、场景与资源流程
 
@@ -87,7 +101,9 @@ Scene::createModel(path)
   -> Scene 保存 ModelAsset shared_ptr 并登记可渲染对象
 ```
 
-同一路径模型不会重复 Assimp 导入，同一路径贴图不会重复创建 `Texture2D`。模型首次加载时，`AssetManager` 为每个 `MeshAsset` 创建并缓存 `MeshResource`；后续实例化只共享 VAO/VBO/IBO，Transform 和 Material 仍属于实例或资产数据。
+同一路径模型不会重复 Assimp 导入，同一路径贴图不会重复创建 `Texture2D`。模型首次加载时，`AssetManager` 为每个 `MeshAsset` 创建并缓存 `MeshResource`；后续实例化只共享 VAO/VBO/IBO，Transform 和 Material 仍属于实例或资产数据。CPU 顶点/索引只保存在共享的 `MeshAsset` 中，场景 `Mesh` 实例不再复制整份几何，只保存局部 `Bounds`、材质引用和 GPU 资源引用。
+
+模型导入阶段同时为每个 `MeshAsset` 计算局部轴对齐包围盒。运行时可通过 `localBounds.transformed(worldMatrix)` 得到世界空间 AABB，为 RenderItem、视锥裁剪、透明排序和包围盒调试提供统一数据来源。
 
 ## 5. Transform 原理
 
@@ -183,19 +199,18 @@ Asset 保存可缓存、可共享的导入数据；GameObject/Mesh/Transform 保
 
 1. Scene/GameObject 仍大量使用裸指针，缺少 Entity Handle/Generation 校验。
 2. `RenderContext` singleton 和直接 OpenGL 调用仍存在，RHI 隔离不完整。
-3. Mesh 实例仍保留一份 CPU 顶点/索引副本，后续应改为共享只读几何数据或句柄。
-4. Shader 源码硬编码在 `ShaderCode.cpp`，缺少外置文件、variant 和热重载。
-5. RenderGraph 没有资源句柄、读写依赖、自动排序与瞬时资源复用。
-6. 方向光阴影没有相机视锥拟合、CSM 和完善调试工具。
-7. glTF alpha mode、double-sided、transmission、skin animation 尚未完整实现。
-8. 后处理参数多为硬编码，缺少统一设置对象与可组合效果栈。
-9. 尚无 draw call、triangle、显存、GPU timestamp 等渲染统计。
-10. CMake 仍使用全局 include 和 GLOB，自动测试/CI 尚未建立。
+3. Shader 源码硬编码在 `ShaderCode.cpp`，缺少外置文件、variant 和热重载。
+4. RenderGraph 没有资源句柄、读写依赖、自动排序与瞬时资源复用。
+5. 方向光阴影没有相机视锥拟合、CSM 和完善调试工具。
+6. glTF alpha mode、double-sided、transmission、skin animation 尚未完整实现。
+7. 后处理参数多为硬编码，缺少统一设置对象与可组合效果栈。
+8. 尚无 draw call、triangle、显存、GPU timestamp 等渲染统计。
+9. CMake 仍使用全局 include 和 GLOB，自动测试/CI 尚未建立。
 
 ## 11. 推荐后续路线
 
 - P0（已完成）：`MeshResource` 和 GPU 资源缓存，多实例共享 VAO/VBO/IBO。
-- P1：构建 `RenderItem`、视锥裁剪和按 pipeline/material 排序的渲染队列。
+- P1（已完成）：引入 Bounds，移除实例 CPU 几何副本，并构建 `RenderItem`、视锥裁剪和按 pipeline/material 排序的渲染队列。
 - P2：Shader 外置，增加 Technique/ShaderPass、宏变体与热重载。
 - P3：让 RenderGraph 声明 texture/buffer 读写依赖，并接入 RenderTargetPool。
 - P4：CSM、glTF skin/alpha/transmission、SSAO、TAA、自动曝光和 GPU profiler。
@@ -216,3 +231,14 @@ Asset 保存可缓存、可共享的导入数据；GameObject/Mesh/Transform 保
 - GPU buffer 统计：`vertices=5469`、`indices=30864`、`gpuBufferBytes=429720`。
 - Example 退出顺序已调整为先释放 Scene/Renderer/AssetManager 与所有 OpenGL 资源，再销毁 GLFW Window/Context。
 - 优雅关闭窗口测试返回码为 `0`，日志输出 `RenderEngine shutdown.`。
+
+## 14. Bounds 与 RenderQueue 阶段验收
+
+- `MeshAsset` 在 Assimp 导入阶段生成局部 AABB；正常场景 Mesh 实例不再复制 CPU 顶点和索引。
+- `RenderQueueBuilder` 使用 `localBounds.transformed(worldMatrix)` 生成世界 AABB，并通过相机 ViewProjection 六平面执行裁剪。
+- 两个 `cat_mask.fbx` 实例中一个位于视锥外时，统计为 `submitted=2`、`visible=1`、`culled=1`。
+- 可见实例统计为 10288 个三角形；两个实例仍只上传一份 MeshResource，第二次加载命中 Model cache。
+- 阴影队列保留两个 caster，避免相机视锥外对象向画面内投影时错误丢失阴影。
+- 不透明队列按 Shader、Material 和 MeshResource 排序；透明队列按相机距离从远到近绘制并关闭深度写入。
+- 没有主方向光时，场景 pass 仍继续执行 IBL、点光源和 Emissive 渲染。
+- Debug/Release 构建及默认场景 8 秒运行通过，未出现 Shader、Framebuffer 或高优先级 OpenGL 错误。

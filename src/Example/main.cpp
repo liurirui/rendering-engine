@@ -360,6 +360,17 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
             ImGui::ColorEdit3("Background Color", (float*)&(renderer->getMeshRenderer().getTargetFrameBuffer()->colorAttachments[0].clearColor)); // Edit 3 floats representing a color
             ImGui::SliderFloat("Exposure", &exposure, 0.1f, 5.0f, "%.2f");
 
+            if (ImGui::CollapsingHeader("Render Statistics")) {
+                const RenderStats& stats = renderer->getMeshRenderer().getRenderStats();
+                ImGui::Text("Submitted: %u", stats.submittedItems);
+                ImGui::Text("Visible: %u", stats.visibleItems);
+                ImGui::Text("Culled: %u", stats.culledItems);
+                ImGui::Text("Invalid Bounds: %u", stats.invalidBoundsItems);
+                ImGui::Text("Shadow / Opaque / Transparent: %u / %u / %u",
+                    stats.shadowItems, stats.opaqueItems, stats.transparentItems);
+                ImGui::Text("Visible Triangles: %llu", static_cast<unsigned long long>(stats.visibleTriangles));
+            }
+
             ImVec4 buttonColor = ImVec4(1.0f, 0.4f, 0.f, 1.0f);      // Color of button
             ImVec4 hoveredColor = ImVec4(0.4f, 0.15f, 0.15f, 1.0f);  // Color on hover
             ImVec4 activeColor = ImVec4(0.8f, 0.15f, 0.0f, 1.0f);    // Color when pressed

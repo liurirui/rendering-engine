@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include "Constants.h"
+#include "Bounds.h"
 #include "Mesh.h"
 #include "Material.h"
 #include <memory>
@@ -13,10 +14,11 @@ NAMESPACE_START
 class MeshResource;
 
 struct MeshAsset {
-    // MeshAsset 只描述导入后的 CPU 几何和材质引用；resource 是可共享的 GPU 表示。
+    // MeshAsset 只描述导入后的共享 CPU 几何、局部包围盒和材质引用；resource 是可共享的 GPU 表示。
     std::string name;
     std::vector<Mesh::Vertex> vertices;
     std::vector<unsigned int> indices;
+    Bounds localBounds;
     bool hasNormals = false;
     bool hasTexCoords = false;
     bool hasTangents = false;

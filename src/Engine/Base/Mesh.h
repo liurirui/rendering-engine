@@ -1,6 +1,7 @@
 #pragma once
 
 #include"Constants.h"
+#include "Bounds.h"
 #include<vector>
 #include<glm/vec3.hpp>
 #include<glm/vec2.hpp>
@@ -35,9 +36,11 @@ class MeshResource;
 
         void createIndexBuffer(unsigned int numIndex, unsigned int* indices);
 
-        // 兼容旧的包围盒和调试代码；使用共享 MeshResource 时不再用这些数组上传 GPU。
+        // 仅供没有 AssetManager/MeshResource 的旧式 fallback 上传使用。正常模型实例不会复制
+        // MeshAsset 中的 CPU 顶点和索引，避免同一模型多实例重复占用内存。
         std::vector<Vertex> vertices;
         std::vector<unsigned int> indices;
+        Bounds localBounds;
         bool hasNormals = false;
         bool hasTexCoords = false;
         bool hasTangents = false;
@@ -49,6 +52,8 @@ class MeshResource;
         std::shared_ptr<MaterialAsset> materialAsset;
         // 非拥有意义上的“资源引用”：多个 Mesh 实例可指向同一 VAO/VBO/IBO。
         std::shared_ptr<MeshResource> resource;
+        bool castShadows = true;
+        bool receiveShadows = true;
          
     };
 

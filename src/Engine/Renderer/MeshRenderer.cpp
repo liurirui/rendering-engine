@@ -6,9 +6,11 @@
 #include "RenderGraph/RenderGraph.h"
 #include "Base/Material.h"
 #include "Base/AssetManager.h"
+#include "Base/Logger.h"
 #include "Renderer/MaterialSystem.h"
 #include "Renderer/IBLSystem.h"
 #include "Renderer/RenderTarget.h"
+#include "Renderer/RenderQueueBuilder.h"
 #include "Base/Scene.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -18,10 +20,10 @@
 NAMESPACE_START
 
 
-static Shader& resolveMaterialShader(AssetManager& assetManager, Mesh* mesh, const std::shared_ptr<Shader>& fallbackShader) {
+static Shader& resolveMaterialShader(AssetManager& assetManager, const RenderItem& item, const std::shared_ptr<Shader>& fallbackShader) {
     // 材质只保存 ShaderHandle；实际 program 从 ShaderLibrary 查找，找不到时回退默认 lit。
-    if (mesh && mesh->materialAsset && mesh->materialAsset->shader.isValid()) {
-        if (std::shared_ptr<Shader> shader = assetManager.getShaderLibrary().get(mesh->materialAsset->shader)) {
+    if (item.materialAsset && item.materialAsset->shader.isValid()) {
+        if (std::shared_ptr<Shader> shader = assetManager.getShaderLibrary().get(item.materialAsset->shader)) {
             return *shader;
         }
     }
@@ -35,11 +37,10 @@ static void setupLitShaderCommon(Shader& shader, Scene& scene, Camera* camera, D
     shader.setMat4("view", camera->GetViewMatrix());
     shader.setVec3("viewPos", camera->Position);
 
-    shader.setMat4("lightSpaceMatrix", mainLight->LightSpaceMatrix);
-
-    shader.setVec3("light.direction", mainLight->getDirection());
-    shader.setVec3("light.color", mainLight->getColor());
-    shader.setFloat("light.intensity", mainLight->getIntensity());
+    shader.setMat4("lightSpaceMatrix", mainLight ? mainLight->LightSpaceMatrix : glm::mat4(1.0f));
+    shader.setVec3("light.direction", mainLight ? mainLight->getDirection() : glm::vec3(0.0f, -1.0f, 0.0f));
+    shader.setVec3("light.color", mainLight ? mainLight->getColor() : glm::vec3(0.0f));
+    shader.setFloat("light.intensity", mainLight ? mainLight->getIntensity() : 0.0f);
 
     shader.setVec3("ambient", 0.3f, 0.3f, 0.3f);
     shader.setVec3("diffuse", 0.6f, 0.6f, 0.6f);
@@ -79,32 +80,29 @@ static void setupLitShaderCommon(Shader& shader, Scene& scene, Camera* camera, D
     shader.setInt("pointLightCount", pointLightCount);
 }
 
-static void renderSceneObjectsWithMaterials(RenderContext* renderContext, AssetManager& assetManager, Scene& scene, Camera* camera, DirectionLight* mainLight, const glm::mat4& projection, GraphicsPipeline basePipeline, const std::shared_ptr<Shader>& fallbackShader, const IBLSystem* iblSystem) {
-    // 按对象材质选择 Shader；同一 Shader 连续绘制时复用 pipeline 状态，减少重复绑定。
+static void renderItemsWithMaterials(RenderContext* renderContext, AssetManager& assetManager, Scene& scene, Camera* camera, DirectionLight* mainLight, const glm::mat4& projection, GraphicsPipeline basePipeline, const std::shared_ptr<Shader>& fallbackShader, const IBLSystem* iblSystem, const std::vector<RenderItem>& items) {
+    // RenderQueue 已按 Shader/Material/Mesh 排序，同一 Shader 连续绘制时可复用 pass 公共状态。
     Shader* boundShader = nullptr;
-
-    for (auto go : scene.GetRenderableObjects()) {
-        if (!go || !go->GetTransform()) {
+    for (const RenderItem& item : items) {
+        if (!item.mesh) {
             continue;
         }
-        for (auto mesh : go->meshes) {
-            if (!mesh) {
-                continue;
-            }
 
-            Shader& shader = resolveMaterialShader(assetManager, mesh, fallbackShader);
-            if (boundShader != &shader) {
-                basePipeline.shader = &shader;
-                renderContext->bindPipeline(basePipeline);
-                setupLitShaderCommon(shader, scene, camera, mainLight, projection, iblSystem);
+        Shader& shader = resolveMaterialShader(assetManager, item, fallbackShader);
+        if (boundShader != &shader) {
+            basePipeline.shader = &shader;
+            renderContext->bindPipeline(basePipeline);
+            setupLitShaderCommon(shader, scene, camera, mainLight, projection, iblSystem);
+            if (mainLight) {
                 renderContext->bindTexture(mainLight->getShadow()->depthMap->id, 1);
-                boundShader = &shader;
             }
-
-            MaterialSystem::bindMaterialAsset(mesh->materialAsset.get(), shader, 2);
-            shader.setMat4("model", go->GetTransform()->worldMaterix);
-            mesh->draw();
+            boundShader = &shader;
         }
+
+        shader.setBool("receiveShadows", item.receiveShadows && mainLight != nullptr);
+        MaterialSystem::bindMaterialAsset(item.materialAsset.get(), shader, 2);
+        shader.setMat4("model", item.worldMatrix);
+        item.mesh->draw();
     }
 }
 MeshRenderer::MeshRenderer(RenderContext& renderContext, AssetManager& assetManager)
@@ -193,13 +191,13 @@ void MeshRenderer::resize(int width, int height) {
     }
 }
 
-void MeshRenderer::addShadowPass(Scene& scene, Camera* camera, RenderGraph& rg) {
+void MeshRenderer::addShadowPass(Scene& scene, const std::shared_ptr<RenderQueue>& renderQueue, RenderGraph& rg) {
     // Shadow pass 只写深度和 model/lightSpaceMatrix，不绑定完整材质贴图。
     if (!scene.GetMainDirectionalLight()) {
         return;
     }
 
-    rg.addPass("shadowPass", &camera, [this, &scene, camera](RenderContext* renderContext) {
+    rg.addPass("shadowPass", renderQueue.get(), [this, &scene, renderQueue](RenderContext* renderContext) {
         DirectionLight* light = scene.GetMainDirectionalLight();
         Shadow* shadow = light->getShadow();
         GLint previousViewport[4];
@@ -222,7 +220,13 @@ void MeshRenderer::addShadowPass(Scene& scene, Camera* camera, RenderGraph& rg) 
         depthMapShader->setMat4("model", glm::mat4(1.0f));
         renderContext->bindVertexArray(planeVAO);
         renderContext->drawArrays(0, 6);
-        scene.DrawObjects(*depthMapShader);
+        for (const RenderItem& item : renderQueue->shadowCasters) {
+            if (!item.mesh) {
+                continue;
+            }
+            depthMapShader->setMat4("model", item.worldMatrix);
+            item.mesh->draw();
+        }
         renderContext->endRendering();
 
         if (!polygonOffsetWasEnabled) {
@@ -234,13 +238,34 @@ void MeshRenderer::addShadowPass(Scene& scene, Camera* camera, RenderGraph& rg) 
 
 void MeshRenderer::render(Scene& scene, Camera* camera, RenderGraph& rg) {
     // Forward PBR pass 将场景数据、材质数据和共享 GPU MeshResource 组合后提交绘制。
-    addShadowPass(scene, camera, rg);
+    const int queueWidth = renderContext_.windowsWidth;
+    const int queueHeight = renderContext_.windowsHeight;
+    if (!camera || queueWidth <= 0 || queueHeight <= 0) {
+        return;
+    }
+    const glm::mat4 queueProjection = glm::perspective(glm::radians(camera->Zoom),
+        static_cast<float>(queueWidth) / static_cast<float>(queueHeight), 0.1f, 1000.0f);
+    std::shared_ptr<RenderQueue> renderQueue(new RenderQueue());
+    RenderQueueBuilder().build(scene, *camera, queueProjection, *renderQueue);
+    if (!hasLoggedRenderStats_ ||
+        lastRenderStats_.submittedItems != renderQueue->stats.submittedItems ||
+        lastRenderStats_.visibleItems != renderQueue->stats.visibleItems ||
+        lastRenderStats_.culledItems != renderQueue->stats.culledItems ||
+        lastRenderStats_.transparentItems != renderQueue->stats.transparentItems) {
+        Logger::Info("Render queue stats. submitted=" + std::to_string(renderQueue->stats.submittedItems) +
+            ", visible=" + std::to_string(renderQueue->stats.visibleItems) +
+            ", culled=" + std::to_string(renderQueue->stats.culledItems) +
+            ", shadow=" + std::to_string(renderQueue->stats.shadowItems) +
+            ", opaque=" + std::to_string(renderQueue->stats.opaqueItems) +
+            ", transparent=" + std::to_string(renderQueue->stats.transparentItems) +
+            ", triangles=" + std::to_string(renderQueue->stats.visibleTriangles));
+        hasLoggedRenderStats_ = true;
+    }
+    lastRenderStats_ = renderQueue->stats;
+    addShadowPass(scene, renderQueue, rg);
 
-    rg.addPass("scenePass", &camera, [this, &scene, camera](RenderContext* renderContext) {
+    rg.addPass("scenePass", renderQueue.get(), [this, &scene, camera, renderQueue](RenderContext* renderContext) {
         DirectionLight* mainLight = scene.GetMainDirectionalLight();
-        if (!mainLight) {
-            return;
-        }
 
         depthStencilState.depthTest = true;
         depthStencilState.depthWrite = true;
@@ -276,15 +301,17 @@ void MeshRenderer::render(Scene& scene, Camera* camera, RenderGraph& rg) {
         lightDebugShader->use();
         lightDebugShader->setMat4("projection", projection);
         lightDebugShader->setMat4("view", camera->GetViewMatrix());
-        //Render a large point light source to act as a unidirectional light source
-        glm::vec3 directionPos = mainLight->getDirection() * (-80.0f);
-        light_model = glm::translate(light_model, directionPos);
-        light_model = glm::scale(light_model, glm::vec3(3.0f, 3.0f, 3.0f));
-        lightDebugShader->setMat4("model", light_model);
-        lightDebugShader->setVec3("lightColor", mainLight->getColor());
-        lightDebugShader->setFloat("lightVisualIntensity", 4.0f);
-        renderContext->bindVertexArray(cubeVAO);
-        renderContext->drawArrays(0, 36);
+        // 方向光只是场景可选光源；没有主方向光时仍保留 IBL、点光源和 Emissive 渲染。
+        if (mainLight) {
+            glm::vec3 directionPos = mainLight->getDirection() * (-80.0f);
+            light_model = glm::translate(light_model, directionPos);
+            light_model = glm::scale(light_model, glm::vec3(3.0f));
+            lightDebugShader->setMat4("model", light_model);
+            lightDebugShader->setVec3("lightColor", mainLight->getColor());
+            lightDebugShader->setFloat("lightVisualIntensity", 4.0f);
+            renderContext->bindVertexArray(cubeVAO);
+            renderContext->drawArrays(0, 36);
+        }
 
         //render light cube
         std::vector<Light*> all_lights = scene.GetAllLights();
@@ -306,7 +333,9 @@ void MeshRenderer::render(Scene& scene, Camera* camera, RenderGraph& rg) {
         graphicsPipeline.shader = defaultLitShader.get();
         renderContext->bindPipeline(graphicsPipeline);
         setupLitShaderCommon(*defaultLitShader, scene, camera, mainLight, projection, iblSystem_.get());
-        renderContext->bindTexture(mainLight->getShadow()->depthMap->id, 1);
+        if (mainLight) {
+            renderContext->bindTexture(mainLight->getShadow()->depthMap->id, 1);
+        }
 
         //render plane
         MaterialSystem::bindMaterialAsset(floorMaterial_.get(), *defaultLitShader, 2);
@@ -314,7 +343,18 @@ void MeshRenderer::render(Scene& scene, Camera* camera, RenderGraph& rg) {
         renderContext->bindVertexArray(planeVAO);
         renderContext->drawArrays(0, 6);
 
-        renderSceneObjectsWithMaterials(renderContext, assetManager_, scene, camera, mainLight, projection, graphicsPipeline, defaultLitShader, iblSystem_.get());
+        renderItemsWithMaterials(renderContext, assetManager_, scene, camera, mainLight, projection,
+            graphicsPipeline, defaultLitShader, iblSystem_.get(), renderQueue->opaqueItems);
+
+        // 透明队列保持深度测试但关闭深度写入，并按相机距离从远到近绘制。
+        if (!renderQueue->transparentItems.empty()) {
+            depthStencilState.depthWrite = false;
+            renderContext->setDepthStencilState(depthStencilState);
+            renderItemsWithMaterials(renderContext, assetManager_, scene, camera, mainLight, projection,
+                graphicsPipeline, defaultLitShader, iblSystem_.get(), renderQueue->transparentItems);
+            depthStencilState.depthWrite = true;
+            renderContext->setDepthStencilState(depthStencilState);
+        }
 
         renderContext->bindVertexArray(0);
         renderContext->endRendering();

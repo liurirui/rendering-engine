@@ -16,6 +16,70 @@
 - 后续注意：
 ```
 
+## 未提交 - 构建基于 Bounds 的 RenderQueue 与视锥裁剪流程
+
+- 改动类型：渲染架构 / 内存优化 / 性能优化 / 渲染流程
+- 建议提交标题：`feat: 构建基于 Bounds 的 RenderQueue 与视锥裁剪流程`
+
+### 改动摘要
+
+本提交完成渲染队列 P1 阶段的完整基础链路。首先引入统一 `Bounds`，在模型导入阶段计算共享局部包围盒，并移除正常模型实例重复保存的 CPU 顶点/索引；随后在 Scene 与 MeshRenderer 之间新增 `RenderItem / RenderQueue / RenderQueueBuilder` 提交层，根据世界包围盒执行视锥裁剪、透明分类和渲染排序。MeshRenderer 不再直接遍历 Scene 的 GameObject/Mesh 容器。
+
+### 具体改动
+
+- 新增 `Base/Bounds.h`，提供 AABB 有效性检查、点扩展、中心、半尺寸以及局部 AABB 到世界 AABB 的矩阵变换。
+- `MeshAsset` 在 Assimp 顶点导入阶段计算 `localBounds`，避免实例化后重复遍历顶点。
+- 正常共享资源路径下，`Mesh` 实例不再复制 `MeshAsset::vertices/indices`，只保存 Bounds、材质和 MeshResource 引用。
+- 没有 `AssetManager/MeshResource` 的旧式 fallback 仍复制 CPU 几何并上传，保持兼容。
+- 旧 `Renderable::calculateCenter()` 改为读取 Bounds，不再依赖实例顶点副本。
+- 新增 `RenderItem`，保存 Mesh/MeshResource、MaterialAsset、世界矩阵、世界 Bounds、距离和阴影标记。
+- 新增 `Frustum`，从 ViewProjection 提取六个平面并执行 AABB 裁剪。
+- 新增 `RenderQueue` 与 `RenderStats`，记录 submitted、visible、culled、shadow、opaque、transparent 和可见三角形数量。
+- 新增 `RenderQueueBuilder`，负责场景收集、世界 Bounds 计算、裁剪、材质透明分类和排序。
+- 不透明队列按 Shader、Material、MeshResource、距离排序；透明队列按距离从远到近排序。
+- Shadow pass 改为消费 `shadowCasters`；Forward PBR pass 分别消费 opaque 和 transparent 队列。
+- 透明阶段保持深度测试并关闭深度写入，绘制完成后恢复。
+- `Mesh` 增加 `castShadows / receiveShadows` 实例标记。
+- RenderGraph pass 通过 `shared_ptr<RenderQueue>` 持有当前帧提交数据，避免延迟执行 lambda 引用局部变量。
+- 没有主方向光时不再跳过整个场景 pass，仍可使用 IBL、点光源和 Emissive。
+- Example 的 ImGui 增加 Render Statistics 面板。
+- 更新项目介绍 PPT 及生成脚本：总体架构加入 RenderQueue，帧流程加入 Build Queue，模型资源页改为当前 MeshResource/Bounds 状态，并新增 Bounds 与 RenderQueue 专题页。
+- 路线图将 P0 MeshResource、P1 RenderQueue 标记为已完成，下一阶段调整为 Shader 外置、Technique/ShaderPass、Variant 与热重载。
+
+### 架构影响
+
+模型几何现在形成清晰的三层关系：
+
+```text
+MeshAsset：共享 CPU 几何 + local Bounds
+    -> MeshResource：共享 GPU VAO/VBO/IBO
+    -> Mesh 实例：Bounds + MaterialAsset + MeshResource 引用
+        -> RenderItem：当前帧世界矩阵、world Bounds 与渲染标记快照
+            -> RenderQueue：Shadow / Opaque / Transparent
+```
+
+Scene 继续管理“世界中有哪些对象”，RenderQueueBuilder 负责把场景实例转换为当前帧渲染数据，MeshRenderer 只消费已经分类和排序的队列。这为后续 Shader Technique、LOD、实例化渲染、方向光阴影视锥裁剪和稳定 Entity Handle 提供了明确接入点。
+
+### 验证情况
+
+- `git diff --check`：通过。
+- Debug 与 Release 构建：通过。
+- 默认场景运行 8 秒：通过，没有 Shader 编译/链接失败、Framebuffer incomplete、HIGH severity 或 `[ERROR]`。
+- 临时单模型加载测试：成功导入 `cat_mask.fbx` 的 5469 个顶点和 30864 个索引并创建共享 MeshResource。
+- 临时创建两个 `cat_mask.fbx` 实例并将一个移动到视锥外：`submitted=2`、`visible=1`、`culled=1`。
+- 两个实例仍只上传一次 MeshResource，第二次模型加载命中 Model cache。
+- 可见实例统计为 10288 个三角形。
+- 临时测试代码已撤回，不改变 Example 默认场景。
+- 本轮新增及修改文件严格 UTF-8 解码通过，无非法字节或替换字符。
+- 重新生成 16 页 `RenderEngine_Project_Overview.pptx`，并通过 PowerPoint 导出 PNG 全页检查，无明显文本溢出或中文乱码。
+- 新版 PDF 已覆盖原 `RenderEngine_Project_Overview.pdf`，并校验源文件与覆盖结果 SHA-256 一致；临时 `_updated` 文件已删除。
+
+### 后续注意
+
+- Shadow caster 当前未按相机视锥裁剪是有意设计；下一步应使用方向光阴影视锥或 cascade 范围裁剪。
+- 透明分类目前根据 `Material::opacity`，后续导入 glTF alphaMode 后应区分 Opaque、Mask 和 Blend。
+- `RenderItem` 当前保留短生命周期 `Mesh*` 观察引用，待 Scene 所有权迁移为 Handle/Generation 后可改为稳定句柄。
+
 ## 未提交 - 补充核心源码中文注释并统一编码
 
 - 改动类型：文档 / 可维护性 / 构建稳定性

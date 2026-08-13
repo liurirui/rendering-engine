@@ -140,6 +140,7 @@ std::shared_ptr<MeshAsset> Model::processMesh(aiMesh* mesh, ModelAsset& modelAss
             vertex.tangent = glm::vec3(mesh->mTangents[i].x, mesh->mTangents[i].y, mesh->mTangents[i].z);
             vertex.bitangent = glm::vec3(mesh->mBitangents[i].x, mesh->mBitangents[i].y, mesh->mBitangents[i].z);
         }
+        meshAsset->localBounds.encapsulate(vertex.position);
         meshAsset->vertices.push_back(vertex);
     }
 
@@ -339,9 +340,8 @@ GameObject* Model::instantiateNode(const std::shared_ptr<ModelNodeAsset>& node, 
         const std::shared_ptr<MeshAsset>& meshAsset = asset->meshes[meshIndex];
         Mesh* mesh = new Mesh();
         mesh->name = meshAsset->name;
-        // 保留 CPU 副本以兼容旧包围盒/调试接口；后续可改成 GeometryAsset 共享引用。
-        mesh->vertices = meshAsset->vertices;
-        mesh->indices = meshAsset->indices;
+        // 实例只保存轻量 Bounds、材质与共享 GPU resource；正常路径不再复制整份 CPU 几何。
+        mesh->localBounds = meshAsset->localBounds;
         mesh->hasNormals = meshAsset->hasNormals;
         mesh->hasTexCoords = meshAsset->hasTexCoords;
         mesh->hasTangents = meshAsset->hasTangents;
@@ -352,6 +352,9 @@ GameObject* Model::instantiateNode(const std::shared_ptr<ModelNodeAsset>& node, 
         }
         else {
             Logger::Warn("MeshAsset has no shared GPU resource; using instance upload fallback. mesh=" + meshAsset->name);
+            // 无 AssetManager 的兼容路径没有共享 GPU resource，只在这种情况下复制 CPU 数据并上传。
+            mesh->vertices = meshAsset->vertices;
+            mesh->indices = meshAsset->indices;
             mesh->setupMesh();
         }
         go->meshes.push_back(mesh);
