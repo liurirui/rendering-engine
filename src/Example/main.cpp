@@ -32,7 +32,6 @@
 #include <assimp/camera.h>
 #include <assimp/mesh.h>
 #include <ImGuiFileDialog.h>
-#include <Engine/Base/ShaderCode.h>
 
 #if defined(_MSC_VER) && (_MSC_VER >= 1900) && !defined(IMGUI_DISABLE_WIN32_FUNCTIONS)
 #pragma comment(lib, "legacy_stdio_definitions")
@@ -261,14 +260,6 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
 
-    screenShader = new Shader(Vert_quad, Frag_quad, nullptr, "engine/screen-quad");
-    screenShader->use();
-    screenShader->setInt("screenTexture", 0);
-    screenShader->setFloat("exposure", exposure);
-    GLenum screenShaderError = glGetError();
-    if (screenShaderError != GL_NO_ERROR) {
-        Logger::Warn("OpenGL error after screen shader setup. error=" + std::to_string(screenShaderError));
-    }
     // screen quad VAO
     unsigned int quadVAO, quadVBO;
     glGenVertexArrays(1, &quadVAO);
@@ -285,6 +276,18 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
     openGLRenderContext->windowsWidth = SRC_WIDTH;
     openGLRenderContext->windowsHeight = SRC_HEIGHT;
     AssetManager* assetManager = new AssetManager(*openGLRenderContext, rootPath);
+    assetManager->getShaderLibrary().registerPass(ShaderLibrary::ScreenShaderName(), ShaderPassType::Forward,
+        { "resources/shaders/fullscreen.vert", "resources/shaders/screen_tonemap.frag", "" });
+    std::shared_ptr<Shader> sharedScreenShader = assetManager->getShaderLibrary().getPass(
+        ShaderHandle(ShaderLibrary::ScreenShaderName()), ShaderPassType::Forward);
+    screenShader = sharedScreenShader.get();
+    screenShader->use();
+    screenShader->setInt("screenTexture", 0);
+    screenShader->setFloat("exposure", exposure);
+    GLenum screenShaderError = glGetError();
+    if (screenShaderError != GL_NO_ERROR) {
+        Logger::Warn("OpenGL error after screen shader setup. error=" + std::to_string(screenShaderError));
+    }
     Renderer* renderer = new Renderer(*openGLRenderContext, *assetManager);
     WindowRenderState windowRenderState;
     windowRenderState.renderer = renderer;
@@ -369,6 +372,20 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
                 ImGui::Text("Shadow / Opaque / Transparent: %u / %u / %u",
                     stats.shadowItems, stats.opaqueItems, stats.transparentItems);
                 ImGui::Text("Visible Triangles: %llu", static_cast<unsigned long long>(stats.visibleTriangles));
+            }
+
+            if (ImGui::CollapsingHeader("Shader System")) {
+                ShaderLibraryStats shaderStats = assetManager->getShaderLibrary().getStats();
+                ImGui::Text("Techniques: %llu", static_cast<unsigned long long>(shaderStats.techniqueCount));
+                ImGui::Text("Programs / Variants: %llu / %llu",
+                    static_cast<unsigned long long>(shaderStats.programCount),
+                    static_cast<unsigned long long>(shaderStats.variantCount));
+                ImGui::Text("Reload Success / Failed: %llu / %llu",
+                    static_cast<unsigned long long>(shaderStats.successfulReloads),
+                    static_cast<unsigned long long>(shaderStats.failedReloads));
+                if (ImGui::Button("Reload Shaders", ImVec2(160, 26))) {
+                    assetManager->getShaderLibrary().requestReload();
+                }
             }
 
             ImVec4 buttonColor = ImVec4(1.0f, 0.4f, 0.f, 1.0f);      // Color of button
@@ -564,6 +581,8 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
     windowRenderState.renderer = nullptr;
     delete scene;
     delete renderer;
+    screenShader = nullptr;
+    sharedScreenShader.reset();
     delete assetManager;
     glDeleteVertexArrays(1, &quadVAO);
 

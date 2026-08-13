@@ -1,5 +1,4 @@
 #include "MeshRenderer.h"
-#include "Base/ShaderCode.h"
 #include "Base/Shader.h"
 #include "Base/Camera.h"
 #include "Base/Light.h"
@@ -111,12 +110,16 @@ MeshRenderer::MeshRenderer(RenderContext& renderContext, AssetManager& assetMana
     depthStencilState.depthWrite = true;
 
     //Shader
-    depthMapShader = assetManager_.getShaderLibrary().getOrCreate(ShaderLibrary::DepthOnlyShaderName());
-    defaultLitShader = assetManager_.getShaderLibrary().getOrCreate(ShaderLibrary::DefaultLitShaderName());
-    lightDebugShader = assetManager_.getShaderLibrary().getOrCreate(ShaderLibrary::LightDebugShaderName());
+    depthMapShader = assetManager_.getShaderLibrary().getPass(
+        ShaderHandle(ShaderLibrary::DepthOnlyShaderName()), ShaderPassType::Shadow);
+    defaultLitShader = assetManager_.getShaderLibrary().getPass(
+        ShaderHandle(ShaderLibrary::DefaultLitShaderName()), ShaderPassType::Forward);
+    lightDebugShader = assetManager_.getShaderLibrary().getPass(
+        ShaderHandle(ShaderLibrary::LightDebugShaderName()), ShaderPassType::Debug);
 
     iblSystem_.reset(new IBLSystem());
-    iblSystem_->initialize(assetManager_.resolvePath("resources/textures/hdr/newport_loft.hdr"));
+    iblSystem_->initialize(assetManager_.resolvePath("resources/textures/hdr/newport_loft.hdr"),
+        assetManager_.getShaderLibrary());
 
     floorMaterial_.reset(new MaterialAsset());
     floorMaterial_->name = "engine/floor";

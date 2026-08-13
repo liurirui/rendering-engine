@@ -1,7 +1,6 @@
 #pragma once
 
 #include <Base/Constants.h>
-#include<Base/TRefCountPtr.h>
 #include <Base/Shader.h>
 #include <RHI/RenderContext.h>
 #include <array>
@@ -9,9 +8,10 @@
 class RenderGraph;
 NAMESPACE_START
 class RenderTarget;
+class AssetManager;
 class PostProcessRenderer {
 public:
-    explicit PostProcessRenderer(RenderContext& renderContext);
+    PostProcessRenderer(RenderContext& renderContext, AssetManager& assetManager);
     ~PostProcessRenderer();
     virtual void render(RenderGraph& rg, FrameBufferInfo* sceneFBO, int effectNo);
     void resize(int width, int height);
@@ -21,16 +21,17 @@ private:
     RenderTarget* targetForEffect(int effectNo);
 
     RenderContext& renderContext_;
+    AssetManager& assetManager_;
     //shader
-    TRefCountPtr<Shader> HightLightShader;
-    TRefCountPtr<Shader> BlurShader;
-    TRefCountPtr<Shader> DownSampleShader;
-    TRefCountPtr<Shader> UpSampleShader;
-    TRefCountPtr<Shader> RadialBlurShader;
-    TRefCountPtr<Shader> MotionBlurShader;
-    TRefCountPtr<Shader> BloomShader;
-    TRefCountPtr<Shader> CartoonShader;
-    TRefCountPtr<Shader> RippleShader;
+    std::shared_ptr<Shader> HightLightShader;
+    std::shared_ptr<Shader> BlurShader;
+    std::shared_ptr<Shader> DownSampleShader;
+    std::shared_ptr<Shader> UpSampleShader;
+    std::shared_ptr<Shader> RadialBlurShader;
+    std::shared_ptr<Shader> MotionBlurShader;
+    std::shared_ptr<Shader> BloomShader;
+    std::shared_ptr<Shader> CartoonShader;
+    std::shared_ptr<Shader> RippleShader;
 
     // Render targets own all post-process attachment textures.
     static const int bloomLevel = 5;

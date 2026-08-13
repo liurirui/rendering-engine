@@ -13,11 +13,19 @@ const std::string& shaderName(const RenderItem& item) {
     return item.materialAsset ? item.materialAsset->shader.name : empty;
 }
 
+const std::vector<std::string>& shaderDefines(const RenderItem& item) {
+    static const std::vector<std::string> empty;
+    return item.materialAsset ? item.materialAsset->shader.defines : empty;
+}
+
 bool opaqueLess(const RenderItem& lhs, const RenderItem& rhs) {
     const std::string& lhsShader = shaderName(lhs);
     const std::string& rhsShader = shaderName(rhs);
     if (lhsShader != rhsShader) {
         return lhsShader < rhsShader;
+    }
+    if (shaderDefines(lhs) != shaderDefines(rhs)) {
+        return shaderDefines(lhs) < shaderDefines(rhs);
     }
 
     const auto lhsMaterial = reinterpret_cast<std::uintptr_t>(lhs.materialAsset.get());

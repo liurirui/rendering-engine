@@ -318,6 +318,12 @@ std::shared_ptr<MaterialAsset> Model::loadMaterial(aiMaterial* mat, const aiScen
         ", metallic=" + std::to_string(material.metallic) +
         ", roughness=" + std::to_string(material.roughness));
 
+    // Variant 宏属于 Shader 资源引用的一部分。当前先把法线贴图分支编译成独立 program，
+    // 无法线贴图材质不再携带切线空间采样代码；后续可继续扩展 Alpha/Skinned 等关键字。
+    if (material.hasNormalMap()) {
+        materialAsset->shader.defines.emplace_back("MATERIAL_NORMAL_MAP");
+    }
+
     return materialAsset;
 }
 

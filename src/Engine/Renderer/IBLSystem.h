@@ -7,13 +7,14 @@
 NAMESPACE_START
 
 class Shader;
+class ShaderLibrary;
 
 class IBLSystem {
 public:
     IBLSystem();
     ~IBLSystem();
 
-    bool initialize(const std::string& hdrPath);
+    bool initialize(const std::string& hdrPath, ShaderLibrary& shaderLibrary);
     void bindToShader(const Shader& shader, int irradianceSlot = 12, int prefilterSlot = 13, int brdfLutSlot = 14) const;
 
     bool isInitialized() const { return initialized_; }
@@ -44,10 +45,10 @@ private:
     unsigned int quadVAO_ = 0;
     unsigned int quadVBO_ = 0;
 
-    std::unique_ptr<Shader> equirectangularToCubemapShader_;
-    std::unique_ptr<Shader> irradianceShader_;
-    std::unique_ptr<Shader> prefilterShader_;
-    std::unique_ptr<Shader> brdfShader_;
+    std::shared_ptr<Shader> equirectangularToCubemapShader_;
+    std::shared_ptr<Shader> irradianceShader_;
+    std::shared_ptr<Shader> prefilterShader_;
+    std::shared_ptr<Shader> brdfShader_;
 };
 
 NAMESPACE_END

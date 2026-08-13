@@ -1,6 +1,6 @@
 #include "PostProcessRenderer.h"
+#include <Base/AssetManager.h>
 #include <Base/Logger.h>
-#include "Base/ShaderCode.h"
 #include "Base/Shader.h"
 #include "Base/Camera.h"
 #include "RenderGraph/RenderGraph.h"
@@ -31,21 +31,29 @@ static std::unique_ptr<RenderTarget> CreateColorTarget(RenderContext& renderCont
     return std::unique_ptr<RenderTarget>(new RenderTarget(renderContext, desc));
 }
 
-PostProcessRenderer::PostProcessRenderer(RenderContext& renderContext)
-    : renderContext_(renderContext) {
+PostProcessRenderer::PostProcessRenderer(RenderContext& renderContext, AssetManager& assetManager)
+    : renderContext_(renderContext), assetManager_(assetManager) {
 	// 后处理目标只保存中间图像；最终 tone mapping 仍由 Example 的屏幕 pass 完成。
 	PostProcessRenderer_depthStencilState.depthTest = false;
     PostProcessRenderer_depthStencilState.depthWrite = false;
     //PostProcessRenderer_depthStencilState.depthWrite = false;
-    HightLightShader = TRefCountPtr<Shader>(new Shader(Vert_quad, Frag_highlight, nullptr, "post/highlight"));
-    BlurShader = TRefCountPtr<Shader>(new Shader(Vert_quad, Frag_blur, nullptr, "post/blur"));
-    DownSampleShader = TRefCountPtr<Shader>(new Shader(Vert_quad, Frag_DownSample, nullptr, "post/downsample"));
-    UpSampleShader = TRefCountPtr<Shader>(new Shader(Vert_quad, Frag_UpSample, nullptr, "post/upsample"));
-    BloomShader = TRefCountPtr<Shader>(new Shader(Vert_quad, Frag_bloom, nullptr, "post/bloom"));
-    RadialBlurShader = TRefCountPtr<Shader>(new Shader(Vert_quad, Frag_Radialblur, nullptr, "post/radial-blur"));
-    MotionBlurShader = TRefCountPtr<Shader>(new Shader(Vert_quad, Frag_Motionblur, nullptr, "post/motion-blur"));
-    CartoonShader = TRefCountPtr<Shader>(new Shader(Vert_quad, Frag_cartoon, nullptr, "post/cartoon"));
-    RippleShader = TRefCountPtr<Shader>(new Shader(Vert_quad, Frag_ripple, nullptr, "post/ripple"));
+    ShaderLibrary& shaders = assetManager_.getShaderLibrary();
+    const std::string technique = ShaderLibrary::PostProcessShaderName();
+    auto loadPass = [&](const char* variant, const char* fragment) {
+        const std::string passTechnique = technique + "/" + variant;
+        shaders.registerPass(passTechnique, ShaderPassType::Forward,
+            { "resources/shaders/fullscreen.vert", fragment, "" });
+        return shaders.getPass(ShaderHandle(passTechnique), ShaderPassType::Forward);
+    };
+    HightLightShader = loadPass("highlight", "resources/shaders/post_highlight.frag");
+    BlurShader = loadPass("blur", "resources/shaders/post_blur.frag");
+    DownSampleShader = loadPass("downsample", "resources/shaders/post_downsample.frag");
+    UpSampleShader = loadPass("upsample", "resources/shaders/post_upsample.frag");
+    BloomShader = loadPass("bloom", "resources/shaders/post_bloom.frag");
+    RadialBlurShader = loadPass("radial-blur", "resources/shaders/post_radial_blur.frag");
+    MotionBlurShader = loadPass("motion-blur", "resources/shaders/post_motion_blur.frag");
+    CartoonShader = loadPass("cartoon", "resources/shaders/post_cartoon.frag");
+    RippleShader = loadPass("ripple", "resources/shaders/post_ripple.frag");
 
     SamplerInfo bloomSampler;
     bloomSampler.mipmapMode = MipmapMode::None;
@@ -53,7 +61,7 @@ PostProcessRenderer::PostProcessRenderer(RenderContext& renderContext)
     const int width = renderContext_.windowsWidth;
     const int height = renderContext_.windowsHeight;
     highLightTarget_ = CreateColorTarget(renderContext_, "post/highlight", width, height, bloomSampler, glm::vec4(0.0f));
-    PostProcessRenderer_graphicsPipeline.shader = HightLightShader.getPtr();
+    PostProcessRenderer_graphicsPipeline.shader = HightLightShader.get();
     PipelineColorBlendAttachment pipelineColorBlendAttachment;
     pipelineColorBlendAttachment.blendState.enabled = false;
     PostProcessRenderer_graphicsPipeline.rasterizationState.cullMode = CullMode::None;
@@ -120,13 +128,13 @@ void PostProcessRenderer::render(RenderGraph& rg, FrameBufferInfo* sceneFBO, int
     const char* bloomPassName = "bloomPass";
     rg.addPass(bloomPassName, sceneFBO, [this, sceneFBO](RenderContext* renderContext) {
         //get high light
-        PostProcessRenderer_graphicsPipeline.shader = HightLightShader.getPtr();
+        PostProcessRenderer_graphicsPipeline.shader = HightLightShader.get();
         renderContext->beginRendering(highLightTarget_->framebuffer());
         glViewport(0, 0, highLightTarget_->width(), highLightTarget_->height());
         renderContext->setDepthStencilState(PostProcessRenderer_depthStencilState);
         renderContext->bindPipeline(PostProcessRenderer_graphicsPipeline);
-        HightLightShader.getPtr()->use();
-        HightLightShader.getPtr()->setInt("scene", 0);
+        HightLightShader.get()->use();
+        HightLightShader.get()->setInt("scene", 0);
         renderContext->bindTexture(sceneFBO->colorAttachments[0].texture->id, 0);
         renderContext->bindVertexArray(quadVAO);
         renderContext->drawArrays(0, 6);
@@ -136,14 +144,14 @@ void PostProcessRenderer::render(RenderGraph& rg, FrameBufferInfo* sceneFBO, int
         for (int i = 0; i < bloomLevel; i++) {
             RenderTarget& downTarget = *downSampleTargets_[i];
             renderContext->beginRendering(downTarget.framebuffer());
-            PostProcessRenderer_graphicsPipeline.shader = DownSampleShader.getPtr();
+            PostProcessRenderer_graphicsPipeline.shader = DownSampleShader.get();
             glViewport(0, 0, downTarget.width(), downTarget.height());
             renderContext->bindPipeline(PostProcessRenderer_graphicsPipeline);
-            DownSampleShader.getPtr()->use();
+            DownSampleShader.get()->use();
             glm::vec2 textureSize(1.0f / static_cast<float>(downTarget.width()),
                 1.0f / static_cast<float>(downTarget.height()));
-            DownSampleShader.getPtr()->setVec2("textureSize", textureSize);
-            DownSampleShader.getPtr()->setInt("u_texture", 0);
+            DownSampleShader.get()->setVec2("textureSize", textureSize);
+            DownSampleShader.get()->setInt("u_texture", 0);
             if (i == 0) renderContext->bindTexture(highLightTarget_->colorTexture()->id, 0);
             else renderContext->bindTexture(downSampleTargets_[i - 1]->colorTexture()->id, 0);
             renderContext->bindVertexArray(quadVAO);
@@ -154,16 +162,16 @@ void PostProcessRenderer::render(RenderGraph& rg, FrameBufferInfo* sceneFBO, int
         for (int i = bloomLevel - 2; i >= 0; i--) {
             RenderTarget& upTarget = *upSampleTargets_[i];
             renderContext->beginRendering(upTarget.framebuffer());
-            PostProcessRenderer_graphicsPipeline.shader = UpSampleShader.getPtr();
+            PostProcessRenderer_graphicsPipeline.shader = UpSampleShader.get();
             glViewport(0, 0, upTarget.width(), upTarget.height());
             renderContext->bindPipeline(PostProcessRenderer_graphicsPipeline);
-            UpSampleShader.getPtr()->use();
+            UpSampleShader.get()->use();
             glm::vec2 textureSize(1.0f / static_cast<float>(upTarget.width()),
                 1.0f / static_cast<float>(upTarget.height()));
-            UpSampleShader.getPtr()->setVec2("textureSize", textureSize);
-            UpSampleShader.getPtr()->setInt("curMipDownSampletexture", 0);
+            UpSampleShader.get()->setVec2("textureSize", textureSize);
+            UpSampleShader.get()->setInt("curMipDownSampletexture", 0);
             renderContext->bindTexture(downSampleTargets_[i]->colorTexture()->id, 0);
-            UpSampleShader.getPtr()->setInt("lastMipUpSampletexture", 1);
+            UpSampleShader.get()->setInt("lastMipUpSampletexture", 1);
             if(i == bloomLevel - 2) renderContext->bindTexture(downSampleTargets_[i + 1]->colorTexture()->id, 1);
             else renderContext->bindTexture(upSampleTargets_[i + 1]->colorTexture()->id, 1);
             renderContext->bindVertexArray(quadVAO);
@@ -171,13 +179,13 @@ void PostProcessRenderer::render(RenderGraph& rg, FrameBufferInfo* sceneFBO, int
         }
 
         //Calculate the final color
-        PostProcessRenderer_graphicsPipeline.shader = BloomShader.getPtr();
+        PostProcessRenderer_graphicsPipeline.shader = BloomShader.get();
         renderContext->beginRendering(bloomTarget_->framebuffer());
         glViewport(0, 0, bloomTarget_->width(), bloomTarget_->height());
         renderContext->bindPipeline(PostProcessRenderer_graphicsPipeline);
-        BloomShader.getPtr()->use();
-        BloomShader.getPtr()->setInt("scene", 0);
-        BloomShader.getPtr()->setInt("bloomBlur", 1);
+        BloomShader.get()->use();
+        BloomShader.get()->setInt("scene", 0);
+        BloomShader.get()->setInt("bloomBlur", 1);
         renderContext->bindTexture(sceneFBO->colorAttachments[0].texture->id, 0);
         renderContext->bindTexture(upSampleTargets_[0]->colorTexture()->id, 1);
         renderContext->bindVertexArray(quadVAO);
@@ -192,20 +200,20 @@ void PostProcessRenderer::render(RenderGraph& rg, FrameBufferInfo* sceneFBO, int
     
     //Radial Blur
     if (effectNo == 2) {
-        PostProcessRenderer_graphicsPipeline.shader = RadialBlurShader.getPtr();
+        PostProcessRenderer_graphicsPipeline.shader = RadialBlurShader.get();
         const char* RadialPassName = "RadialPass";
         rg.addPass(RadialPassName, bloomTexture, [this](RenderContext* renderContext) {
         //Radial Blur
-        PostProcessRenderer_graphicsPipeline.shader = RadialBlurShader.getPtr();
+        PostProcessRenderer_graphicsPipeline.shader = RadialBlurShader.get();
         renderContext->beginRendering(radialTarget_->framebuffer());
         glViewport(0, 0, radialTarget_->width(), radialTarget_->height());
         renderContext->bindPipeline(PostProcessRenderer_graphicsPipeline);
         LogOpenGLErrorIfAny("post radial after bind pipeline");
-        RadialBlurShader.getPtr()->use();
+        RadialBlurShader.get()->use();
         LogOpenGLErrorIfAny("post radial after use shader");
-        RadialBlurShader.getPtr()->setInt("sceneTexture", 0);
-        RadialBlurShader.getPtr()->setVec2("center", 0.5f, 0.5f);
-        RadialBlurShader.getPtr()->setFloat("strength", 0.3f);
+        RadialBlurShader.get()->setInt("sceneTexture", 0);
+        RadialBlurShader.get()->setVec2("center", 0.5f, 0.5f);
+        RadialBlurShader.get()->setFloat("strength", 0.3f);
         renderContext->bindTexture(bloomTexture->id, 0);
         renderContext->bindVertexArray(quadVAO);
         renderContext->drawArrays(0, 6);
@@ -217,9 +225,9 @@ void PostProcessRenderer::render(RenderGraph& rg, FrameBufferInfo* sceneFBO, int
     // Motion Blur 使用 A/B ping-pong 保存上一帧输出，resize 后必须重置历史状态。
     if (effectNo == 3) {
         const char* MotionPassName = "MotionPass";
-        PostProcessRenderer_graphicsPipeline.shader = MotionBlurShader.getPtr();
+        PostProcessRenderer_graphicsPipeline.shader = MotionBlurShader.get();
         rg.addPass(MotionPassName, bloomTexture, [this](RenderContext* renderContext) {
-        PostProcessRenderer_graphicsPipeline.shader = MotionBlurShader.getPtr();
+        PostProcessRenderer_graphicsPipeline.shader = MotionBlurShader.get();
         nowTarget_ = useFramebufferA ? motionTargetA_.get() : motionTargetB_.get();
         if (firstRender) {
             lastTexture = bloomTexture;
@@ -230,11 +238,11 @@ void PostProcessRenderer::render(RenderGraph& rg, FrameBufferInfo* sceneFBO, int
         glViewport(0, 0, nowTarget_->width(), nowTarget_->height());
         renderContext->setDepthStencilState(PostProcessRenderer_depthStencilState);
         renderContext->bindPipeline(PostProcessRenderer_graphicsPipeline);
-        MotionBlurShader.getPtr()->use();
+        MotionBlurShader.get()->use();
         LogOpenGLErrorIfAny("post motion after use shader");
         renderContext->bindVertexArray(quadVAO);
-        MotionBlurShader.getPtr()->setInt("sceneTexture", 0);
-        MotionBlurShader.getPtr()->setInt("lastTexture", 1);
+        MotionBlurShader.get()->setInt("sceneTexture", 0);
+        MotionBlurShader.get()->setInt("lastTexture", 1);
         renderContext->bindTexture(bloomTexture->id, 0);
         renderContext->bindTexture(lastTexture->id, 1);
         renderContext->drawArrays(0, 6);
@@ -249,14 +257,14 @@ void PostProcessRenderer::render(RenderGraph& rg, FrameBufferInfo* sceneFBO, int
     if (effectNo == 4) {
         const char* CartoonPassName = "CartoonPass";
         rg.addPass(CartoonPassName, bloomTexture, [this](RenderContext* renderContext) {
-        PostProcessRenderer_graphicsPipeline.shader = CartoonShader.getPtr();
+        PostProcessRenderer_graphicsPipeline.shader = CartoonShader.get();
         renderContext->beginRendering(cartoonTarget_->framebuffer());
         glViewport(0, 0, cartoonTarget_->width(), cartoonTarget_->height());
         renderContext->bindPipeline(PostProcessRenderer_graphicsPipeline);
-        CartoonShader.getPtr()->use();
+        CartoonShader.get()->use();
         LogOpenGLErrorIfAny("post cartoon");
         renderContext->bindVertexArray(quadVAO);
-        CartoonShader.getPtr()->setInt("sceneTexture", 0);
+        CartoonShader.get()->setInt("sceneTexture", 0);
         renderContext->bindTexture(bloomTexture->id, 0);
         renderContext->drawArrays(0, 6);
         renderContext->endRendering();
@@ -269,20 +277,20 @@ void PostProcessRenderer::render(RenderGraph& rg, FrameBufferInfo* sceneFBO, int
         const char* RipplePassName = "RipplePass";
         rg.addPass(RipplePassName, bloomTexture, [this](RenderContext* renderContext) {
         //Radial Blur
-        PostProcessRenderer_graphicsPipeline.shader = RippleShader.getPtr();
+        PostProcessRenderer_graphicsPipeline.shader = RippleShader.get();
         renderContext->beginRendering(rippleTarget_->framebuffer());
         glViewport(0, 0, rippleTarget_->width(), rippleTarget_->height());
         renderContext->bindPipeline(PostProcessRenderer_graphicsPipeline);
         LogOpenGLErrorIfAny("post ripple after bind pipeline");
-        RippleShader.getPtr()->use();
+        RippleShader.get()->use();
         LogOpenGLErrorIfAny("post ripple after use shader");
         renderContext->bindVertexArray(quadVAO);
-        RippleShader.getPtr()->setVec2("rippleCenter", glm::vec2(0.5f, 0.5f));
-        RippleShader.getPtr()->setFloat("time", time);
-        RippleShader.getPtr()->setFloat("waveAmplitude", 0.02f);
-        RippleShader.getPtr()->setFloat("waveFrequency", 20.0f);
-        RippleShader.getPtr()->setFloat("waveSpeed", 5.0f);
-        RippleShader.getPtr()->setInt("sceneTexture", 0);
+        RippleShader.get()->setVec2("rippleCenter", glm::vec2(0.5f, 0.5f));
+        RippleShader.get()->setFloat("time", time);
+        RippleShader.get()->setFloat("waveAmplitude", 0.02f);
+        RippleShader.get()->setFloat("waveFrequency", 20.0f);
+        RippleShader.get()->setFloat("waveSpeed", 5.0f);
+        RippleShader.get()->setInt("sceneTexture", 0);
         renderContext->bindTexture(bloomTexture->id, 0);
         renderContext->drawArrays(0, 6);
         renderContext->endRendering();

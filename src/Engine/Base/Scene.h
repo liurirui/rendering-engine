@@ -10,7 +10,6 @@
 #include "Mesh.h"
 #include "Base/AssetTypes.h"
 #include"Base/Renderable.h"
-#include "Base/ShaderCode.h"
 #include"Camera.h"
 class RenderGraph;
 NAMESPACE_START

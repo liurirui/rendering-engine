@@ -21,39 +21,70 @@ NAMESPACE_START
             debugName_ = debugName;
         }
     
-        // 2. compile shaders
-        unsigned int vertex, fragment, geometry;
+        compileAndReplace(vertexCode, fragmentCode, geometryCode);
+    }
+
+    bool Shader::compileAndReplace(const char* vertexCode, const char* fragmentCode, const char* geometryCode)
+    {
+        if (!vertexCode || !fragmentCode) {
+            Logger::Error("Shader source is null. name=" + debugName_);
+            return false;
+        }
+
+        unsigned int vertex = 0, fragment = 0, geometry = 0;
         // vertex shader
         vertex = glCreateShader(GL_VERTEX_SHADER);
         glShaderSource(vertex, 1, &vertexCode, NULL);
         glCompileShader(vertex);
-        checkCompileErrors(vertex, "VERTEX", vertexCode);
+        if (!checkCompileErrors(vertex, "VERTEX", vertexCode)) {
+            glDeleteShader(vertex);
+            return false;
+        }
         // fragment Shader
         fragment = glCreateShader(GL_FRAGMENT_SHADER);
         glShaderSource(fragment, 1, &fragmentCode, NULL);
         glCompileShader(fragment);
-        checkCompileErrors(fragment, "FRAGMENT", fragmentCode);
+        if (!checkCompileErrors(fragment, "FRAGMENT", fragmentCode)) {
+            glDeleteShader(vertex);
+            glDeleteShader(fragment);
+            return false;
+        }
         //If geometry shader code is provided, compile the geometry shader
         if (geometryCode != nullptr)
         {
             geometry = glCreateShader(GL_GEOMETRY_SHADER);
             glShaderSource(geometry, 1, &geometryCode, NULL);
             glCompileShader(geometry);
-            checkCompileErrors(geometry, "GEOMETRY", geometryCode);
+            if (!checkCompileErrors(geometry, "GEOMETRY", geometryCode)) {
+                glDeleteShader(vertex);
+                glDeleteShader(fragment);
+                glDeleteShader(geometry);
+                return false;
+            }
         }
 
-        // shader Program
-        ID = glCreateProgram();
-        glAttachShader(ID, vertex);
-        glAttachShader(ID, fragment);
-        if (geometryCode != nullptr)   glAttachShader(ID, geometry);
+        const unsigned int candidateProgram = glCreateProgram();
+        glAttachShader(candidateProgram, vertex);
+        glAttachShader(candidateProgram, fragment);
+        if (geometryCode != nullptr) glAttachShader(candidateProgram, geometry);
            
-        glLinkProgram(ID);
-        checkCompileErrors(ID, "PROGRAM");
+        glLinkProgram(candidateProgram);
+        const bool linked = checkCompileErrors(candidateProgram, "PROGRAM");
         // delete the shaders as they're linked into our program now and no longer necessary
         glDeleteShader(vertex);
         glDeleteShader(fragment);
-        if (geometryCode != nullptr)    glDeleteShader(geometry);    
+        if (geometryCode != nullptr) glDeleteShader(geometry);
+        if (!linked) {
+            glDeleteProgram(candidateProgram);
+            return false;
+        }
+
+        const unsigned int previousProgram = ID;
+        ID = candidateProgram;
+        if (previousProgram != 0) {
+            glDeleteProgram(previousProgram);
+        }
+        return true;
     }
 
     Shader::~Shader()
@@ -150,7 +181,7 @@ NAMESPACE_START
         return preview.str();
     }
 
-    void Shader::checkCompileErrors(GLuint shader, const std::string& type, const char* sourceCode)
+    bool Shader::checkCompileErrors(GLuint shader, const std::string& type, const char* sourceCode)
     {
         GLint success = GL_FALSE;
         GLchar infoLog[4096] = {};
@@ -161,6 +192,7 @@ NAMESPACE_START
             {
                 glGetShaderInfoLog(shader, sizeof(infoLog), NULL, infoLog);
                 Logger::Error("Shader compile failed. name=" + debugName_ + ", stage=" + type + "\n" + infoLog + "\nSource preview:\n" + BuildShaderSourcePreview(sourceCode));
+                return false;
             }
         }
         else
@@ -170,8 +202,10 @@ NAMESPACE_START
             {
                 glGetProgramInfoLog(shader, sizeof(infoLog), NULL, infoLog);
                 Logger::Error("Shader link failed. name=" + debugName_ + "\n" + infoLog);
+                return false;
             }
         }
+        return true;
     }
 
 NAMESPACE_END

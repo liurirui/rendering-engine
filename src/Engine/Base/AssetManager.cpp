@@ -17,6 +17,7 @@ AssetManager::AssetManager(RenderContext& renderContext, std::string rootPath)
     while (!rootPath_.empty() && rootPath_.back() == '/') {
         rootPath_.pop_back();
     }
+    shaderLibrary_.setRootPath(rootPath_);
 }
 
 std::string AssetManager::resolvePath(const std::string& relativePath) const {

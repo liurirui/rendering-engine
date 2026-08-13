@@ -16,6 +16,46 @@
 - 后续注意：
 ```
 
+## 未提交 - 外置 Shader 并引入 Technique、Variant 与热重载
+
+- 改动类型：渲染架构 / Shader 系统 / 开发工具 / 诊断
+- 建议提交标题：`feat: 外置 Shader 并引入 Technique、Variant 与安全热重载`
+
+### 改动摘要
+
+完成 Shader System P2 阶段。所有运行时 Shader 源码迁移到 `resources/shaders/`，ShaderLibrary 从单一名称缓存升级为 Technique、Pass、Variant program 缓存；Renderer 支持基于文件时间戳的自动热重载，编译失败时保留上一版 program，不再因编辑中的语法错误导致黑屏。
+
+### 具体改动
+
+- `Shader::compileAndReplace()` 先编译候选 program，全部成功后才替换当前 OpenGL ID。
+- `ShaderTechniqueDesc / ShaderPassDesc / ShaderPassType` 描述 Technique 与 Forward、Shadow、Debug pass。
+- program key 由 Technique、Pass 和排序后的 defines 共同组成，避免相同 Variant 重复编译。
+- `ShaderHandle` 增加 defines；法线贴图材质自动加入 `MATERIAL_NORMAL_MAP` Variant。
+- 迁移 PBR、DepthOnly、LightDebug、Screen、IBL、Bloom 和全部后处理 GLSL 到外置资源文件。
+- Renderer 每 500ms 检查文件时间戳；同一失败版本只报错一次，再次保存或手动 Reload 后重试。
+- PostProcessRenderer 与 IBLSystem 改为通过 AssetManager/ShaderLibrary 获取共享 Shader program。
+- ImGui 新增 Shader System 面板，显示 Technique、Program、Variant、成功/失败重载次数，并提供手动 Reload 按钮。
+
+### 架构影响
+
+Material 仍然只保存纯数据和 ShaderHandle，不持有 OpenGL program。ShaderLibrary 成为源码定位、Technique/Pass 解析、Variant 编译缓存和热重载的唯一入口；Shader 对象地址在热重载期间保持稳定，因此 GraphicsPipeline 和 Renderer 中已有引用不失效。
+
+### 验证情况
+
+- Debug 与 Release 构建通过。
+- 默认场景运行 8 秒，全部外置 Shader 成功加载，无 Shader/FBO/高优先级 OpenGL 错误。
+- 热重载成功测试通过。
+- 非法 GLSL 测试输出明确编译错误，进程保持运行并继续使用上一版 program。
+- 同一份非法 GLSL 等待 3 秒只产生 1 次编译失败和 1 次回退日志，确认失败版本不会每 500ms 重试刷屏。
+- 修复文件后自动恢复成功；临时测试内容已撤回。
+- 自动加载带法线贴图的 `backpack.obj` 验收时成功创建 `engine/default-lit#forward+MATERIAL_NORMAL_MAP`，确认 Variant 缓存链路真实生效；测试启动代码已撤回。
+- 项目介绍 PPT 已覆盖更新为 17 页，并检查 Shader System、诊断、路线图和结论页，无中文乱码或明显文字溢出。
+
+### 后续注意
+
+- Technique 路径目前在 C++ 注册，后续可增加 `.technique.json` 和 `#include` 依赖追踪。
+- 热重载必须发生在持有有效 OpenGL Context 的渲染线程；当前由 Renderer 每帧安全调用。
+
 ## 未提交 - 构建基于 Bounds 的 RenderQueue 与视锥裁剪流程
 
 - 改动类型：渲染架构 / 内存优化 / 性能优化 / 渲染流程

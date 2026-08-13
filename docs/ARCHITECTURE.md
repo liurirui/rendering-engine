@@ -134,6 +134,25 @@ MeshRenderer
   -> Mesh::draw()
 ```
 
+### Shader Technique、Pass 与 Variant
+
+运行时 Shader 源码已经从 `ShaderCode.cpp` 迁移到 `resources/shaders/`。`ShaderLibrary` 使用三层资源模型：
+
+```text
+ShaderHandle：Technique 名称 + Variant Defines
+    -> ShaderTechniqueDesc
+        -> Forward / Shadow / Debug ShaderPassDesc
+            -> vertex / fragment / geometry 外置文件
+                -> Program Cache
+```
+
+- Technique 表示一类渲染能力，例如 `engine/default-lit`、`engine/depth-only`。
+- Pass 表示同一 Technique 在不同渲染阶段使用的 program，例如 Forward、Shadow、Debug。
+- Variant 使用排序后的宏集合参与 program key；当前 `MATERIAL_NORMAL_MAP` 已作为真实材质变体接入。
+- 相同 Technique、Pass 和宏集合只编译一次，MaterialAsset 继续只保存轻量 ShaderHandle。
+
+Renderer 每 500ms 检查 Shader 文件时间戳。热重载会先编译候选 program：成功后保持 Shader 对象地址不变并替换内部 OpenGL ID；失败时保留上一版 program，日志输出源码行号和错误信息。同一个失败文件版本只尝试一次，避免持续刷日志；再次保存文件或点击 ImGui 的 `Reload Shaders` 后重试。
+
 PBR 使用 metallic-roughness 工作流：GGX NDF、Smith/Schlick-GGX Geometry、Schlick Fresnel。直接光来自方向光和最多 4 个有限范围点光源；间接光来自 irradiance diffuse、prefiltered specular 和 BRDF LUT。glTF combined texture 按 G=roughness、B=metallic 读取；旧式 shininess 会近似转换为 roughness。
 
 ## 7. IBL 原理
@@ -199,19 +218,19 @@ Asset 保存可缓存、可共享的导入数据；GameObject/Mesh/Transform 保
 
 1. Scene/GameObject 仍大量使用裸指针，缺少 Entity Handle/Generation 校验。
 2. `RenderContext` singleton 和直接 OpenGL 调用仍存在，RHI 隔离不完整。
-3. Shader 源码硬编码在 `ShaderCode.cpp`，缺少外置文件、variant 和热重载。
+3. Technique 当前由 C++ 注册文件路径，尚缺少 JSON/YAML 资产描述、include 预处理和依赖图。
 4. RenderGraph 没有资源句柄、读写依赖、自动排序与瞬时资源复用。
 5. 方向光阴影没有相机视锥拟合、CSM 和完善调试工具。
 6. glTF alpha mode、double-sided、transmission、skin animation 尚未完整实现。
 7. 后处理参数多为硬编码，缺少统一设置对象与可组合效果栈。
-8. 尚无 draw call、triangle、显存、GPU timestamp 等渲染统计。
+8. 尚无 draw call、显存、GPU timestamp 等完整渲染统计。
 9. CMake 仍使用全局 include 和 GLOB，自动测试/CI 尚未建立。
 
 ## 11. 推荐后续路线
 
 - P0（已完成）：`MeshResource` 和 GPU 资源缓存，多实例共享 VAO/VBO/IBO。
 - P1（已完成）：引入 Bounds，移除实例 CPU 几何副本，并构建 `RenderItem`、视锥裁剪和按 pipeline/material 排序的渲染队列。
-- P2：Shader 外置，增加 Technique/ShaderPass、宏变体与热重载。
+- P2（已完成）：Shader 外置，增加 Technique/ShaderPass、宏变体与安全热重载。
 - P3：让 RenderGraph 声明 texture/buffer 读写依赖，并接入 RenderTargetPool。
 - P4：CSM、glTF skin/alpha/transmission、SSAO、TAA、自动曝光和 GPU profiler。
 
@@ -242,3 +261,13 @@ Asset 保存可缓存、可共享的导入数据；GameObject/Mesh/Transform 保
 - 不透明队列按 Shader、Material 和 MeshResource 排序；透明队列按相机距离从远到近绘制并关闭深度写入。
 - 没有主方向光时，场景 pass 仍继续执行 IBL、点光源和 Emissive 渲染。
 - Debug/Release 构建及默认场景 8 秒运行通过，未出现 Shader、Framebuffer 或高优先级 OpenGL 错误。
+
+## 15. Shader System 阶段验收
+
+- PBR、DepthOnly、LightDebug、Screen、IBL 与全部后处理 Shader 已统一迁移到 `resources/shaders/`。
+- 启动日志确认所有 Technique/Pass 从外置文件成功创建 program，默认场景运行 8 秒无 Shader/FBO/高优先级 OpenGL 错误。
+- 修改 `light_debug.frag` 后自动热重载成功；写入非法 GLSL 时编译错误直接输出，进程继续运行并保持上一版 program。
+- 修复文件后再次自动热重载成功，验证失败回退与恢复链路完整。
+- 同一份非法 GLSL 等待 3 秒只记录 1 次失败，不会每 500ms 重复编译刷日志。
+- `ShaderHandle::defines` 参与 Variant 缓存；自动加载 `backpack.obj` 时成功创建 `engine/default-lit#forward+MATERIAL_NORMAL_MAP` 独立 program。
+- 项目介绍 PPT 已覆盖更新为 17 页，Shader System、诊断、路线图和结论页通过中文编码与布局检查。

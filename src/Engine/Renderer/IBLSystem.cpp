@@ -2,6 +2,7 @@
 
 #include <Base/Logger.h>
 #include <Base/Shader.h>
+#include <Base/ShaderLibrary.h>
 #include <glad.h>
 #include <stb_image.h>
 #include <glm/glm.hpp>
@@ -300,7 +301,7 @@ IBLSystem::~IBLSystem() {
     destroy();
 }
 
-bool IBLSystem::initialize(const std::string& hdrPath) {
+bool IBLSystem::initialize(const std::string& hdrPath, ShaderLibrary& shaderLibrary) {
     // 初始化阶段一次性预计算环境 cubemap、irradiance、prefilter 和 BRDF LUT，
     // 运行时 Shader 只做查表采样。
     if (initialized_) {
@@ -319,10 +320,15 @@ bool IBLSystem::initialize(const std::string& hdrPath) {
     createCubeGeometry();
     createQuadGeometry();
 
-    equirectangularToCubemapShader_.reset(new Shader(kCubemapVertexShader, kEquirectangularToCubemapShader, nullptr, "engine/ibl-equirectangular-to-cubemap"));
-    irradianceShader_.reset(new Shader(kCubemapVertexShader, kIrradianceShader, nullptr, "engine/ibl-irradiance"));
-    prefilterShader_.reset(new Shader(kCubemapVertexShader, kPrefilterShader, nullptr, "engine/ibl-prefilter"));
-    brdfShader_.reset(new Shader(kQuadVertexShader, kBRDFShader, nullptr, "engine/ibl-brdf-lut"));
+    auto loadPass = [&](const char* name, const char* vertex, const char* fragment) {
+        const std::string technique = std::string(ShaderLibrary::IBLShaderName()) + "/" + name;
+        shaderLibrary.registerPass(technique, ShaderPassType::Forward, { vertex, fragment, "" });
+        return shaderLibrary.getPass(ShaderHandle(technique), ShaderPassType::Forward);
+    };
+    equirectangularToCubemapShader_ = loadPass("equirectangular", "resources/shaders/ibl_cubemap.vert", "resources/shaders/ibl_equirectangular.frag");
+    irradianceShader_ = loadPass("irradiance", "resources/shaders/ibl_cubemap.vert", "resources/shaders/ibl_irradiance.frag");
+    prefilterShader_ = loadPass("prefilter", "resources/shaders/ibl_cubemap.vert", "resources/shaders/ibl_prefilter.frag");
+    brdfShader_ = loadPass("brdf-lut", "resources/shaders/ibl_brdf.vert", "resources/shaders/ibl_brdf.frag");
 
     GLint previousViewport[4] = {};
     GLint previousDepthFunc = GL_LESS;

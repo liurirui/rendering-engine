@@ -15,13 +15,15 @@ Renderer::Renderer(RenderContext& renderContext, AssetManager& assetManager)
     : renderContext_(renderContext), assetManager_(assetManager) {
     meshRenderer_.reset(new MeshRenderer(renderContext_, assetManager_));
     meshRenderer_->setFloorTexture(assetManager_.loadTexture2D("resources/textures/wood.png"));
-    postProcessRenderer_.reset(new PostProcessRenderer(renderContext_));
+    postProcessRenderer_.reset(new PostProcessRenderer(renderContext_, assetManager_));
 }
 
 Renderer::~Renderer() = default;
 
 void Renderer::render(Scene& scene, Camera& camera, int postProcessEffect) {
     // 每帧由 Renderer 组织完整流程；Example 不再直接拼接 shadow、scene 和 post pass。
+    // 500ms 节流检查外置 Shader 文件；成功时原子替换 program，失败保留上一版。
+    assetManager_.getShaderLibrary().updateHotReload();
     RenderGraph renderGraph;
 
     scene.Update();
