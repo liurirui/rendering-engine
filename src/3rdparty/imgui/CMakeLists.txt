@@ -1,9 +1,6 @@
 get_filename_component(CURRENT_DIR ${CMAKE_CURRENT_LIST_FILE} PATH)
 
 
-include_directories("${CURRENT_DIR}")
-
-
 file(GLOB imgui_SOURCES 
     "${CURRENT_DIR}/imconfig.h"
     "${CURRENT_DIR}/imgui_draw.cpp"
@@ -23,4 +20,9 @@ list(APPEND SOURCES ${imgui_SOURCES})
 
 # 生成链接库
 add_library(imgui ${SOURCES})
+target_include_directories(imgui PUBLIC "${CURRENT_DIR}")
+
+if(MSVC)
+    target_compile_options(imgui PRIVATE /utf-8)
+endif()
 

@@ -16,6 +16,40 @@
 - 后续注意：
 ```
 
+## 未提交 - 模块化 EditorUI 并规范第三方依赖边界
+
+- 改动类型：编辑器架构 / 构建系统 / 第三方依赖整理
+- 建议提交标题：`refactor: 模块化 EditorUI 并规范第三方依赖关系`
+
+### 改动摘要
+
+将 ImGui 从 `Example/main.cpp` 的临时示例式接入，重构为独立 `editor_ui` 开发工具 target。Example 只保留窗口、输入、场景初始化和帧驱动；引擎核心不依赖 ImGui。与此同时清理 Example 对 Assimp、GLAD、stb_image 等底层库的重复链接，让静态 `engine` target 自己传递它实际需要的依赖。
+
+### 具体改动
+
+- 新增 `src/Editor/EditorUI.h/.cpp` 和 `editor_ui` target，集中管理 ImGui 上下文、GLFW/OpenGL3 backend、模型与贴图文件选择、材质/后处理控制、RenderQueue 统计和 Shader 热重载面板。
+- 删除 `src/Example` 内重复保存的 `imgui_impl_glfw.*`、`imgui_impl_opengl3.*` 和 loader 文件；改用 `src/3rdparty/imgui/backends` 中的官方 backend 源码，避免版本漂移。
+- Example 的 CMake 源文件列表由 GLOB 改为显式 `main.cpp`，不会再把目录内临时 `.cpp` 自动编译进可执行程序。
+- `example` 现在只链接 `engine` 和 `editor_ui`；`editor_ui` 负责 ImGui、ImGuiFileDialog、GLFW、GLAD 的工具层依赖。
+- `engine` 公开传递 GLAD、stb_image、Assimp，修复静态库内部符号只能依赖上层重复链接才能解析的问题。
+- 为现有平铺存放的 GLFW 头文件提供标准 `<GLFW/...>` 转发头，使官方 ImGui backend 可直接使用。
+
+### 架构影响
+
+形成 `example -> engine` 与 `example -> editor_ui` 两条明确边界。Engine 保持可在无编辑器环境中复用；EditorUI 是可选开发期层，未来可增加 Inspector、Asset Browser 和 Profiler，而不会继续膨胀 `main.cpp`。
+
+### 验证情况
+
+- CMake 重新生成通过。
+- Debug `example` 构建通过。
+- Release `example` 构建通过。
+- 已保留原 Assimp DLL 自动部署逻辑；未改动用户的 `build_project.bat`。
+
+### 后续注意
+
+- 当前 GLFW / Assimp 仍使用仓库内预编译 Windows 库；后续可迁移到 vcpkg/Conan 或统一的 `third_party` 目录。
+- Release 编译仍存在旧的 `MathUtil.cpp` 除零风险警告，和本次 UI/CMake 改造无关，应单独修复。
+
 ## 未提交 - 外置 Shader 并引入 Technique、Variant 与热重载
 
 - 改动类型：渲染架构 / Shader 系统 / 开发工具 / 诊断

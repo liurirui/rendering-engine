@@ -4,9 +4,8 @@ get_filename_component(CURRENT_DIR ${CMAKE_CURRENT_LIST_FILE} PATH)
 include_directories("${CURRENT_DIR}/..")
 
 
-file(GLOB Main_SOURCES
-        "${CURRENT_DIR}/*.cpp"
-        "${CURRENT_DIR}/*.h"
+set(Main_SOURCES
+        "${CURRENT_DIR}/main.cpp"
         )
 
 FilterFolder("${Main_SOURCES}")
@@ -22,31 +21,8 @@ if(MSVC)
     target_compile_options(example PRIVATE /utf-8)
 endif()
 
-find_package(engine)
-include_directories("${engine_INCLUDE_DIRS}")
-
-find_package(glad)
-include_directories("${glad_INCLUDE_DIRS}")
-
-find_package(glfw)
-include_directories("${glfw_INCLUDE_DIRS}")
-
-find_package(stb_image)
-include_directories("${stb_image_INCLUDE_DIRS}")
-
-find_package(glm)
-include_directories("${glm_INCLUDE_DIRS}")
-
-find_package(assimp)
-include_directories(${assimp_INCLUDE_DIRS})
-
-find_package(imgui)
-include_directories(${imgui_INCLUDE_DIRS})
-
-find_package(ImGuiFileDialog)
-include_directories(${ImGuiFileDialog_INCLUDE_DIRS})
-
-target_link_libraries(example ${engine_LIBRARIES} ${glad_LIBRARIES} ${glfw_LIBRARIES} ${stb_image_LIBRARIES} ${assimp_LIBRARIES} ${imgui_LIBRARIES} ${ImGuiFileDialog_LIBRARIES})
+target_include_directories(example PRIVATE "${CURRENT_DIR}/..")
+target_link_libraries(example PRIVATE engine editor_ui)
 
 set(ASSIMP_RUNTIME_DLL "${CMAKE_SOURCE_DIR}/src/3rdparty/assimp/lib/dll/assimp-vc142-mt.dll")
 

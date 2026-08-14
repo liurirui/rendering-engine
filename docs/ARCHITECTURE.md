@@ -271,3 +271,25 @@ Asset 保存可缓存、可共享的导入数据；GameObject/Mesh/Transform 保
 - 同一份非法 GLSL 等待 3 秒只记录 1 次失败，不会每 500ms 重复编译刷日志。
 - `ShaderHandle::defines` 参与 Variant 缓存；自动加载 `backpack.obj` 时成功创建 `engine/default-lit#forward+MATERIAL_NORMAL_MAP` 独立 program。
 - 项目介绍 PPT 已覆盖更新为 17 页，Shader System、诊断、路线图和结论页通过中文编码与布局检查。
+
+## 16. Editor/UI 与第三方依赖阶段
+
+当前 Example 只负责创建窗口、初始化 Engine 和驱动主循环；ImGui 上下文、GLFW/OpenGL3 backend、文件选择器和编辑器面板由独立的 `editor_ui` target 管理。
+
+```text
+example
+ ├── engine
+ └── editor_ui
+      ├── imgui
+      ├── ImGuiFileDialog
+      ├── GLFW
+      └── GLAD
+```
+
+- `src/Example` 不再使用 GLOB 编译所有文件，只显式编译 `main.cpp`。
+- 删除 Example 中重复的 ImGui backend 源码，统一使用 `src/3rdparty/imgui/backends` 官方实现。
+- 增加 `src/Editor/EditorUI.*`，集中管理编辑器初始化、Frame 生命周期、模型/贴图选择、渲染统计、Shader 热重载和后处理控制。
+- `Engine` 通过 `target_link_libraries(... PUBLIC ...)` 声明 Assimp、stb_image、GLAD 等静态库依赖，最终应用不再重复手工列出底层库。
+- 为当前平铺式 GLFW 头文件增加 `<GLFW/glfw3.h>` 兼容转发头，以匹配官方 backend 的标准 include 方式。
+
+这样调整的原因是隔离运行时引擎和开发期工具：未来可以构建不带 ImGui 的纯 Runtime，同时编辑器面板不会继续侵入 `Example/main.cpp`。

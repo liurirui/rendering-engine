@@ -50,4 +50,20 @@ include_directories("${glm_INCLUDE_DIRS}")
 find_package(assimp)
 include_directories("${assimp_INCLUDE_DIRS}")
 
-target_link_libraries(engine ${glad_LIBRARIES})
+target_include_directories(engine PUBLIC
+    "${CURRENT_DIR}/.."
+    "${CURRENT_DIR}"
+    ${glad_INCLUDE_DIRS}
+    ${stb_image_INCLUDE_DIRS}
+    ${glm_INCLUDE_DIRS}
+    ${assimp_INCLUDE_DIRS}
+)
+
+# Engine 的公开依赖必须随静态库传递给最终可执行程序；否则链接器无法
+# 解析 Texture2D/Model/IBLSystem 使用的 stb_image 与 Assimp 符号。
+target_link_libraries(engine
+    PUBLIC
+        glad
+        ${stb_image_LIBRARIES}
+        ${assimp_LIBRARIES}
+)

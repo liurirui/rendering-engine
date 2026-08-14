@@ -29,5 +29,6 @@ add_subdirectory("${THIRDPARTY_PATH}/imgui")
 add_subdirectory("${THIRDPARTY_PATH}/ImGuiFileDialog")
 
 add_subdirectory("${PROJECT_SOURCE_DIR}/src/Engine")
+add_subdirectory("${PROJECT_SOURCE_DIR}/src/Editor")
 
 add_subdirectory("${PROJECT_SOURCE_DIR}/src/Example")

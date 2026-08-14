@@ -1,8 +1,5 @@
 #include <glad.h>
 #include <glfw3.h>
-#include "imgui.h"
-#include "imgui_impl_glfw.h"
-#include "imgui_impl_opengl3.h"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -19,19 +16,15 @@
 #include<Engine/Base/AssetManager.h>
 #include<Engine/Base/Logger.h>
 #include <Engine/Base/Shader.h>
+#include <Editor/EditorUI.h>
 
 #include <iostream>
-#include<array>
 #include<algorithm>
 
 #include<Engine/Base/Constants.h>
 
 #include "Windows.h"
 #include <windows.h>
-
-#include <assimp/camera.h>
-#include <assimp/mesh.h>
-#include <ImGuiFileDialog.h>
 
 #if defined(_MSC_VER) && (_MSC_VER >= 1900) && !defined(IMGUI_DISABLE_WIN32_FUNCTIONS)
 #pragma comment(lib, "legacy_stdio_definitions")
@@ -65,7 +58,6 @@ glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
 
 //Controls whether the cursor is visible
 static bool isCursorVisible = false;
-static bool isWindowOpen = false;
 
 //int main(int argc, char* argv[])
 
@@ -183,7 +175,7 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
 #endif
 
     // Create window with graphics context
-    GLFWwindow* window = glfwCreateWindow(SRC_WIDTH, SRC_HEIGHT, "Dear ImGui GLFW+OpenGL3 example", nullptr, nullptr);
+    GLFWwindow* window = glfwCreateWindow(SRC_WIDTH, SRC_HEIGHT, "Render Engine", nullptr, nullptr);
     if (window == nullptr) {
         Logger::Error("Failed to create GLFW window.");
         Logger::Shutdown();
@@ -215,49 +207,22 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
         Logger::Warn("OpenGL debug callback is not available on this driver/context.");
     }
 
-    // Setup Dear ImGui context
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO(); (void)io;
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
-
-    // Setup Dear ImGui style
-    ImGui::StyleColorsDark();
-    //ImGui::StyleColorsLight();
-
-    // Setup Platform/Renderer backends
-    ImGui_ImplGlfw_InitForOpenGL(window, true);
-#ifdef __EMSCRIPTEN__
-    ImGui_ImplGlfw_InstallEmscriptenCallbacks(window, "#canvas");
-#endif
-    ImGui_ImplOpenGL3_Init(glsl_version);
-
-    // Load Fonts
-    // - If no fonts are loaded, dear imgui will use the default font. You can also load multiple fonts and use ImGui::PushFont()/PopFont() to select them.
-    // - AddFontFromFileTTF() will return the ImFont* so you can store it if you need to select the font among multiple.
-    // - If the file cannot be loaded, the function will return a nullptr. Please handle those errors in your application (e.g. use an assertion, or display an error and quit).
-    // - The fonts will be rasterized at a given size (w/ oversampling) and stored into a texture when calling ImFontAtlas::Build()/GetTexDataAsXXXX(), which ImGui_ImplXXXX_NewFrame below will call.
-    // - Use '#define IMGUI_ENABLE_FREETYPE' in your imconfig file to use Freetype for higher quality font rendering.
-    // - Read 'docs/FONTS.md' for more instructions and details.
-    // - Remember that in C/C++ if you want to include a backslash \ in a string literal you need to write a double backslash \\ !
-    // - Our Emscripten build process allows embedding fonts to be accessible at runtime from the "fonts/" folder. See Makefile.emscripten for details.
-    //io.Fonts->AddFontDefault();
-    //io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\segoeui.ttf", 18.0f);
-    //io.Fonts->AddFontFromFileTTF("../../misc/fonts/DroidSans.ttf", 16.0f);
-    //io.Fonts->AddFontFromFileTTF("../../misc/fonts/Roboto-Medium.ttf", 16.0f);
-    //io.Fonts->AddFontFromFileTTF("../../misc/fonts/Cousine-Regular.ttf", 15.0f);
-    //ImFont* font = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\ArialUni.ttf", 18.0f, nullptr, io.Fonts->GetGlyphRangesJapanese());
-    //IM_ASSERT(font != nullptr);
+    /* EditorUI owns Dear ImGui context and backend initialization. */
+    EditorUI editorUI;
+    if (!editorUI.initialize(window, glsl_version)) {
+        Logger::Error("Failed to initialize EditorUI.");
+        glfwDestroyWindow(window);
+        Logger::Shutdown();
+        glfwTerminate();
+        return 1;
+    }
 
     //Decide which effect to use
     int useEffect = 0;
     float exposure = 1.35f;
     
-    // Our state
-    bool show_demo_window = false;
-    bool show_another_window = false;
-    ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+    // 清屏颜色属于窗口/应用状态，不属于 EditorUI。
+    glm::vec4 clearColor(0.45f, 0.55f, 0.60f, 1.00f);
 
 
     // screen quad VAO
@@ -315,9 +280,6 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
 
     // Main loop
 #ifdef __EMSCRIPTEN__
-    // For an Emscripten build we are disabling file-system access, so let's not attempt to do a fopen() of the imgui.ini file.
-    // You may manually call LoadIniSettingsFromMemory() to load settings from your own storage.
-    io.IniFilename = nullptr;
     EMSCRIPTEN_MAINLOOP_BEGIN
 #else
     while (!glfwWindowShouldClose(window))
@@ -333,206 +295,8 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
         glfwPollEvents();
         if (glfwGetWindowAttrib(window, GLFW_ICONIFIED) != 0)
         {
-            ImGui_ImplGlfw_Sleep(10);
+            glfwWaitEventsTimeout(0.01);
             continue;
-        }
-
-        // Start the Dear ImGui frame
-        ImGui_ImplOpenGL3_NewFrame();
-        ImGui_ImplGlfw_NewFrame();
-        ImGui::NewFrame();
-
-        // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
-        if (show_demo_window)
-            ImGui::ShowDemoWindow(&show_demo_window);
-
-        // 2. Show a simple window that we create ourselves. We use a Begin/End pair to create a named window.
-        {
-            ImGui::SetNextWindowSize(ImVec2(400, 300));
-            // Flag for file dialog
-            static bool openModelDialog = false, openTextureDialog = false;
-            // store selected file path
-            static std::string selectedFilePath = "";
-
-            // Create a window called "Hello, world!" and append into it.
-            isWindowOpen = ImGui::Begin("Hello, world! Hold down the 'Alt' key");
-            ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
-            ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
-            ImGui::Checkbox("Another Window", &show_another_window);
-
-            ImGui::ColorEdit3("Background Color", (float*)&(renderer->getMeshRenderer().getTargetFrameBuffer()->colorAttachments[0].clearColor)); // Edit 3 floats representing a color
-            ImGui::SliderFloat("Exposure", &exposure, 0.1f, 5.0f, "%.2f");
-
-            if (ImGui::CollapsingHeader("Render Statistics")) {
-                const RenderStats& stats = renderer->getMeshRenderer().getRenderStats();
-                ImGui::Text("Submitted: %u", stats.submittedItems);
-                ImGui::Text("Visible: %u", stats.visibleItems);
-                ImGui::Text("Culled: %u", stats.culledItems);
-                ImGui::Text("Invalid Bounds: %u", stats.invalidBoundsItems);
-                ImGui::Text("Shadow / Opaque / Transparent: %u / %u / %u",
-                    stats.shadowItems, stats.opaqueItems, stats.transparentItems);
-                ImGui::Text("Visible Triangles: %llu", static_cast<unsigned long long>(stats.visibleTriangles));
-            }
-
-            if (ImGui::CollapsingHeader("Shader System")) {
-                ShaderLibraryStats shaderStats = assetManager->getShaderLibrary().getStats();
-                ImGui::Text("Techniques: %llu", static_cast<unsigned long long>(shaderStats.techniqueCount));
-                ImGui::Text("Programs / Variants: %llu / %llu",
-                    static_cast<unsigned long long>(shaderStats.programCount),
-                    static_cast<unsigned long long>(shaderStats.variantCount));
-                ImGui::Text("Reload Success / Failed: %llu / %llu",
-                    static_cast<unsigned long long>(shaderStats.successfulReloads),
-                    static_cast<unsigned long long>(shaderStats.failedReloads));
-                if (ImGui::Button("Reload Shaders", ImVec2(160, 26))) {
-                    assetManager->getShaderLibrary().requestReload();
-                }
-            }
-
-            ImVec4 buttonColor = ImVec4(1.0f, 0.4f, 0.f, 1.0f);      // Color of button
-            ImVec4 hoveredColor = ImVec4(0.4f, 0.15f, 0.15f, 1.0f);  // Color on hover
-            ImVec4 activeColor = ImVec4(0.8f, 0.15f, 0.0f, 1.0f);    // Color when pressed
-
-           // Reusable function to apply button colors
-            auto setButtonStyle = [&]() {
-                ImGui::PushStyleColor(ImGuiCol_Button, buttonColor);
-                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, hoveredColor);
-                ImGui::PushStyleColor(ImGuiCol_ButtonActive, activeColor);
-            };
-
-            setButtonStyle();
-            if (ImGui::Button("Load Model", ImVec2(160, 30)))  openModelDialog = true;
-            ImGui::PopStyleColor(3);
-
-            if (openModelDialog) {
-                IGFD::FileDialogConfig config;
-                config.path = assetManager->resolvePath("resources/objects");                // Default folder path for model selection
-                config.countSelectionMax = 1;                       // Allow only one file to be selected
-                config.flags = ImGuiFileDialogFlags_None;           // No special flags
-
-                // Open model file dialog
-                ImGuiFileDialog::Instance()->OpenDialog("ChooseModelDlgKey", "Choose Model", ".obj,.fbx,.glb,.gltf,.dae", config);
-                openModelDialog = false;
-            }
-
-            // Process selected model file
-            if (ImGuiFileDialog::Instance()->Display("ChooseModelDlgKey")) {
-                if (ImGuiFileDialog::Instance()->IsOk()) {
-                    selectedFilePath = ImGuiFileDialog::Instance()->GetFilePathName();
-                    scene->createModel(selectedFilePath);   // Add model to the scene
-                }
-                ImGuiFileDialog::Instance()->Close();
-            }
-            
-            setButtonStyle();
-            if (ImGui::Button("Change Floor Texture", ImVec2(160, 30))) openTextureDialog = true;
-            ImGui::PopStyleColor(3);
-
-            if (openTextureDialog) {
-                IGFD::FileDialogConfig config;
-                config.path = assetManager->resolvePath("resources/textures");               // Default folder path for texture selection
-                config.countSelectionMax = 1;                       // Allow only one file to be selected
-                config.flags = ImGuiFileDialogFlags_None;           // No special flags
-
-                // Open texture file dialog
-                ImGuiFileDialog::Instance()->OpenDialog("ChooseTextureDlgKey", "Choose Texture", ".png,.jpg,.jpeg,.bmp", config);
-                openTextureDialog = false;
-            }
-
-            // Process selected texture file
-            if (ImGuiFileDialog::Instance()->Display("ChooseTextureDlgKey")) {
-                if (ImGuiFileDialog::Instance()->IsOk()) {
-                    selectedFilePath = ImGuiFileDialog::Instance()->GetFilePathName();
-                    renderer->getMeshRenderer().setFloorTexture(assetManager->loadTexture2D(selectedFilePath));
-                }
-                ImGuiFileDialog::Instance()->Close();
-            }
-
-            if (!scene->root->child.empty()) {
-                if (ImGui::CollapsingHeader("Model Control")) {
-                    ImGui::Indent(ImGui::GetFontSize() * 2);
-                    for (int i = 0; i < scene->root->child.size(); i++) {
-                        if (ImGui::CollapsingHeader(("Model " + to_string(i + 1) + " Control").c_str())) {
-                            ImGui::Indent(ImGui::GetFontSize() * 2);
-                            if (ImGui::CollapsingHeader(("Model " + to_string(i + 1) + " Position").c_str())) {
-                                if (ImGui::SliderFloat(("Position X##" + to_string(i)).c_str(), &((scene->root->child[i]->GetTransform()->localPosition).x), -10.0f, 10.0f))  scene->root->child[i]->GetTransform()->SetDirty();
-                                if (ImGui::SliderFloat(("Position Y##" + to_string(i)).c_str(), &((scene->root->child[i]->GetTransform()->localPosition).y), 0.0f, 10.0f))  scene->root->child[i]->GetTransform()->SetDirty();
-                                if (ImGui::SliderFloat(("Position Z##" + to_string(i)).c_str(), &((scene->root->child[i]->GetTransform()->localPosition).z), -10.0f, 10.0f))  scene->root->child[i]->GetTransform()->SetDirty();
-                            }
-                            if (ImGui::CollapsingHeader(("Model " + to_string(i + 1) + " Rotation").c_str())) {
-                                if (ImGui::SliderFloat(("Rotation X##" + to_string(i)).c_str(), &((scene->root->child[i]->GetTransform()->localRotation).x), -90.0f, 90.0f))  scene->root->child[i]->GetTransform()->SetDirty();
-                                if (ImGui::SliderFloat(("Rotation Y##" + to_string(i)).c_str(), &((scene->root->child[i]->GetTransform()->localRotation).y), -90.0f, 90.0f))  scene->root->child[i]->GetTransform()->SetDirty();
-                                if (ImGui::SliderFloat(("Rotation Z##" + to_string(i)).c_str(), &((scene->root->child[i]->GetTransform()->localRotation).z), -90.0f, 90.0f))  scene->root->child[i]->GetTransform()->SetDirty();
-                            }
-                            if (ImGui::CollapsingHeader(("Model " + to_string(i + 1) + " Scale").c_str())) {
-                                if (ImGui::SliderFloat(("Scale X##" + to_string(i)).c_str(), &((scene->root->child[i]->GetTransform()->localScale).x), 0.0f, 5.0f))  scene->root->child[i]->GetTransform()->SetDirty();
-                                if (ImGui::SliderFloat(("Scale Y##" + to_string(i)).c_str(), &((scene->root->child[i]->GetTransform()->localScale).y), 0.0f, 5.0f))  scene->root->child[i]->GetTransform()->SetDirty();
-                                if (ImGui::SliderFloat(("Scale Z##" + to_string(i)).c_str(), &((scene->root->child[i]->GetTransform()->localScale).z), 0.0f, 5.0f))  scene->root->child[i]->GetTransform()->SetDirty();
-                            }
-                            ImGui::Unindent();
-                        }
-                    }
-                    ImGui::Unindent();
-                }
-            }
-
-            //Provides the option to select post-processing
-            ImGui::Text("Select Post-processing Effect");
-            ImGui::RadioButton("Origin", &useEffect, 0);
-            ImGui::SameLine(0, 10);
-            ImGui::RadioButton("Bloom", &useEffect, 1);
-            ImGui::SameLine(0, 10);
-            ImGui::RadioButton("Radial", &useEffect, 2);
-            ImGui::SameLine(0, 10);
-            ImGui::RadioButton("Motion", &useEffect, 3);
-            ImGui::SameLine(0, 10);
-            ImGui::RadioButton("Cartoon", &useEffect, 4);
-
-            ImGui::RadioButton("Ripple", &useEffect, 5);
-            
-            /*if (ImGui::CollapsingHeader("Lights Control")) {
-                //directionLight 
-                ImGui::Text("Directional Light:");
-                ImGui::Indent(ImGui::GetFontSize() * 2);
-                if (ImGui::Checkbox("Directional Light", &(scene->meshRenderer->directionLight->Switch))) {
-                    if (scene->meshRenderer->directionLight->Switch) scene->meshRenderer->directionLight->turnOn();
-                    else   scene->meshRenderer->directionLight->turnOff();
-                }
-                ImGui::Unindent();
-
-                //pointLight
-                ImGui::Text("Point Lights:");
-                ImGui::Indent(ImGui::GetFontSize() * 2);
-                // 4 pointLights switch
-                static const std::array<std::string, 4> nameLight = { "red", "green", "blue", "white" };
-                string name = "light ";
-                for (int i = 0; i < 4; i++) {
-                    if (ImGui::CollapsingHeader((name + nameLight[i]).c_str())) {
-                        //Control the light source on and off
-                        if (ImGui::Checkbox(("On / Off##" + nameLight[i]).c_str(), &(scene->meshRenderer->pointLights[i]->Switch))) {
-                            if (scene->meshRenderer->pointLights[i]->Switch)    scene->meshRenderer->pointLights[i]->turnOn();
-                            else  scene->meshRenderer->pointLights[i]->turnOff();
-                        }
-                        //Control the position of light sources
-                        ImGui::SliderFloat((name + nameLight[i] + "X").c_str(), &((scene->meshRenderer->pointLights[i]->getPosition()).x), -10.0f, 10.0f);
-                        ImGui::SliderFloat((name + nameLight[i] + "Y").c_str(), &((scene->meshRenderer->pointLights[i]->getPosition()).y), 0.0f, 10.0f);
-                        ImGui::SliderFloat((name + nameLight[i] + "Z").c_str(), &((scene->meshRenderer->pointLights[i]->getPosition()).z), -10.0f, 10.0f);
-                    }
-                }
-                ImGui::Unindent();
-            }*/
-            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
-            ImGui::End();
-        }
-        
-
-        // 3. Show another simple window.
-        if (show_another_window)
-        {
-            ImGui::Begin("Another Window", &show_another_window);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
-            ImGui::Text("Hello from another window!");
-            if (ImGui::Button("Close Me"))
-                show_another_window = false;
-            ImGui::End();
         }
 
         // Rendering
@@ -540,7 +304,7 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
         int display_w, display_h;
         glfwGetFramebufferSize(window, &display_w, &display_h);
         glViewport(0, 0, display_w, display_h);
-        glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
+        glClearColor(clearColor.x * clearColor.w, clearColor.y * clearColor.w, clearColor.z * clearColor.w, clearColor.w);
         glClear(GL_COLOR_BUFFER_BIT);
 
 
@@ -569,8 +333,9 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
         else 
         glBindTexture(GL_TEXTURE_2D, renderer->getPostProcessRenderer().getTargetColorTextureID(0,useEffect));
         glDrawArrays(GL_TRIANGLES, 0, 6);
-        ImGui::Render();
-        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        editorUI.beginFrame();
+        editorUI.draw(*renderer, *scene, *assetManager, clearColor, exposure, useEffect);
+        editorUI.render();
 
         glfwSwapBuffers(window);
     }
@@ -588,9 +353,7 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
 
 
     // Cleanup
-    ImGui_ImplOpenGL3_Shutdown();
-    ImGui_ImplGlfw_Shutdown();
-    ImGui::DestroyContext();
+    editorUI.shutdown();
 
     // Release all OpenGL-backed resources before destroying the GLFW context.
     delete openGLRenderContext;
@@ -622,8 +385,8 @@ void processInput(GLFWwindow *window)
     if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
         camera.ProcessKeyboard(DOWN, deltaTime);
 
-    //Control whether the cursor should be hidden
-    if (!isWindowOpen) {             //When the window is not expanded
+    // EditorUI owns mouse capture state; Alt toggles the camera cursor.
+    {
         if (glfwGetKey(window, GLFW_KEY_LEFT_ALT) == GLFW_PRESS) {
             if (!isCursorVisible)    //Press "Alt" when the cursor is not visible
             {
@@ -636,10 +399,6 @@ void processInput(GLFWwindow *window)
             glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);         // Hide  Cursor
             isCursorVisible = false;
         }
-    }
-    else if (!isCursorVisible) {    //When the window is expanded
-        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);              //Show Currsor
-        isCursorVisible = true;
     }
 }
 
