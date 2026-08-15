@@ -34,6 +34,12 @@ void Renderer::render(Scene& scene, Camera& camera, int postProcessEffect) {
     }
 
     renderGraph.execute(&renderContext_);
+    lastRenderGraphStats_ = renderGraph.stats();
+    if (lastRenderGraphStats_.reorderedPassCount > 0) {
+        Logger::Info("RenderGraph reordered passes. passCount=" + std::to_string(lastRenderGraphStats_.passCount) +
+            ", edges=" + std::to_string(lastRenderGraphStats_.dependencyEdgeCount) +
+            ", moved=" + std::to_string(lastRenderGraphStats_.reorderedPassCount));
+    }
 
     glDisable(GL_DEPTH_TEST);
     glDepthMask(GL_FALSE);

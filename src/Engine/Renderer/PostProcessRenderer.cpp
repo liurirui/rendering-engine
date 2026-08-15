@@ -126,7 +126,9 @@ void PostProcessRenderer::render(RenderGraph& rg, FrameBufferInfo* sceneFBO, int
     // Bloom 是公共前置 pass；effectNo 决定是否继续追加一个后处理效果。
     ////Bloom
     const char* bloomPassName = "bloomPass";
-    rg.addPass(bloomPassName, sceneFBO, [this, sceneFBO](RenderContext* renderContext) {
+    rg.addPass(bloomPassName, sceneFBO,
+        { {"scene.color", RenderGraphAccess::Read}, {"post.bloom", RenderGraphAccess::Write} },
+        [this, sceneFBO](RenderContext* renderContext) {
         //get high light
         PostProcessRenderer_graphicsPipeline.shader = HightLightShader.get();
         renderContext->beginRendering(highLightTarget_->framebuffer());
@@ -202,7 +204,9 @@ void PostProcessRenderer::render(RenderGraph& rg, FrameBufferInfo* sceneFBO, int
     if (effectNo == 2) {
         PostProcessRenderer_graphicsPipeline.shader = RadialBlurShader.get();
         const char* RadialPassName = "RadialPass";
-        rg.addPass(RadialPassName, bloomTexture, [this](RenderContext* renderContext) {
+        rg.addPass(RadialPassName, bloomTexture,
+            { {"post.bloom", RenderGraphAccess::Read}, {"post.radial", RenderGraphAccess::Write} },
+            [this](RenderContext* renderContext) {
         //Radial Blur
         PostProcessRenderer_graphicsPipeline.shader = RadialBlurShader.get();
         renderContext->beginRendering(radialTarget_->framebuffer());
@@ -226,7 +230,9 @@ void PostProcessRenderer::render(RenderGraph& rg, FrameBufferInfo* sceneFBO, int
     if (effectNo == 3) {
         const char* MotionPassName = "MotionPass";
         PostProcessRenderer_graphicsPipeline.shader = MotionBlurShader.get();
-        rg.addPass(MotionPassName, bloomTexture, [this](RenderContext* renderContext) {
+        rg.addPass(MotionPassName, bloomTexture,
+            { {"post.bloom", RenderGraphAccess::Read}, {"post.motion.history", RenderGraphAccess::ReadWrite} },
+            [this](RenderContext* renderContext) {
         PostProcessRenderer_graphicsPipeline.shader = MotionBlurShader.get();
         nowTarget_ = useFramebufferA ? motionTargetA_.get() : motionTargetB_.get();
         if (firstRender) {
@@ -256,7 +262,9 @@ void PostProcessRenderer::render(RenderGraph& rg, FrameBufferInfo* sceneFBO, int
     //Cartoon effect
     if (effectNo == 4) {
         const char* CartoonPassName = "CartoonPass";
-        rg.addPass(CartoonPassName, bloomTexture, [this](RenderContext* renderContext) {
+        rg.addPass(CartoonPassName, bloomTexture,
+            { {"post.bloom", RenderGraphAccess::Read}, {"post.cartoon", RenderGraphAccess::Write} },
+            [this](RenderContext* renderContext) {
         PostProcessRenderer_graphicsPipeline.shader = CartoonShader.get();
         renderContext->beginRendering(cartoonTarget_->framebuffer());
         glViewport(0, 0, cartoonTarget_->width(), cartoonTarget_->height());
@@ -275,7 +283,9 @@ void PostProcessRenderer::render(RenderGraph& rg, FrameBufferInfo* sceneFBO, int
     //Ripple effect
     if (effectNo == 5) {
         const char* RipplePassName = "RipplePass";
-        rg.addPass(RipplePassName, bloomTexture, [this](RenderContext* renderContext) {
+        rg.addPass(RipplePassName, bloomTexture,
+            { {"post.bloom", RenderGraphAccess::Read}, {"post.ripple", RenderGraphAccess::Write} },
+            [this](RenderContext* renderContext) {
         //Radial Blur
         PostProcessRenderer_graphicsPipeline.shader = RippleShader.get();
         renderContext->beginRendering(rippleTarget_->framebuffer());

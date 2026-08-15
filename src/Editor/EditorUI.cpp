@@ -78,6 +78,15 @@ void EditorUI::draw(Renderer& renderer, Scene& scene, AssetManager& assetManager
             if (ImGui::Button("Reload Shaders", ImVec2(160, 26))) assetManager.getShaderLibrary().requestReload();
         }
 
+        if (ImGui::CollapsingHeader("RenderGraph")) {
+            const RenderGraph::Stats& stats = renderer.getLastRenderGraphStats();
+            ImGui::Text("Passes: %llu", static_cast<unsigned long long>(stats.passCount));
+            ImGui::Text("Dependency Edges: %llu", static_cast<unsigned long long>(stats.dependencyEdgeCount));
+            ImGui::Text("Reordered / Cycles: %llu / %llu",
+                static_cast<unsigned long long>(stats.reorderedPassCount),
+                static_cast<unsigned long long>(stats.cycleCount));
+        }
+
         const auto pushActionButtonStyle = []() {
             ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(1.0f, 0.4f, 0.0f, 1.0f));
             ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.4f, 0.15f, 0.15f, 1.0f));

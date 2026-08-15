@@ -50,6 +50,42 @@
 - 当前 GLFW / Assimp 仍使用仓库内预编译 Windows 库；后续可迁移到 vcpkg/Conan 或统一的 `third_party` 目录。
 - Release 编译仍存在旧的 `MathUtil.cpp` 除零风险警告，和本次 UI/CMake 改造无关，应单独修复。
 
+## 未提交 - 引入 RenderGraph 资源依赖与稳定拓扑排序
+
+- 改动类型：渲染架构 / RenderGraph / 诊断 / 稳定性
+- 建议提交标题：`feat: 引入 RenderGraph 资源依赖与稳定拓扑排序`
+
+### 改动摘要
+
+RenderGraph 2.0 阶段完成第一步：Pass 通过资源访问声明描述读写关系，Graph 在执行前构建依赖边并进行稳定拓扑排序，同时收集依赖和循环诊断统计。
+
+### 具体改动
+
+- 新增 `RenderGraphAccess` 和 `RenderGraphResourceAccess`。
+- 保留旧版 `addPass(name, parameter, lambda)`，新增带资源声明的重载，支持渐进迁移。
+- 使用写后读、读后写、写后写规则建立依赖边，最小提交下标优先保证无依赖 Pass 的稳定顺序。
+- MeshRenderer 声明 `shadow.depth -> scene.color`，PostProcessRenderer 声明 `scene.color -> post.bloom -> post.*`。
+- 增加 `RenderGraph::Stats`，并在 EditorUI 中显示 Pass、依赖边、重排和循环数量。
+- 循环依赖时输出明确错误，并回退到原提交顺序。
+- 将 MathUtil 的旧 `0 / 0` NaN 检测改为 `std::isnan`，消除 Release 编译除零警告。
+
+### 架构影响
+
+Renderer 仍然每帧创建临时 RenderGraph，但执行顺序已经由逻辑资源关系决定。下一阶段可以在不修改各个 Pass lambda 的情况下增加 RenderTarget 生命周期、复用和资源别名。
+
+### 验证情况
+
+- Debug `example` 构建通过。
+- Release `example` 构建通过。
+- MathUtil 除零警告已消失。
+- RenderGraph 依赖声明和 EditorUI 统计面板编译通过。
+- 保留旧 Assimp DLL 自动部署逻辑，未修改用户的 `build_project.bat`。
+
+### 后续注意
+
+- 当前资源 key 仍是逻辑字符串，下一步需要引入真正的 RenderGraph resource handle 和 RenderTarget Pool。
+- 当前所有 Pass 仍在同一个 OpenGL 渲染线程执行，尚未引入异步或跨队列调度。
+
 ## 未提交 - 外置 Shader 并引入 Technique、Variant 与热重载
 
 - 改动类型：渲染架构 / Shader 系统 / 开发工具 / 诊断

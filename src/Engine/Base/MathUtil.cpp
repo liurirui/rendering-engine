@@ -1,6 +1,7 @@
 #include "Base.h"
 #include "MathUtil.h"
 #include <math.h>
+#include <cmath>
 #include <stdlib.h>
 
 
@@ -84,13 +85,9 @@ float MathUtil::cosDeg(float degrees) {
 }
 
 /* Need to pass 0 as an argument, so VC++ doesn't error with C2124 */
-static bool __isNan(float value, float zero) {
-	float _nan = (float) 0.0 / zero;
-	return 0 == memcmp((void *) &value, (void *) &_nan, sizeof(value));
-}
-
 bool MathUtil::isNan(float v) {
-	return __isNan(v, 0);
+	// 直接使用标准库，避免旧实现通过 0/0 生成 NaN 触发编译器除零警告。
+	return std::isnan(v);
 }
 
 float MathUtil::random() {

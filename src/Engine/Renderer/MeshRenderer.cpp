@@ -200,7 +200,9 @@ void MeshRenderer::addShadowPass(Scene& scene, const std::shared_ptr<RenderQueue
         return;
     }
 
-    rg.addPass("shadowPass", renderQueue.get(), [this, &scene, renderQueue](RenderContext* renderContext) {
+    rg.addPass("shadowPass", renderQueue.get(),
+        { {"shadow.depth", RenderGraphAccess::Write} },
+        [this, &scene, renderQueue](RenderContext* renderContext) {
         DirectionLight* light = scene.GetMainDirectionalLight();
         Shadow* shadow = light->getShadow();
         GLint previousViewport[4];
@@ -267,7 +269,9 @@ void MeshRenderer::render(Scene& scene, Camera* camera, RenderGraph& rg) {
     lastRenderStats_ = renderQueue->stats;
     addShadowPass(scene, renderQueue, rg);
 
-    rg.addPass("scenePass", renderQueue.get(), [this, &scene, camera, renderQueue](RenderContext* renderContext) {
+    rg.addPass("scenePass", renderQueue.get(),
+        { {"shadow.depth", RenderGraphAccess::Read}, {"scene.color", RenderGraphAccess::Write} },
+        [this, &scene, camera, renderQueue](RenderContext* renderContext) {
         DirectionLight* mainLight = scene.GetMainDirectionalLight();
 
         depthStencilState.depthTest = true;

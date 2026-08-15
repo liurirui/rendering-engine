@@ -293,3 +293,21 @@ example
 - 为当前平铺式 GLFW 头文件增加 `<GLFW/glfw3.h>` 兼容转发头，以匹配官方 backend 的标准 include 方式。
 
 这样调整的原因是隔离运行时引擎和开发期工具：未来可以构建不带 ImGui 的纯 Runtime，同时编辑器面板不会继续侵入 `Example/main.cpp`。
+
+## 17. RenderGraph 2.0 阶段
+
+RenderGraph 不再只是按提交顺序执行的 lambda 容器。每个 Pass 可以声明对逻辑资源的 `Read`、`Write` 或 `ReadWrite` 访问，Graph 在执行前根据写后读、读后写和写后写关系生成依赖边，并使用稳定拓扑排序得到执行顺序。
+
+```text
+Pass A --write--> scene.color --read--> Pass B
+Pass C --write--> shadow.depth --read--> scenePass
+```
+
+- `RenderGraphResourceAccess` 描述资源名、可选身份指针和访问类型。
+- 没有资源声明的旧 `addPass` 接口仍保留，保证旧调用代码可以渐进迁移。
+- `RenderGraph::Stats` 记录 Pass 数量、依赖边数量、重排数量和循环依赖数量。
+- MeshRenderer 已声明 Shadow -> Scene 依赖；PostProcessRenderer 已声明 Scene -> Bloom -> Radial/Motion/Cartoon/Ripple 依赖。
+- 检测到循环依赖时输出错误并回退到提交顺序，避免无声地跳过 Pass。
+- EditorUI 的 RenderGraph 面板可查看当前帧的 Pass、依赖边、重排和循环统计。
+
+这样做的价值是把“执行顺序”从调用者手写顺序提升为资源依赖结果，为后续 RenderTarget Pool、资源别名、Pass 合并和异步计算留出统一入口。
