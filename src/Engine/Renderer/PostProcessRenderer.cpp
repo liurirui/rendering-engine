@@ -127,8 +127,14 @@ void PostProcessRenderer::render(RenderGraph& rg, FrameBufferInfo* sceneFBO, int
     ////Bloom
     const char* bloomPassName = "bloomPass";
     rg.addPass(bloomPassName, sceneFBO,
-        { {"scene.color", RenderGraphAccess::Read}, {"post.bloom", RenderGraphAccess::Write} },
+        { {"scene.color", RenderGraphAccess::Read}, {"scene.bloom", RenderGraphAccess::Read},
+          {"post.bloom", RenderGraphAccess::Write} },
         [this, sceneFBO](RenderContext* renderContext) {
+        if (!sceneFBO || sceneFBO->colorAttachments.size() < 2 ||
+            !sceneFBO->colorAttachments[1].texture) {
+            Logger::Error("Bloom pass skipped: scene bloom mask attachment is missing.");
+            return;
+        }
         //get high light
         PostProcessRenderer_graphicsPipeline.shader = HightLightShader.get();
         renderContext->beginRendering(highLightTarget_->framebuffer());
@@ -136,8 +142,8 @@ void PostProcessRenderer::render(RenderGraph& rg, FrameBufferInfo* sceneFBO, int
         renderContext->setDepthStencilState(PostProcessRenderer_depthStencilState);
         renderContext->bindPipeline(PostProcessRenderer_graphicsPipeline);
         HightLightShader.get()->use();
-        HightLightShader.get()->setInt("scene", 0);
-        renderContext->bindTexture(sceneFBO->colorAttachments[0].texture->id, 0);
+        HightLightShader.get()->setInt("sceneBloomMask", 0);
+        renderContext->bindTexture(sceneFBO->colorAttachments[1].texture->id, 0);
         renderContext->bindVertexArray(quadVAO);
         renderContext->drawArrays(0, 6);
         renderContext->endRendering();

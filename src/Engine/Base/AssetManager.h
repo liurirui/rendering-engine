@@ -45,8 +45,8 @@ private:
     RenderContext& renderContext_;
     std::string rootPath_;
     ShaderLibrary shaderLibrary_;
-    // 缓存 key 必须使用 resolvePath() 产生的规范路径，避免相对路径和绝对路径
-    // 指向同一个文件时各自创建一份资源。
+    // 缓存 key 当前使用 resolvePath() 生成的统一根路径；该路径尚未完成
+    // canonical 和大小写归一化，不能保证所有等价路径都合并为同一个资源。
     std::unordered_map<std::string, std::shared_ptr<Texture2D>> textureCache_;
     std::unordered_map<std::string, std::shared_ptr<ModelAsset>> modelCache_;
     // MeshResource 的生命周期由缓存和 Mesh 实例共同持有，多个实例共享 GPU buffer。

@@ -28,6 +28,8 @@ public:
     void addShadowPass(Scene& scene, const std::shared_ptr<RenderQueue>& renderQueue, RenderGraph& rg);
     void resize(int width, int height);
     void setFloorTexture(const std::shared_ptr<Texture2D>& texture);
+    // 设置场景 HDR 颜色附件的清屏颜色；最终画面由该附件经过 Tone Mapping 输出。
+    void setSceneClearColor(const glm::vec4& color);
     unsigned int getTargetColorTextureID(int  attachment);
     FrameBufferInfo* getTargetFrameBuffer();
     const RenderStats& getRenderStats() const { return lastRenderStats_; }

@@ -84,7 +84,6 @@ float MathUtil::cosDeg(float degrees) {
 	return (float)::cos(degrees * MathUtil::Deg_Rad);
 }
 
-/* Need to pass 0 as an argument, so VC++ doesn't error with C2124 */
 bool MathUtil::isNan(float v) {
 	// 直接使用标准库，避免旧实现通过 0/0 生成 NaN 触发编译器除零警告。
 	return std::isnan(v);

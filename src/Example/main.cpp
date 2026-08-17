@@ -56,7 +56,7 @@ float lastFrame = 0.0f;
 glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
 
 
-//Controls whether the cursor is visible
+// 应用输入层维护相机鼠标捕获状态；按住 Alt 时显示鼠标光标。
 static bool isCursorVisible = false;
 
 //int main(int argc, char* argv[])
@@ -68,7 +68,7 @@ struct WindowRenderState {
     Renderer* renderer = nullptr;
 };
 
-float quadVertices[] = { // vertex attributes for a quad that fills the entire screen in Normalized Device Coordinates. NOTE that this plane is now much smaller and at the top of the screen
+float quadVertices[] = { // 全屏 NDC 四边形：位置和 UV 交错排列，用于最终屏幕合成。
         // positions   // texCoords
         -1.0f,  -1.0f,  0.0f, 0.0f,
         1.0f,  -1.0f,  1.0f, 0.0f,
@@ -146,7 +146,7 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
         return 1;
     }
 
-    // Decide GL+GLSL versions
+    // 选择当前平台的 OpenGL Context 和 GLSL 版本。
 #if defined(IMGUI_IMPL_OPENGL_ES2)
     // GL ES 2.0 + GLSL 100
     const char* glsl_version = "#version 100";
@@ -161,12 +161,12 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);  // 3.2+ only
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);            // Required on Mac
 #else
-    // GL 3.0 + GLSL 130
+    // 旧版 OpenGL 3.0 / GLSL 130 配置已停用，仅保留注释供后续跨平台扩展参考。
     //const char* glsl_version = "#version 130";
     //glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     //glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
     
-     // GL 3.3 + GLSL 330
+     // 当前 Windows 路径创建 OpenGL 4.2 Core Context，Shader 使用 GLSL 330。
       const char* glsl_version = "#version 330";
      glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
      glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
@@ -287,11 +287,8 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
     {
         
         /////
-        // Poll and handle events (inputs, window resize, etc.)
-        // You can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to tell if dear imgui wants to use your inputs.
-        // - When io.WantCaptureMouse is true, do not dispatch mouse input data to your main application, or clear/overwrite your copy of the mouse data.
-        // - When io.WantCaptureKeyboard is true, do not dispatch keyboard input data to your main application, or clear/overwrite your copy of the keyboard data.
-        // Generally you may always pass all inputs to dear imgui, and hide them from your application based on those two flags.
+        // 轮询 GLFW 事件并处理窗口尺寸与相机输入。
+        // EditorUI 在自己的模块中处理 ImGui Frame；应用层这里只轮询 GLFW 事件并处理相机输入。
         glfwPollEvents();
         if (glfwGetWindowAttrib(window, GLFW_ICONIFIED) != 0)
         {
@@ -315,6 +312,8 @@ int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPS
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
         renderer->getPostProcessRenderer().time = lastFrame;
+        // 场景最终显示的是 HDR Scene Target，而不是默认 framebuffer；因此清屏颜色必须同步到 Renderer。
+        renderer->getMeshRenderer().setSceneClearColor(clearColor);
         // input
         // -----
         processInput(window);
@@ -385,7 +384,7 @@ void processInput(GLFWwindow *window)
     if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
         camera.ProcessKeyboard(DOWN, deltaTime);
 
-    // EditorUI owns mouse capture state; Alt toggles the camera cursor.
+    // 应用输入层负责鼠标捕获；按住 Alt 时显示光标，松开后恢复相机控制。
     {
         if (glfwGetKey(window, GLFW_KEY_LEFT_ALT) == GLFW_PRESS) {
             if (!isCursorVisible)    //Press "Alt" when the cursor is not visible

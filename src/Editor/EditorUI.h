@@ -10,7 +10,8 @@ class AssetManager;
 class Renderer;
 class Scene;
 
-// 编辑器 UI 只负责采集和展示开发期控制项，不参与 Engine 的资源或渲染生命周期。
+// 编辑器 UI 负责开发期控制和操作，但不拥有 Engine 资源或渲染对象的生命周期；
+// 资源和渲染对象仍由 AssetManager、Scene 和 Renderer 管理。
 class EditorUI {
 public:
     bool initialize(GLFWwindow* window, const char* glslVersion);

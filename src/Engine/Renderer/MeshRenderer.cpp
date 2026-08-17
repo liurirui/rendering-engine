@@ -18,6 +18,9 @@
 
 NAMESPACE_START
 
+// 灯光模型的 Bloom 强度是独立的艺术参数，可按场景手动调节；不参与真实光照。
+constexpr float kLightDebugBloomIntensity = 8.0f;
+
 
 static Shader& resolveMaterialShader(AssetManager& assetManager, const RenderItem& item, const std::shared_ptr<Shader>& fallbackShader) {
     // 材质只保存 ShaderHandle；实际 program 从 ShaderLibrary 查找，找不到时回退默认 lit。
@@ -79,6 +82,8 @@ static void setupLitShaderCommon(Shader& shader, Scene& scene, Camera* camera, D
     shader.setInt("pointLightCount", pointLightCount);
 }
 
+// Bloom 采用显式 Mask 后不再经过亮度阈值，但显示器对 RGB 通道的感知亮度仍不同。
+// 对彩色灯只补偿 Mask 强度，不改变点光源实际参与 PBR 的 intensity。
 static void renderItemsWithMaterials(RenderContext* renderContext, AssetManager& assetManager, Scene& scene, Camera* camera, DirectionLight* mainLight, const glm::mat4& projection, GraphicsPipeline basePipeline, const std::shared_ptr<Shader>& fallbackShader, const IBLSystem* iblSystem, const std::vector<RenderItem>& items) {
     // RenderQueue 已按 Shader/Material/Mesh 排序，同一 Shader 连续绘制时可复用 pass 公共状态。
     Shader* boundShader = nullptr;
@@ -139,10 +144,17 @@ MeshRenderer::MeshRenderer(RenderContext& renderContext, AssetManager& assetMana
     sceneColor.format = TextureFormat::RGBA32F;
     sceneColor.clearColor = glm::vec4(0.1f, 0.05f, 0.15f, 1.0f);
     sceneTargetDesc.colors.emplace_back(sceneColor);
+    // 独立的 HDR 泛光遮罩：只由材质自发光和灯光可视化几何体写入，
+    // 避免从最终光照颜色推断泛光而导致红/蓝光源被亮度权重误过滤。
+    RenderTargetColorDesc bloomMask;
+    bloomMask.format = TextureFormat::RGBA32F;
+    bloomMask.clearColor = glm::vec4(0.0f);
+    sceneTargetDesc.colors.emplace_back(bloomMask);
     sceneTargetDesc.depth.enabled = true;
     sceneTargetDesc.depth.format = TextureFormat::Depth24_Stencil8;
     sceneTargetDesc.depth.sampler = depthSampler;
     sceneTarget_.reset(new RenderTarget(renderContext_, sceneTargetDesc));
+    Logger::Info("Scene HDR target configured. colorAttachment=0, bloomMaskAttachment=1");
     graphicsPipeline.shader = defaultLitShader.get();
     PipelineColorBlendAttachment pipelineColorBlendAttachment;
     pipelineColorBlendAttachment.blendState.enabled = true;
@@ -183,6 +195,14 @@ void MeshRenderer::setFloorTexture(const std::shared_ptr<Texture2D>& texture) {
         floorMaterial_->material.name = floorMaterial_->name;
     }
     floorMaterial_->material.setDiffuseMap(texture);
+}
+
+void MeshRenderer::setSceneClearColor(const glm::vec4& color) {
+    if (!sceneTarget_ || sceneTarget_->framebuffer().colorAttachments.empty()) {
+        return;
+    }
+    // RenderTarget 在 beginRendering 时使用 attachment.clearColor 调用 glClearBufferfv。
+    sceneTarget_->framebuffer().colorAttachments[0].clearColor = color;
 }
 
 void MeshRenderer::resize(int width, int height) {
@@ -270,7 +290,8 @@ void MeshRenderer::render(Scene& scene, Camera* camera, RenderGraph& rg) {
     addShadowPass(scene, renderQueue, rg);
 
     rg.addPass("scenePass", renderQueue.get(),
-        { {"shadow.depth", RenderGraphAccess::Read}, {"scene.color", RenderGraphAccess::Write} },
+        { {"shadow.depth", RenderGraphAccess::Read}, {"scene.color", RenderGraphAccess::Write},
+          {"scene.bloom", RenderGraphAccess::Write} },
         [this, &scene, camera, renderQueue](RenderContext* renderContext) {
         DirectionLight* mainLight = scene.GetMainDirectionalLight();
 
@@ -316,6 +337,8 @@ void MeshRenderer::render(Scene& scene, Camera* camera, RenderGraph& rg) {
             lightDebugShader->setMat4("model", light_model);
             lightDebugShader->setVec3("lightColor", mainLight->getColor());
             lightDebugShader->setFloat("lightVisualIntensity", 4.0f);
+            // 这是可独立调节的手动参数，不参与真实方向光照计算。
+            lightDebugShader->setFloat("lightBloomIntensity", kLightDebugBloomIntensity);
             renderContext->bindVertexArray(cubeVAO);
             renderContext->drawArrays(0, 36);
         }
@@ -332,6 +355,8 @@ void MeshRenderer::render(Scene& scene, Camera* camera, RenderGraph& rg) {
                 lightDebugShader->setMat4("model", light_model);
                 lightDebugShader->setVec3("lightColor", pointLight->getColor());
                 lightDebugShader->setFloat("lightVisualIntensity", 4.0f);
+                // 彩色灯使用单独的 Bloom 强度，避免通过提高 PointLight intensity 影响周围物体。
+                lightDebugShader->setFloat("lightBloomIntensity", kLightDebugBloomIntensity);
                 renderContext->bindVertexArray(cubeVAO);
                 renderContext->drawArrays(0, 36);
             }

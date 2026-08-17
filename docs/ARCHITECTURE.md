@@ -67,7 +67,7 @@ Application Loop
   -> ImGui -> swap buffers
 ```
 
-当前 `RenderGraph` 是轻量顺序 pass 列表，能够把 pass 组织从应用层移走，但尚未分析资源依赖、自动排序、做 transient aliasing 或 barrier 管理。每帧执行前，`RenderQueueBuilder` 从 Scene 收集渲染数据，生成不依赖场景树结构的 `RenderItem` 快照；各 pass 只消费对应队列。
+当前 `RenderGraph` 是轻量的 Pass 依赖图：Pass 可以声明资源读写，执行前会分析写后读、读后写和写后写关系并进行稳定拓扑排序。它尚未实现 transient aliasing、RenderTarget Pool 或 GPU barrier 管理。每帧执行前，`RenderQueueBuilder` 从 Scene 收集渲染数据，生成不依赖场景树结构的 `RenderItem` 快照；各 pass 只消费对应队列。
 
 ```text
 Scene / GameObject

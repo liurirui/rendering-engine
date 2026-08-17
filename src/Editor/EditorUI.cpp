@@ -52,7 +52,7 @@ void EditorUI::draw(Renderer& renderer, Scene& scene, AssetManager& assetManager
         ImGui::Checkbox("ImGui Demo", &showDemoWindow_);
         ImGui::Checkbox("Auxiliary Window", &showAuxiliaryWindow_);
 
-        ImGui::ColorEdit3("Window Clear Color", &clearColor.x);
+        ImGui::ColorEdit3("Scene Clear Color", &clearColor.x);
         ImGui::SliderFloat("Exposure", &exposure, 0.1f, 5.0f, "%.2f");
 
         if (ImGui::CollapsingHeader("Render Statistics")) {
